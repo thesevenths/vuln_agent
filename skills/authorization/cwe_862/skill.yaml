@@ -1,0 +1,20 @@
+# CWE-862 Skill 元数据
+# 从 templates/cwe/cwe_862.json 迁移
+
+skill_id: cwe_862_missing_authorization
+source_cwe: CWE-862
+priority: P0
+
+related_cwes:
+  - cwe: CWE-285
+    reason: improper_authorization_general - CWE-862 是授权完全缺失的特殊情况
+  - cwe: CWE-284
+    reason: improper_access_control - 访问控制机制存在但覆盖不完整
+  - cwe: CWE-639
+    reason: idor - 水平越权是 CWE-862 最常见的利用方式
+  - cwe: CWE-306
+    reason: missing_auth_for_critical_function - 缺少认证使授权检查无从谈起
+  - cwe: CWE-863
+    reason: incorrect_authorization - 授权不当与授权缺失常共现：部分路径有授权但不正确，部分路径完全无授权
+
+description: 所有涉及数据读写、状态变更或资源访问的端点是 CWE-862 的攻击面

@@ -1,0 +1,10 @@
+# CWE-89 Skill 元数据
+# 从 templates/cwe/cwe_89.json 迁移
+
+skill_id: cwe_89_sql_injection
+source_cwe: CWE-89
+priority: P0
+
+related_cwes:
+  - CWE-564
+  - CWE-20

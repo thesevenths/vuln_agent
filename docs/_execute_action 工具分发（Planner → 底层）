@@ -1,0 +1,44 @@
+flowchart TB
+    EA["_execute_action"]
+
+    EA --> GATE{"logic_only?"}
+    GATE -->|污点 scan / 污点 Skill| DENY["blocked: logic_only_mode"]
+    GATE -->|否或 logic 类 tool| HUB{tool_name}
+
+    HUB --> SK[Skill.run]
+    HUB --> CTX[set_context]
+    HUB --> CPG[JoernTool.ensure_cpg]
+    HUB --> TQ["run_taint_queries ⚠️"]
+    HUB --> TS["run_targeted_scan ⚠️"]
+    HUB --> SS["run_source_scan ⚠️"]
+    HUB --> LS[run_logic_scan]
+    HUB --> EX[expand_flow_context]
+    HUB --> FR[FileTool]
+    HUB --> JA[JavaAuditTool]
+    HUB --> RV[run_reachability]
+
+    SS --> G1[graph.run_source_scan]
+    LS --> G2[graph.run_logic_scan]
+    EX --> G3[graph.expand_flow_context]
+    G1 & G2 & G3 --> JVS[JoernVulnScannerHTTP]
+
+    subgraph fr_detail [FileTool.read_file 路径门控]
+        FR --> R1["_get_file_index → _live_file_index"]
+        R1 --> R2["_resolve_planner_read_path<br/>resolve_l2_path only"]
+        R2 --> R3{"命中?"}
+        R3 -->|否 非 glob| R4["path_not_in_index"]
+        R3 -->|是| R5["resolve_allowed_path 读盘"]
+        R5 --> R6{"文件存在?"}
+        R6 -->|否| R7["磁盘不存在或未授权"]
+        R6 -->|是| R8[返回行段内容]
+    end
+
+    subgraph ls_incr [run_logic_scan 增量参数]
+        LS --> I1["incremental_query_names"]
+        LS --> I2["cached_query_results"]
+        LS --> I3["cached_findings → last_logic_findings"]
+    end
+
+    style TQ fill:#ffe6e6
+    style TS fill:#ffe6e6
+    style SS fill:#ffe6e6

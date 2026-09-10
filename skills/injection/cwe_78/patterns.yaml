@@ -1,0 +1,48 @@
+# CWE-78 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(Runtime\.exec|ProcessBuilder|exec|system|popen|shell_exec|spawn)/i]'
+  - 'Call[name=~/(Runtime\.getRuntime|getRuntime|Process)/i]'
+
+semantic_keywords:
+  - exec
+  - system
+  - command
+  - shell
+  - process
+  - cmd
+  - ping
+  - traceroute
+  - nslookup
+  - whois
+  - dig
+
+file_context:
+  - controller
+  - util
+  - network_tool
+  - admin_handler
+  - system_tool
+
+logic_query_keywords_generic:
+  dangerous_calls:
+    - os.system
+    - subprocess.call
+    - subprocess.Popen
+    - exec
+    - eval
+    - shell_exec
+  user_input_concat:
+    - '"ping " +'
+    - '"nslookup " +'
+    - '"whois " +'
+  safe_patterns:
+    - subprocess.run with list args
+    - shlex.quote
+    - shell=False
+
+sanitizers:
+  - '用户输入通过白名单正则校验（如 IP 格式: ^[\d.]+$ 或主机名格式）'
+  - '使用 ProcessBuilder 参数数组传递（List<String>），无字符串拼接'
+  - 使用 Java API 替代系统命令（InetAddress.isReachable 代替 ping）
+  - 命令为固定值，不含任何动态部分

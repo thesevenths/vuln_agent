@@ -1,0 +1,13 @@
+# CWE-200 Skill 元数据
+# 从 templates/cwe/cwe_200.json 迁移
+
+skill_id: cwe_200_sensitive_info_exposure
+source_cwe: CWE-200
+priority: P1
+
+related_cwes:
+  - CWE-532
+  - CWE-209
+  - CWE-359
+  - CWE-668
+  - CWE-919

@@ -1,0 +1,24 @@
+# CWE-841 Skill 元数据
+# 从 templates/cwe/cwe_841.json 迁移
+
+skill_id: cwe_841_workflow_bypass
+source_cwe: CWE-841
+priority: P0
+
+related_cwes:
+  - cwe: CWE-863
+    reason: incorrect_authorization - 工作流绕过常与授权检查不完整共存：跳过的步骤本身可能含授权逻辑
+  - cwe: CWE-862
+    reason: missing_authorization - 工作流步骤缺少鉴权使攻击者可独立调用任何步骤
+  - cwe: CWE-306
+    reason: missing_auth_for_critical_function - 终态操作（支付确认、发货）可能完全无认证保护
+  - cwe: CWE-639
+    reason: idor - 工作流中通过篡改 orderId/userId 可跳到他人订单的终态操作
+  - cwe: CWE-840
+    reason: business_logic_error - 工作流绕过是业务逻辑错误的子类型：违反流程不变量
+  - cwe: CWE-362
+    reason: race_condition - 并发请求可使工作流步骤竞态执行，跳过中间状态验证
+  - cwe: CWE-472
+    reason: external_control_of_state - 客户端可控的状态参数（step/status/hidden_field）使攻击者可操纵工作流
+
+description: 多步骤业务流程的端点是 CWE-841 的核心攻击面，必须验证每个步骤的前置条件

@@ -1,0 +1,64 @@
+# Python 端点枚举规则
+# 用于发现所有 HTTP 可达入口
+
+# Django URL 路由
+django:
+  url_patterns:
+    - "path()"
+    - "re_path()"
+    - "url()"  # 旧版
+  router_patterns:
+    - "DefaultRouter"
+    - "SimpleRouter"
+    - "@action"
+  config_files:
+    - "**/urls.py"
+  view_patterns:
+    - "class-based views (View, GenericView)"
+    - "function-based views"
+    - "@api_view"
+    - "ViewSet"
+
+# Flask 路由
+flask:
+  decorators:
+    - "@app.route"
+    - "@blueprint.route"
+    - "@router.get"
+    - "@router.post"
+    - "@router.put"
+    - "@router.delete"
+    - "@router.patch"
+  config_files:
+    - "**/app.py"
+    - "**/routes.py"
+    - "**/views.py"
+
+# FastAPI 路由
+fastapi:
+  decorators:
+    - "@app.get"
+    - "@app.post"
+    - "@app.put"
+    - "@app.delete"
+    - "@app.patch"
+    - "@router.get"
+    - "@router.post"
+    - "@router.put"
+    - "@router.delete"
+    - "@router.patch"
+  include_router:
+    - "app.include_router"
+  config_files:
+    - "**/main.py"
+    - "**/routers/*.py"
+    - "**/api/*.py"
+
+# 端点属性提取
+endpoint_attributes:
+  http_method: "GET/POST/PUT/DELETE/PATCH"
+  path: "URL 路径"
+  auth_decorators: "装饰器列表"
+  parameters: "函数参数签名"
+  view_class: "视图类名"
+  view_function: "视图函数名"

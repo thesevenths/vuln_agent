@@ -1,0 +1,39 @@
+# CWE-367 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【定位 Check 点】识别「使用敏感资源前」的条件检查：文件 exists、余额充足、库存>0、权限有效等，记录检查所用变量/路径。'
+  - 'Step 2: 【定位 Use 点】识别检查通过后的变更操作：delete/write/transfer/decrement，确认二者在同一方法或同一请求处理链内。'
+  - 'Step 3: 【测量时间窗】Check 与 Use 之间是否存在：二次 I/O、远程调用、sleep、用户可控延迟、或另一请求可插入的间隙？有无锁/事务/原子操作覆盖该窗口？'
+  - 'Step 4: 【并发与替换场景】评估：双请求并发扣款、上传后删除前符号链接替换、权限撤销与操作并发、库存超卖等典型业务竞态。'
+  - 'Step 5: 【与 SAST 区分】若仅有「参数流到 delete」而无独立 Check→Use 时序分析 → 不得仅凭污点流判 TOCTOU；须证明检查结论在使用前可能失效。'
+  - 'Step 6: 若 Check 与 Use 非原子且业务上可被并发/替换利用 → CWE-367；PoC 须描述并发步骤或 symlink 替换步骤。'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'if (Files.exists(path)) { Files.delete(path); } // path 来自用户，无锁'
+      vulnerability_analysis: 攻击者在 exists 检查后、delete 前将 path 替换为符号链接指向 /etc/passwd，经典文件 TOCTOU。SAST 仅见 path 到 delete，看不到竞态窗口。
+      fix_pattern: Files.deleteIfExists(path) 或使用原子 move + 固定临时目录；对敏感路径使用 java.nio.file 原子 API 并校验 realpath。
+    - code_snippet: 'if (account.getBalance() >= amount) { account.setBalance(balance - amount); accountRepo.save(account); }'
+      vulnerability_analysis: 余额检查与扣减非事务/非行锁，两笔并发提现均可通过检查导致透支。属于业务层 TOCTOU，非 SQL 注入。
+      fix_pattern: '@Transactional + SELECT balance FROM account WHERE id=? FOR UPDATE；或使用乐观锁 @Version。'
+  mitigation_rules:
+    - '将 Check+Use 合并为单一原子操作（deleteIfExists、CAS、数据库单行 UPDATE ... WHERE balance>=?）'
+    - 敏感资源操作使用分布式锁或数据库行锁覆盖整个 Check→Use 区间
+    - 文件操作使用 O_NOFOLLOW、固定基目录 + canonical path 校验，避免检查后路径被替换
+    - PoC 必须体现「两次请求」或「检查与使用之间状态变化」，不能只有单次 curl
+
+differentiation_from_sast:
+  - 传统 SAST 污点流只能证明「某时刻参数到达 sink」，无法建模「检查时刻」与「使用时刻」之间的时间窗。
+  - 本模板要求重建 TOCTOU 双阶段：Check(存在性/权限/余额) → Gap(无锁/无事务) → Use(删除/扣款/写文件)。
+  - 必须评估并发请求、符号链接替换、状态被另一线程修改等业务时序，而非单线程数据流。
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-367
+  check_point: string (检查点描述与代码位置)
+  use_point: string (使用/变更点)
+  race_window: string (时间窗如何被利用)
+  concurrency_poc: string (并发或替换复现步骤，必填若 confirmed)
+  missing_synchronization: 'enum[''no_lock'', ''no_transaction'', ''path_reparse'', ''read_modify_write_race'']'
+  remediation: string

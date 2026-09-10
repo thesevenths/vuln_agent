@@ -1,0 +1,74 @@
+# PoC 生成方法论
+# 每个 confirmed=true 的 finding 必须附带可验证的 PoC
+
+poc_generation:
+  philosophy: >
+    没有 PoC 的漏洞报告等于威胁描述，不等于漏洞发现。
+    PoC 的目标是让接收者（人工审计/开发团队）能在本地环境中复现漏洞，
+    从而确认其真实性和影响范围。
+
+  hard_rules:
+    confirmed_requires_poc: >
+      判为 confirmed=true 时必须给出可验证 PoC（写入 exploit_poc 字段），
+      禁止留空或仅威胁描述。
+      严禁「本报告不提供 exploit」「漏洞利用：无（但说明可利用性）」等表述。
+
+    no_fabricated_credentials: >
+      密码/密钥/JWT secret 必须来自 prompt 中「源码敏感字面量」或方法源码中的
+      static final String / Joern HARDCODED_CRED value=，
+      禁止猜测 password、webgoat 等占位值。
+
+  poc_by_vuln_category:
+    logic_vulnerability:
+      description: "逻辑漏洞（授权/鉴权/业务逻辑）PoC 要求"
+      required_fields:
+        - field: "http_entry"
+          description: "HTTP 方法 + 路径 + 动词（如 GET /access-control/users）"
+          source: "[文件:行号]"
+        - field: "prerequisite"
+          description: "前置条件：未登录 / 低权限用户 / 需持有的 cookie 或 token"
+        - field: "malicious_request"
+          description: "完整 HTTP 请求（curl 或 Burp raw request）"
+        - field: "expected_response"
+          description: "预期响应（证明漏洞存在的响应特征）"
+      safe_boundary: "禁止破坏性 payload；仅改鉴权相关参数、资源 ID、业务状态字段"
+      note: "逻辑漏洞 PoC 可仅改 ID/参数/step，无需完整 exploit chain"
+
+    injection_vulnerability:
+      description: "注入类漏洞（SQLi/CMDi/SSRF/反序列化）PoC 要求"
+      required_fields:
+        - field: "entry_point"
+          description: "对外 API / 命令行 / 网络协议处理函数 [文件:行号]"
+        - field: "malicious_input"
+          description: "完整恶意输入（报文/命令/序列化数据）"
+        - field: "expected_behavior"
+          description: "预期触发行为（错误信息/命令执行/SSRF 回连）"
+
+    memory_vulnerability:
+      description: "内存类漏洞（UAF/double-free/overflow）PoC 要求"
+      required_fields:
+        - field: "trigger_input"
+          description: "触发输入：完整 DER/HTTP 报文十六进制 或 最小 C 调用代码"
+        - field: "crash_or_behavior"
+          description: "预期崩溃位置或异常行为"
+        - field: "build_config"
+          description: "编译配置（若影响可触发性）"
+
+  poc_format:
+    burp_style: "Burp Suite → Copy to file 原始请求包"
+    curl_style: "等价 curl -v 命令"
+    placeholder_rules:
+      - "须标注 {BASE_URL} 或实际 Host"
+      - "未实测时写明「静态草案，L3 待验证」"
+
+  output_fields:
+    affected_entry: "受影响的入口（HTTP 方法+路径或 RPC 入口）"
+    user_controllable_input: "攻击者可控的参数/ID/状态字段"
+    auth_requirement: "应有鉴权 vs 实际缺失点"
+    burp_raw_request: "完整原始请求（未 confirmed 可空）"
+    evidence_file_lines: "[{file, line, snippet}] — 代码证据"
+
+  applicable_to:
+    - "Joern flow 分析 confirmed=true 的 finding"
+    - "逻辑漏洞扫描 confirmed=true 的 finding"
+    - "SCA 可达性分析判定为可利用的 CVE"

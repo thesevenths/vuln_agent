@@ -1,0 +1,13 @@
+# CWE-384 Skill 元数据
+# 从 templates/cwe/cwe_384.json 迁移
+
+skill_id: cwe_384_session_fixation
+source_cwe: CWE-384
+priority: P1
+
+related_cwes:
+  - CWE-613
+  - CWE-287
+  - CWE-319
+  - CWE-522
+  - CWE-614

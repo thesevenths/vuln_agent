@@ -1,0 +1,10 @@
+# CWE-78 Skill 元数据
+# 从 templates/cwe/cwe_78.json 迁移
+
+skill_id: cwe_78_os_command_injection
+source_cwe: CWE-78
+priority: P0
+
+related_cwes:
+  - CWE-77
+  - CWE-88

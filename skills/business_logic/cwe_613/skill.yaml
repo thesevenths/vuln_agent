@@ -1,0 +1,24 @@
+# CWE-613 Skill 元数据
+# 从 templates/cwe/cwe_613.json 迁移
+
+skill_id: cwe_613_insufficient_session_expiration
+source_cwe: CWE-613
+priority: P1
+
+related_cwes:
+  - cwe: CWE-384
+    reason: session_fixation - 同属 session_management 控制项，会话固定后永不过期加剧危害
+  - cwe: CWE-287
+    reason: authentication_bypass - 会话不过期等价于认证可被无限重用
+  - cwe: CWE-306
+    reason: missing_auth - 永不过期的会话等于关键功能缺少时效性认证
+  - cwe: CWE-307
+    reason: excessive_attempts - 永不过期会话 + 无限重试 = 组合攻击放大
+  - cwe: CWE-614
+    reason: cookie_without_secure - 会话Cookie缺失Secure标志，会话ID可被中间人截获后长期利用
+  - cwe: CWE-522
+    reason: insufficient_credential_protection - 明文传输会话标识，截获后因不过期而长期有效
+  - cwe: CWE-488
+    reason: data_exposure - 已过期会话仍可访问未授权的敏感数据
+
+description: 执行敏感操作时应验证会话仍然有效，以下端点类型需额外检查会话时效

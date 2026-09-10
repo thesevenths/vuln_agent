@@ -1,0 +1,69 @@
+# 误报过滤方法论
+# 系统化反证流程，确保 confirmed=true 的 finding 经得起人工复核
+
+false_positive_filter:
+  philosophy: >
+    误报是漏洞扫描工具最大的信任杀手。
+    本方法论定义系统化的反证（refutation）流程：
+    对每个初判为"是"的 finding，主动寻找可能否定它的证据，
+    只有反证失败后才最终确认。
+
+  refutation_workflow:
+    step_1_identify_defense_mechanisms:
+      description: "查找可能阻止利用的安全机制"
+      check_items:
+        - "输入验证/过滤（sanitize/validate/whitelist）"
+        - "框架级防护（CSRF token、参数绑定、ORM 防 SQL 注入）"
+        - "安全配置（CORS、CSP、HSTS）"
+        - "认证/授权守卫（即使候选本身无保护，上游 Filter 可能拦截）"
+        - "运行时防护（WAF、RASP、ObjectInputFilter）"
+
+    step_2_evaluate_defense_effectiveness:
+      description: "评估防护是否真正有效"
+      rules:
+        - rule: "防护必须覆盖当前候选的具体路径"
+          example: "全局 Filter 可能不覆盖 WebSocket 端点"
+        - rule: "防护必须针对当前漏洞类型"
+          example: "SQL 注入防护不能阻止命令注入"
+        - rule: "配置型防护必须验证已生效"
+          example: "SecurityConfig 中 permitAll 的路径不受 auth Filter 保护"
+
+    step_3_refutation_verdict:
+      description: "反证判定结果"
+      values:
+        confirmed: "反证失败，漏洞真实存在"
+        likely_false_positive: "发现有效防护，大概率为误报"
+        needs_dynamic_test: "静态证据不足以判定，需 L3 动态验证"
+        inconclusive: "证据不足，无法确认也无法否定"
+
+  common_false_positive_patterns:
+    auth_related:
+      - "所有敏感端点都在认证保护下"
+      - "permitAll 仅覆盖静态资源和公开 API"
+      - "自定义 Filter 正确拦截了所有需认证路径"
+      - "使用了框架默认安全配置（默认全部需认证）"
+    injection_related:
+      - "已有边界检查或长度校验"
+      - "使用安全 API 替代（如 snprintf 替代 sprintf）"
+      - "输入已被上层过滤或限制"
+      - "配置了 ObjectInputFilter 白名单"
+    idor_related:
+      - "使用了框架级数据隔离机制（Hibernate @Filter, EF Core Global Query Filter）"
+      - "资源 ID 为不可猜测的 UUID 且服务端验证了签发合法性"
+      - "该资源在设计文档中明确定义为公开共享且经安全评审确认"
+      - "多租户场景下查询同时包含租户 ID 过滤"
+      - "批量导出/列表接口也包含所有权过滤"
+
+  verdict_gate_rules:
+    description: "终态判定硬性规则（来自 VERDICT_AND_POC_POLICY）"
+    rules:
+      - "终态只允许二选一：✅ 是 或 ❌ 否（禁止「部分是」「待确认」）"
+      - "confirmed=true 必须有可验证 PoC（禁止留空或仅威胁描述）"
+      - "证据不足时 confirmed=false，写明证据缺口与建议补查项"
+      - "反证阶段：初判 ✅ 是 但 PoC 节为空 → 改为 likely_false_positive"
+
+  applicable_to:
+    - "Joern flow 分析的终态判定"
+    - "逻辑漏洞 LLM 分析的 confirmation 阶段"
+    - "SCA 可达性分析的利用性判定"
+    - "反证 LLM 的复核流程"

@@ -1,0 +1,1222 @@
+# 语言特化 CWE 检测模式
+# 由迁移脚本从 templates/cwe/ 提取
+
+# CWE-269 语言特化检测模式
+
+# --- python route patterns ---
+cwe_269_route_patterns:
+  - '@app\.route.*/(role|admin|permission|user|account)'
+  - '@router\.(post|put|patch|delete).*/(role|admin|permission|user|account)'
+  - '@api_view.*\[.*(?:POST|PUT|PATCH|DELETE)'
+
+# --- java route patterns ---
+cwe_269_route_patterns:
+  - '@(Post|Put|Patch|Delete)Mapping.*/(role|admin|permission|user|account|privilege|authority)'
+  - '@RequestMapping.*/(role|admin|permission|user|account)'
+
+# --- python query keywords ---
+cwe_269_python_keywords:
+  django_privilege_ops:
+    - is_superuser
+    - is_staff
+    - is_admin
+    - user.is_superuser
+    - user.is_staff
+    - groups.add
+    - user_permissions.add
+    - User.objects.create_superuser
+    - User.objects.create_user
+    - Group.objects.create
+    - Permission.objects.create
+    - user.user_permissions.set
+    - user.groups.set
+  flask_privilege_ops:
+    - set_role
+    - grant_admin
+    - update_permissions
+    - change_role
+    - make_admin
+    - is_admin
+    - is_administrator
+    - add_role
+    - user.role
+    - user.is_admin
+    - UserRole
+    - current_user.role
+  fastapi_privilege_ops:
+    - set_role
+    - is_admin
+    - is_superuser
+    - role
+    - permissions
+    - grant_permission
+    - revoke_permission
+    - user.role
+    - UserRole
+    - update_role
+  tainted_params: '{''django'': ["request.POST.get(''role'')", "request.POST.get(''is_admin'')", "request.data.get(''is_superuser'')", ''is_staff.*=.*request'', ''is_superuser.*=.*request'', ''ModelForm'', ''UserCreationForm'', ''**request.POST''], ''flask'': ["request.form.get(''role'')", "request.json.get(''is_admin'')", "request.args.get(''privilege'')", "request.get_json().get(''role'')"], ''fastapi'': [''role.*:.*str'', ''is_admin.*:.*bool'', ''UserUpdate.*role'', ''UserCreate.*is_admin'']}'
+  default_privilege_patterns:
+    - 'is_staff.*=.*True'
+    - 'is_superuser.*=.*True'
+    - 'default_role.*=.*admin'
+    - 'role.*=.*''admin'''
+    - UserRole.ADMIN
+    - 'create_user.*role'
+  config_files:
+    - settings.py
+    - config.py
+    - app.py
+    - .env
+    - models.py
+
+# --- java query keywords ---
+cwe_269_java_keywords:
+  spring_privilege_ops:
+    - setRole
+    - grantRole
+    - revokeRole
+    - updateRole
+    - addRole
+    - setAdmin
+    - makeAdmin
+    - changePermission
+    - grantAuthority
+    - setPrivilege
+    - elevateRole
+    - addAuthority
+    - SimpleGrantedAuthority
+    - GrantedAuthority
+    - 'Collection<GrantedAuthority>'
+    - UserDetails
+    - user.getAuthorities()
+    - Authentication.getAuthorities()
+  shiro_privilege_ops:
+    - addRole
+    - addRoles
+    - setRoles
+    - addStringPermission
+    - addStringPermissions
+    - setPermissions
+    - SimpleAuthorizationInfo
+    - subject.hasRole
+    - subject.isPermitted
+  tainted_params:
+    - '@RequestParam("role")'
+    - '@RequestParam("isAdmin")'
+    - '@RequestBody RoleRequest'
+    - '@RequestBody UserDTO'
+    - '@ModelAttribute'
+    - 'request.getParameter("role")'
+    - 'request.getParameter("isAdmin")'
+    - 'request.getParameter("privilege")'
+    - '@PathVariable.*role'
+    - bindingResult
+  default_privilege_patterns:
+    - new User(role=
+    - setDefaultRole
+    - DEFAULT_ROLE
+    - ROLE_USER
+    - createUser
+    - register
+    - signup
+  config_files:
+    - application.properties
+    - application.yml
+    - 'application-*.yml'
+    - 'application-*.properties'
+    - SecurityConfig.java
+    - WebSecurityConfig.java
+    - ShiroConfig.java
+
+# CWE-276 语言特化检测模式
+
+# --- python route patterns ---
+cwe_276_route_patterns:
+  - os.chmod
+  - os.mkdir
+  - os.umask
+
+# --- java route patterns ---
+cwe_276_route_patterns:
+  - Files.setPosixFilePermissions
+  - File.setReadable
+  - File.setWritable
+
+# --- python query keywords ---
+cwe_276_python_keywords:
+  file_ops:
+    - os.chmod
+    - os.umask
+    - os.mkdir
+    - os.open
+    - stat.S_IRWXO
+    - stat.S_IRWXG
+    - 0o777
+    - 0o666
+  cloud_ops:
+    - 'ACL=''public-read'''
+    - put_bucket_acl
+    - public_access_block_configuration
+
+# --- java query keywords ---
+cwe_276_java_keywords:
+  file_ops:
+    - Files.setPosixFilePermissions
+    - PosixFilePermissions.fromString
+    - File.setReadable
+    - File.setWritable
+    - File.setExecutable
+    - rwxrwxrwx
+  cloud_ops:
+    - CannedAccessControlList.PublicRead
+    - setAcl
+    - withCannedAcl
+
+# CWE-287 语言特化检测模式
+
+# --- python route patterns ---
+cwe_287_route_patterns:
+  - '@app\.route.*/(login|auth|signin|token|password|reset|otp)'
+  - '@router\.(post|get|put).*/(login|auth|signin|token|password)'
+  - '@api_view.*\[.*(?:POST|GET)'
+
+# --- java route patterns ---
+cwe_287_route_patterns:
+  - '@(Post|Get|Put)Mapping.*/(login|auth|signin|token|password|reset|session|otp|mfa)'
+  - '@RequestMapping.*/(login|auth|signin|token|password)'
+
+# --- python query keywords ---
+cwe_287_python_keywords:
+  django_auth_ops:
+    - authenticate
+    - login
+    - logout
+    - AUTHENTICATION_BACKENDS
+    - User.objects.create_user
+    - check_password
+    - make_password
+    - SESSION_ENGINE
+    - SESSION_COOKIE_AGE
+    - LOGIN_URL
+  flask_auth_ops:
+    - login_user
+    - logout_user
+    - login_required
+    - current_user
+    - check_password_hash
+    - generate_password_hash
+    - session
+    - flask_login
+    - flask_security
+  fastapi_auth_ops:
+    - OAuth2PasswordBearer
+    - Depends(get_current_user)
+    - create_access_token
+    - verify_token
+    - decode_token
+    - HTTPBearer
+    - APIKeyHeader
+  password_ops:
+    - bcrypt
+    - argon2
+    - hashlib
+    - sha256
+    - md5
+    - check_password_hash
+    - generate_password_hash
+    - werkzeug.security
+    - passlib
+  weak_patterns:
+    - 'password.*=='
+    - 'password.*is.*not.*None'
+    - md5
+    - sha1
+    - 'sha256.*without.*salt'
+    - default_password
+    - admin123
+    - test123
+  config_files:
+    - settings.py
+    - config.py
+    - app.py
+    - .env
+    - auth.py
+    - security.py
+    - tokens.py
+
+# --- java query keywords ---
+cwe_287_java_keywords:
+  spring_auth_ops:
+    - authenticate
+    - attemptAuthentication
+    - doLogin
+    - login
+    - successfulAuthentication
+    - unsuccessfulAuthentication
+    - AuthenticationManager
+    - AuthenticationProvider
+    - UserDetailsService
+    - DaoAuthenticationProvider
+    - loadUserByUsername
+  shiro_auth_ops:
+    - SecurityUtils.getSubject
+    - Subject.login
+    - UsernamePasswordToken
+    - rememberMe
+    - filterChainDefinitions
+    - authc
+    - anon
+    - DefaultSecurityManager
+    - AuthenticatingRealm
+  jwt_ops:
+    - parseClaims
+    - setSigningKey
+    - Jwts.parser
+    - Jwts.builder
+    - verify
+    - JWT.decode
+    - getClaims
+    - getSubject
+    - setExpiration
+    - setIssuedAt
+    - SignatureAlgorithm
+    - none
+    - HS256
+    - RS256
+    - MAC
+  session_ops:
+    - HttpSession
+    - session.getAttribute
+    - session.setAttribute
+    - session.invalidate
+    - request.getSession
+    - session.getId
+    - SecurityContextHolder
+    - SecurityContext
+  password_ops:
+    - PasswordEncoder
+    - BCryptPasswordEncoder
+    - passwordEncoder.matches
+    - passwordEncoder.encode
+    - password.equals
+    - password.compareTo
+    - checkPassword
+    - verifyPassword
+  weak_patterns:
+    - equals(
+    - ==
+    - compareTo
+    - none
+    - permitAll
+    - anonymous
+    - rememberMe
+    - hardcoded
+    - default_password
+    - admin123
+  config_files:
+    - application.properties
+    - application.yml
+    - SecurityConfig.java
+    - WebSecurityConfig.java
+    - ShiroConfig.java
+    - JwtUtils.java
+    - TokenProvider.java
+
+# CWE-306 语言特化检测模式
+
+# --- python route patterns ---
+cwe_306_route_patterns:
+  - '@app\.route.*/(admin|config|system|internal|debug|test|backup|export|import)'
+  - '@router\.(get|post|put|delete).*/(admin|config|system|manage|user)'
+
+# --- java route patterns ---
+cwe_306_route_patterns:
+  - '@(Get|Post|Put|Delete|Patch)Mapping.*/(admin|config|system|internal|debug|test|backup|export|import|deploy)'
+  - '@RequestMapping.*/(admin|config|system|manage|user)'
+
+# --- python query keywords ---
+cwe_306_python_keywords:
+  django_auth_checks:
+    - login_required
+    - permission_required
+    - IsAuthenticated
+    - permission_classes
+    - has_perm
+    - user_passes_test
+  flask_auth_checks:
+    - login_required
+    - is_authenticated
+    - '@requires_auth'
+    - flask_login
+    - current_user
+  fastapi_auth_checks:
+    - Depends(get_current_user)
+    - Depends(oauth2_scheme)
+    - HTTPBearer
+    - APIKeyHeader
+    - OAuth2PasswordBearer
+  critical_ops:
+    - create_account
+    - delete_user
+    - reset_password
+    - update_config
+    - transfer
+    - export_data
+    - execute_command
+    - send_mail
+
+# --- java query keywords ---
+cwe_306_java_keywords:
+  critical_ops:
+    - createBankAccount
+    - deleteUser
+    - resetPassword
+    - updateConfig
+    - transfer
+    - withdraw
+    - grantRole
+    - createUser
+    - exportData
+    - importData
+    - executeCommand
+    - deployApplication
+    - restartService
+    - backupDatabase
+  auth_checks:
+    - isAuthenticated
+    - getAuthentication
+    - SecurityContextHolder
+    - hasRole
+    - '@PreAuthorize'
+    - '@Secured'
+    - '@RolesAllowed'
+    - RequiresAuthentication
+    - Subject.isAuthenticated
+    - RequiresPermissions
+    - RequiresRoles
+  security_config:
+    - SecurityFilterChain
+    - authorizeHttpRequests
+    - authorizeRequests
+    - permitAll
+    - antMatchers
+    - requestMatchers
+    - filterChainDefinitions
+    - shiro.ini
+    - anon
+    - authc
+    - anyRequest
+  jaxrs_public_risk:
+    - '@PermitAll'
+    - '@Path'
+    - ContainerRequestFilter
+    - jaxrs_unprotected
+    - jaxrs_no_filter
+
+# CWE-362 语言特化检测模式
+
+# --- python route patterns ---
+cwe_362_route_patterns:
+  - select_for_update
+  - atomic
+  - threading.Lock
+  - F(
+
+# --- java route patterns ---
+cwe_362_route_patterns:
+  - SELECT ... FOR UPDATE
+  - '@Transactional'
+  - synchronized
+  - ReentrantLock
+  - AtomicInteger
+
+# --- python query keywords ---
+cwe_362_python_keywords:
+  shared_state:
+    - global
+    - class variable
+    - cache
+    - redis
+    - g.
+    - thread_local
+  sync_mechanisms:
+    - threading.Lock
+    - multiprocessing.Lock
+    - select_for_update
+    - atomic
+    - with_lock
+    - F(
+    - transaction.atomic
+  toctou_ops:
+    - os.path.exists
+    - os.access
+    - os.stat
+    - os.path.isfile
+    - os.path.isdir
+    - os.path.islink
+  db_ops:
+    - select_for_update
+    - F(
+    - transaction.atomic
+    - update_fields
+
+# --- java query keywords ---
+cwe_362_java_keywords:
+  shared_state:
+    - static
+    - singleton
+    - instance variable
+    - balance
+    - stock
+    - counter
+    - ConcurrentHashMap
+    - volatile
+  sync_mechanisms:
+    - synchronized
+    - ReentrantLock
+    - AtomicInteger
+    - AtomicReference
+    - '@Transactional'
+    - Lock
+    - RedissonClient
+    - StampedLock
+    - ReadWriteLock
+  toctou_ops:
+    - File.exists
+    - Files.isReadable
+    - file.canWrite
+    - Files.exists
+    - file.isFile
+    - file.canRead
+  db_ops:
+    - SELECT ... FOR UPDATE
+    - '@Version'
+    - saveAndFlush
+    - PESSIMISTIC_WRITE
+    - OPTIMISTIC
+
+# CWE-613 语言特化检测模式
+
+# --- python route patterns ---
+cwe_613_route_patterns:
+  - '@app\.route.*methods'
+  - '@router\.(delete|put|post|patch)'
+  - '@api_view.*\[.*(?:DELETE|PUT|POST|PATCH)'
+
+# --- java route patterns ---
+cwe_613_route_patterns:
+  - '@(Delete|Put|Post|Patch)Mapping'
+  - '@RequestMapping'
+
+# --- python query keywords ---
+cwe_613_python_keywords:
+  django_session_ops:
+    - SESSION_COOKIE_AGE
+    - SESSION_EXPIRE_AT_BROWSER_CLOSE
+    - SESSION_COOKIE_HTTPONLY
+    - SESSION_COOKIE_SECURE
+    - SESSION_SAVE_EVERY_REQUEST
+    - session.clear()
+    - cycle_key()
+    - flush()
+    - django.contrib.sessions.middleware
+    - SessionMiddleware
+  flask_session_ops:
+    - PERMANENT_SESSION_LIFETIME
+    - session.permanent
+    - SESSION_COOKIE_MAX_AGE
+    - SESSION_COOKIE_HTTPONLY
+    - SESSION_COOKIE_SECURE
+    - SESSION_COOKIE_DOMAIN
+    - redis.setex
+    - app.config
+    - session.clear()
+    - session.pop
+  fastapi_session_ops:
+    - SessionMiddleware
+    - session_cookie_max_age
+    - redis.setex
+    - token_expires_delta
+    - timedelta
+    - create_access_token
+    - ALGORITHM
+    - auth_jwt
+  config_files:
+    - settings.py
+    - config.py
+    - app.py
+    - .env
+    - env.py
+
+# --- java query keywords ---
+cwe_613_java_keywords:
+  spring_session_ops:
+    - sessionManagement()
+    - maximumSessions(
+    - sessionFixation()
+    - invalidateSession
+    - session.invalidate()
+    - sessionCreationPolicy
+    - HttpSession
+    - setMaxInactiveInterval
+    - server.servlet.session.timeout
+    - spring.session.timeout
+    - server.servlet.session.cookie.max-age
+    - spring.session.servlet.cookie.max-age
+    - spring.session.redis.namespace
+    - ConfigureRedisAction
+  shiro_session_ops:
+    - sessionManager
+    - globalSessionTimeout
+    - sessionValidationInterval
+    - sessionValidationScheduler
+    - SessionDAO
+    - EnterpriseCacheSessionDAO
+    - sessionDAO
+  jwt_ops:
+    - setExpiration
+    - setIssuedAt
+    - exp
+    - Jwts.builder
+    - Jwts.parserBuilder
+    - jwt.expiration
+    - jwt.refresh-expiration
+    - jwt.access-token-expiration
+    - redisTemplate.expire
+    - token-blacklist
+    - JwtBuilder
+  config_files:
+    - application.properties
+    - application.yml
+    - application.yaml
+    - 'application-*.yml'
+    - 'application-*.properties'
+    - web.xml
+
+# CWE-639 语言特化检测模式
+
+# --- python route patterns ---
+cwe_639_route_patterns:
+  - '@app\.route.*/(orders|invoices|profiles|documents|accounts)/<.*:.*id>'
+  - '@router\.(get|put|delete).*/(user|account|order|invoice)/\{.*id\}'
+
+# --- java route patterns ---
+cwe_639_route_patterns:
+  - '@GetMapping.*/(orders|invoices|profiles|documents|accounts|messages|files)/\{.*Id\}'
+  - '@(Get|Put|Delete)Mapping.*/(user|account|order|invoice|document)/'
+  - '@PathVariable.*Long.*id'
+  - '@PathParam.*id'
+
+# --- python query keywords ---
+cwe_639_python_keywords:
+  resource_keys:
+    - query.get
+    - query.filter_by
+    - filter_by(id=
+    - get_or_404
+    - get_object_or_404
+    - filter(id=
+  ownership_fields:
+    - user_id
+    - owner_id
+    - author_id
+    - tenant_id
+    - created_by
+  safe_patterns:
+    - filter_by(user_id=current_user.id)
+    - filter(user_id=request.user.id)
+    - 'get_object_or_404.*user=request.user'
+
+# --- java query keywords ---
+cwe_639_java_keywords:
+  resource_keys:
+    - findById
+    - getById
+    - findOne
+    - deleteById
+    - getReferenceById
+    - findBySlug
+    - findByIdAndUserId
+    - findByOwnerId
+    - findByTenantId
+  ownership_fields:
+    - user_id
+    - owner_id
+    - tenant_id
+    - account_id
+    - customer_id
+    - author_id
+    - created_by
+    - user
+  jaxrs_path_ids:
+    - '@PathVariable'
+    - '@PathParam'
+    - '@Path'
+    - userId
+    - orderId
+    - invoiceId
+    - documentId
+  safe_patterns:
+    - findByIdAndUserId
+    - findByOwnerId
+    - 'WHERE.*AND.*user_id.*='
+    - 'WHERE.*AND.*owner_id.*='
+
+# CWE-798 语言特化检测模式
+
+# --- python route patterns ---
+cwe_798_route_patterns:
+  - psycopg2.connect
+  - 'boto3.client.*aws_access_key'
+  - AES.new
+  - jwt.encode
+
+# --- java route patterns ---
+cwe_798_route_patterns:
+  - DriverManager.getConnection
+  - new BasicAWSCredentials
+  - SecretKeySpec
+  - setPassword
+
+# --- python query keywords ---
+cwe_798_python_keywords:
+  cred_variables:
+    - password
+    - passwd
+    - secret
+    - api_key
+    - token
+    - credential
+    - private_key
+    - access_key
+    - jwt_secret
+    - session_secret
+    - SECRET_KEY
+    - DATABASE_URL
+    - REDIS_URL
+    - SMTP_PASSWORD
+    - AWS_SECRET_ACCESS_KEY
+    - client_secret
+  cred_patterns:
+    - psycopg2.connect
+    - mysql.connector.connect
+    - pymongo.MongoClient
+    - redis.Redis
+    - boto3.client
+    - smtplib.SMTP
+    - AES.new
+    - jwt.encode
+    - jwt.decode
+  crypto_keys:
+    - AES.new
+    - DES.new
+    - RSA.generate
+    - Fernet
+    - cryptography.hazmat
+    - Cipher
+  config_files:
+    - settings.py
+    - config.py
+    - .env
+    - config.ini
+    - secrets.yaml
+    - credentials.yaml
+
+# --- java query keywords ---
+cwe_798_java_keywords:
+  cred_variables:
+    - password
+    - passwd
+    - secret
+    - apiKey
+    - api_key
+    - token
+    - credential
+    - privateKey
+    - accessKey
+    - secretKey
+    - connectionString
+    - jwtSecret
+    - accessKeyId
+    - secretAccessKey
+    - clientSecret
+    - oauth_secret
+  cred_patterns:
+    - getConnection
+    - authenticate
+    - DriverManager
+    - Login
+    - BasicAWSCredentials
+    - SecretKeySpec
+    - setPassword
+    - new Password
+    - 'encode("'
+  crypto_keys:
+    - SecretKeySpec
+    - AES
+    - DES
+    - RSA
+    - PrivateKey
+    - PublicKey
+    - KeyPair
+    - KeyStore
+    - PKCS
+  config_files:
+    - application.properties
+    - application.yml
+    - 'application-*.yml'
+    - 'application-*.properties'
+    - persistence.xml
+    - hibernate.cfg.xml
+
+# CWE-840 语言特化检测模式
+
+# --- python route patterns ---
+cwe_840_route_patterns:
+  - '@app\.(post|put).*/(checkout|payment|refund|transfer|withdraw|coupon|discount)'
+  - '@router\.(post|put).*/(checkout|payment|order|billing)'
+
+# --- java route patterns ---
+cwe_840_route_patterns:
+  - '@(Post|Put)Mapping.*/(checkout|payment|refund|transfer|withdraw|coupon|discount|order|cart|balance)'
+  - '@RequestMapping.*/(checkout|payment|order|billing|subscription)'
+
+# --- python query keywords ---
+cwe_840_python_keywords:
+  client_controlled_fields:
+    - price
+    - amount
+    - quantity
+    - total
+    - discount
+    - status
+    - role
+    - balance
+    - credit
+  request_bindings:
+    - request.form
+    - request.args
+    - request.json
+    - request.values
+  server_authority_ops:
+    - calculate_total
+    - validate_price
+    - check_inventory
+    - apply_discount
+    - validate_coupon
+  dangerous_trust:
+    - update(price=
+    - status=
+    - role=
+    - balance=
+
+# --- java query keywords ---
+cwe_840_java_keywords:
+  client_controlled_fields:
+    - price
+    - amount
+    - quantity
+    - total
+    - discount
+    - balance
+    - status
+    - role
+    - isAdmin
+    - coupon
+    - credit
+    - step
+    - tier
+  request_bindings:
+    - '@RequestParam'
+    - '@RequestBody'
+    - '@PathVariable'
+    - getParameter
+    - request.get
+  server_authority_ops:
+    - calculateTotal
+    - recalculate
+    - validatePrice
+    - getPriceFromCatalog
+    - checkInventory
+    - assertRole
+    - enforceLimit
+    - applyDiscount
+    - validateCoupon
+  dangerous_trust:
+    - setPrice
+    - setAmount
+    - setTotal
+    - setStatus
+    - setRole
+    - grantRole
+    - applyDiscount
+    - setBalance
+  invariant_keywords:
+    - non_negative
+    - inventory_limit
+    - conservation_of_value
+    - single_use_coupon
+    - max_discount
+    - daily_limit
+
+# CWE-841 语言特化检测模式
+
+# --- python route patterns ---
+cwe_841_route_patterns:
+  - '@app\.route.*/(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate)'
+  - '@router\.(post|put).*/(checkout|order|payment|approval)'
+
+# --- java route patterns ---
+cwe_841_route_patterns:
+  - '@(Post|Put|Patch)Mapping.*/(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate|redeem|claim)'
+  - '@RequestMapping.*/(checkout|workflow|order|payment|approval)'
+
+# --- python query keywords ---
+cwe_841_python_keywords:
+  django_workflow_ops:
+    - checkout
+    - confirm_order
+    - submit_order
+    - process_payment
+    - ship_order
+    - activate_account
+    - approve_request
+    - cancel_order
+    - refund_order
+    - redeem_coupon
+  state_fields:
+    - status
+    - step
+    - stage
+    - phase
+    - state
+    - order_status
+    - payment_status
+    - shipping_status
+    - approval_status
+    - workflow_state
+  guards:
+    - validate_step
+    - check_previous
+    - require_step
+    - assert_state
+    - can_transition
+    - is_complete
+    - validate_precondition
+  state_machine:
+    - django_fsm
+    - FSMField
+    - transition
+    - django_state_machines
+    - can_proceed
+
+# --- java query keywords ---
+cwe_841_java_keywords:
+  spring_workflow_ops:
+    - checkout
+    - confirmOrder
+    - submitOrder
+    - processPayment
+    - authorizePayment
+    - shipOrder
+    - activateAccount
+    - approveRequest
+    - cancelOrder
+    - refundOrder
+    - placeOrder
+    - completeOrder
+    - finalizeOrder
+  state_fields:
+    - status
+    - step
+    - stage
+    - phase
+    - orderState
+    - workflowState
+    - paymentStatus
+    - shippingStatus
+    - approvalStatus
+    - OrderStatus
+    - PaymentStatus
+    - ShippingStatus
+  guards:
+    - validateStep
+    - checkPreviousStep
+    - isStepComplete
+    - requireStep
+    - assertState
+    - canTransition
+    - validatePrecondition
+    - checkState
+    - isValidTransition
+  state_machine:
+    - StateMachine
+    - StateMachineFactory
+    - StateMachineBuilder
+    - spring-statemachine
+    - StateContext
+    - TransitionAction
+    - Guard
+    - Action
+
+# CWE-862 语言特化检测模式
+
+# --- python route patterns ---
+cwe_862_route_patterns:
+  - '@app\.route.*/(api|v[0-9])/'
+  - '@router\.(get|post|put|delete).*/(api|v[0-9])/'
+
+# --- java route patterns ---
+cwe_862_route_patterns:
+  - '@(Get|Post|Put|Delete|Patch)Mapping.*/(api|v[0-9])/'
+  - '@RequestMapping.*/(api|rest|service)'
+
+# --- python query keywords ---
+cwe_862_python_keywords:
+  django_auth_decorators:
+    - login_required
+    - permission_required
+    - permission_classes
+    - IsAuthenticated
+    - user_passes_test
+  flask_auth_decorators:
+    - login_required
+    - requires_auth
+    - auth_required
+    - roles_required
+    - flask_login
+  fastapi_auth_deps:
+    - Depends(get_current_user)
+    - Depends(oauth2_scheme)
+    - HTTPBearer
+    - OAuth2PasswordBearer
+  auth_code_calls:
+    - is_authenticated
+    - check_auth
+    - verify_token
+    - has_perm
+    - check_permissions
+  sensitive_ops:
+    - commit
+    - delete
+    - execute
+    - system
+    - send_mail
+    - save
+    - create
+    - update
+    - raw
+
+# --- java query keywords ---
+cwe_862_java_keywords:
+  auth_annotations:
+    - PreAuthorize
+    - Secured
+    - RolesAllowed
+    - RequiresAuthentication
+    - RequiresPermissions
+    - RequiresRoles
+    - DenyAll
+    - PermitAll
+  shiro_guards:
+    - RequiresAuthentication
+    - RequiresPermissions
+    - RequiresRoles
+    - RequiresGuest
+    - RequiresUser
+    - SecurityUtils.getSubject
+  jaxrs_guards:
+    - RolesAllowed
+    - PermitAll
+    - DenyAll
+    - '@Path'
+    - ContainerRequestFilter
+  security_config:
+    - SecurityFilterChain
+    - authorizeHttpRequests
+    - authorizeRequests
+    - permitAll
+    - antMatchers
+    - requestMatchers
+    - filterChainDefinitions
+    - shiro.ini
+  auth_code_calls:
+    - isAuthenticated
+    - hasRole
+    - hasPermission
+    - checkPermission
+    - authorize
+    - getAuthentication
+    - getPrincipal
+    - Subject.isAuthenticated
+  sensitive_ops:
+    - save
+    - delete
+    - update
+    - remove
+    - execute
+    - transfer
+    - payment
+    - createUser
+    - deleteUser
+    - grantRole
+
+# CWE-863 语言特化检测模式
+
+# --- python route patterns ---
+cwe_863_route_patterns:
+  - '@app\.route.*/(admin|manage|config|setting|internal)'
+  - '@router\.(get|post|put|delete).*/(admin|manage|user|role)'
+
+# --- java route patterns ---
+cwe_863_route_patterns:
+  - '@(Get|Post|Put|Patch|Delete)Mapping.*/(admin|manage|config|setting|internal|private)'
+  - '@RequestMapping.*/(admin|manage|user|role|permission)'
+
+# --- python query keywords ---
+cwe_863_python_keywords:
+  authz_variables:
+    - role
+    - permission
+    - is_admin
+    - is_superuser
+    - is_staff
+    - user_type
+    - access_level
+    - privilege
+  untrusted_sources:
+    - request.cookies
+    - request.headers
+    - request.args
+    - request.form
+    - request.get_json
+    - session
+  authz_checks:
+    - login_required
+    - permission_required
+    - roles_required
+    - has_perm
+    - is_authenticated
+    - check_permissions
+    - permission_classes
+    - IsAuthenticated
+    - IsAdminUser
+
+# --- java query keywords ---
+cwe_863_java_keywords:
+  authz_variables:
+    - role
+    - permission
+    - auth
+    - token
+    - userType
+    - isAdmin
+    - user_type
+    - accessLevel
+    - privilege
+    - authority
+    - is_superuser
+    - is_staff
+    - group
+  untrusted_sources:
+    - cookie
+    - header
+    - parameter
+    - request.getParameter
+    - '@CookieValue'
+    - '@RequestHeader'
+    - '@HeaderParam'
+    - '@QueryParam'
+    - '@RequestParam'
+    - HttpServletRequest.getHeader
+    - HttpServletRequest.getCookies
+  authz_checks:
+    - hasRole
+    - hasPermission
+    - isAuthorized
+    - checkPermission
+    - '@PreAuthorize'
+    - '@Secured'
+    - '@RolesAllowed'
+    - RequiresAuthentication
+    - RequiresPermissions
+    - RequiresRoles
+    - subject.hasRole
+    - subject.isPermitted
+  incomplete_patterns:
+    - 'only.*check.*login.*not.*role'
+    - 'only.*check.*role.*not.*resource.*ownership'
+    - 'check.*admin.*not.*super_admin'
+    - 'role.*==.*ADMIN.*without.*resource.*check'
+
+# CWE-915 语言特化检测模式
+
+# --- python route patterns ---
+cwe_915_route_patterns:
+  - populate_obj
+  - request.get_json()
+  - ModelForm
+  - marshal_with
+
+# --- java route patterns ---
+cwe_915_route_patterns:
+  - '@ModelAttribute'
+  - '@RequestBody'
+  - BeanUtils.copyProperties
+  - WebDataBinder
+
+# --- python query keywords ---
+cwe_915_python_keywords:
+  binding_ops:
+    - populate_obj
+    - request.get_json()
+    - marshal
+    - load
+    - Schema
+    - ModelForm
+    - form.save()
+  entity_risk:
+    - is_admin
+    - role
+    - status
+    - balance
+    - is_staff
+    - is_superuser
+  protections:
+    - marshmallow
+    - pydantic
+    - WTForms
+    - fields
+    - Meta.fields
+    - exclude
+    - dump_only
+
+# --- java query keywords ---
+cwe_915_java_keywords:
+  binding_ops:
+    - '@ModelAttribute'
+    - '@RequestBody'
+    - BeanUtils.copyProperties
+    - WebDataBinder
+    - setDisallowedFields
+    - setAllowedFields
+    - '@InitBinder'
+    - ObjectMapper.readValue
+  entity_risk:
+    - role
+    - isAdmin
+    - status
+    - balance
+    - permission
+    - createdAt
+    - accountType
+    - enabled
+  protections:
+    - '@JsonIgnore'
+    - '@Transient'
+    - insertable=false
+    - updatable=false
+    - DTO
+    - VO
+    - Record
+    - '@JsonProperty(access=READ_ONLY)'

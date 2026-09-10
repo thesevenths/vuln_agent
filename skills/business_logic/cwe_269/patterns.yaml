@@ -1,0 +1,105 @@
+# CWE-269 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(updateRole|grantRole|revokeRole|setAdmin|elevatePrivilege|changeRole|assignPermission|promoteUser|setPrivilege|downgrade|modifyPermission)/i]'
+  - 'ClassDef[name=~/(AdminController|RoleController|UserController|PermissionController|AuthController|AccountController|RoleManager|UserManager)/i]'
+  - 'Call[name=~/(setRole|addRole|grantAuthority|changePermission|makeAdmin|elevateRole|setAdmin|addAuthority)/i]'
+  - 'Annotation[name=~/(PostMapping|PutMapping|RequestMapping|PatchMapping).*(role|admin|privilege|permission|authority|user|account)/i]'
+
+semantic_keywords:
+  - role
+  - admin
+  - privilege
+  - permission
+  - authority
+  - elevate
+  - promote
+  - grant
+  - revoke
+  - isAdmin
+  - setRole
+  - updateRole
+  - default_role
+  - user_type
+  - account_type
+  - is_superuser
+  - is_staff
+  - group
+  - membership
+
+file_context:
+  - user_service
+  - admin_controller
+  - role_manager
+  - auth_service
+  - permission_service
+  - account_controller
+  - security_config
+  - registration
+  - signup
+  - user_model
+  - role_entity
+  - rbac
+  - acl
+
+sensitive_operations:
+  - update_role
+  - grant_permission
+  - revoke_permission
+  - promote_user
+  - demote_user
+  - create_user
+  - delete_user
+  - update_user
+  - register
+  - signup
+  - import_users
+  - batch_assign_role
+  - change_password
+  - reset_password
+
+logic_query_keywords_generic:
+  privilege_ops:
+    - set_role
+    - grant_admin
+    - elevate
+    - promote
+    - change_permission
+    - assign_role
+    - add_role
+    - is_admin
+    - is_superuser
+    - is_staff
+    - user_type
+    - access_level
+    - make_admin
+    - isAdmin
+  tainted_params:
+    - role
+    - isAdmin
+    - is_admin
+    - privilege
+    - permission
+    - authority
+    - user_type
+    - access_level
+    - is_superuser
+    - is_staff
+    - group
+    - membership
+  default_privilege_keywords:
+    - default_role
+    - default_permission
+    - initial_role
+    - base_role
+    - auto_assign
+
+sanitizers:
+  - '权限变更接口仅允许超级管理员调用（如 @PreAuthorize("hasRole(''SUPER_ADMIN'')")）'
+  - 角色/权限值通过服务端枚举或白名单严格校验，拒绝任意客户端输入
+  - 禁止用户修改自己的角色或权限（自提升防御）
+  - 使用独立的 AdminDTO 接收参数，物理隔离了角色/权限等敏感字段
+  - '角色管理由外部 IdP（如 Auth0, Okta）统一处理，应用层无直接角色写入'
+  - 角色降级操作同步清理了所有高权限角色和功能访问
+  - 多环境配置中各环境均保持了相同或更高安全级别的默认角色设置
+  - 认证豁免路径（如注册接口）仅创建最低权限用户，且不接受权限相关字段

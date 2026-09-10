@@ -1,0 +1,92 @@
+# Django 权限模型
+# 框架特化检测模式（仅在识别到 Django 依赖时加载）
+
+# 用户认证
+authentication:
+  backends:
+    - "AUTHENTICATION_BACKENDS"
+    - "ModelBackend"
+    - "RemoteUserBackend"
+  password:
+    patterns:
+      - "make_password"
+      - "check_password"
+      - "PASSWORD_HASHERS"
+    strong:
+      - "PBKDF2PasswordHasher"
+      - "PBKDF2SHA1PasswordHasher"
+      - "Argon2PasswordHasher"
+      - "BCryptSHA256PasswordHasher"
+    weak:
+      - "MD5PasswordHasher"
+      - "UnsaltedMD5PasswordHasher"
+      - "CryptPasswordHasher"
+
+# 权限系统
+authorization:
+  model_permissions:
+    - "add"
+    - "change"
+    - "delete"
+    - "view"
+  custom_permissions:
+    - "class Meta: permissions"
+    - "Permission"
+    - "Group"
+  checks:
+    - "user.has_perm"
+    - "user.has_perms"
+    - "permission_required"
+    - "PermissionRequiredMixin"
+
+# DRF 权限
+drf_permissions:
+  built_in:
+    - "AllowAny"
+    - "IsAuthenticated"
+    - "IsAdminUser"
+    - "IsAuthenticatedOrReadOnly"
+    - "DjangoModelPermissions"
+    - "DjangoObjectPermissions"
+  custom:
+    - "BasePermission"
+    - "has_permission"
+    - "has_object_permission"
+  risk: "自定义 Permission 的 has_object_permission 可能遗漏"
+
+# Session 配置
+session:
+  settings:
+    - "SESSION_ENGINE"
+    - "SESSION_COOKIE_AGE"
+    - "SESSION_EXPIRE_AT_BROWSER_CLOSE"
+    - "SESSION_COOKIE_HTTPONLY"
+    - "SESSION_COOKIE_SECURE"
+    - "SESSION_SAVE_EVERY_REQUEST"
+  risk_patterns:
+    - "SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'"
+    - "SESSION_COOKIE_AGE 过大"
+    - "SESSION_EXPIRE_AT_BROWSER_CLOSE = False"
+
+# CSRF 保护
+csrf:
+  protection:
+    - "CsrfViewMiddleware"
+    - "{% csrf_token %}"
+    - "csrf_exempt"
+  risk: "csrf_exempt 装饰的视图不检查 CSRF Token"
+
+# ORM 安全
+orm_safety:
+  safe:
+    - "filter(field=value)"
+    - "get(field=value)"
+    - "F() expressions"
+    - "Q() objects"
+  risky:
+    - "raw()"
+    - "extra()"
+    - "RawSQL"
+    - "cursor.execute"
+    - "exec()"
+  risk: "raw SQL 拼接导致 SQL 注入"

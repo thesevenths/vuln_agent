@@ -1,0 +1,11 @@
+# CWE-836 Skill 元数据
+# 从 templates/cwe/cwe_836.json 迁移
+
+skill_id: cwe_836_client_side_hash_auth
+source_cwe: CWE-836
+priority: P1
+
+related_cwes:
+  - CWE-1390
+  - CWE-602
+  - CWE-328

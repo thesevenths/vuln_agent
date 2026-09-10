@@ -1,0 +1,10 @@
+# CWE-502 Skill 元数据
+# 从 templates/cwe/cwe_502.json 迁移
+
+skill_id: cwe_502_deserialization_of_untrusted_data
+source_cwe: CWE-502
+priority: P0
+
+related_cwes:
+  - CWE-913
+  - CWE-95

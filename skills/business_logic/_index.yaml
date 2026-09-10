@@ -1,0 +1,111 @@
+# business_logic/ — 业务逻辑类 Skill
+# CWE 映射表 + Joern 主查询 + 伴随 CWE
+
+category: business_logic
+description: 业务逻辑漏洞：IDOR、工作流绕过、竞态条件、批量赋值等
+
+skills:
+  - cwe: "639"
+    name: IDOR
+    path: cwe_639/
+    priority: P0
+    primary_queries: [idor_candidates, idor_path_variable, idor_profile]
+    companions: ["285"]
+
+  - cwe: "840"
+    name: Business Logic Error
+    path: cwe_840/
+    priority: P0
+    primary_queries: [business_logic_risk]
+    companions: []
+
+  - cwe: "841"
+    name: Workflow Bypass
+    path: cwe_841/
+    priority: P0
+    primary_queries: [workflow_bypass]
+    companions: []
+
+  - cwe: "915"
+    name: Mass Assignment
+    path: cwe_915/
+    priority: P0
+    primary_queries: [mass_assignment_risk]
+    companions: ["269"]
+
+  - cwe: "362"
+    name: Race Condition
+    path: cwe_362/
+    priority: P0
+    primary_queries: [race_condition_risk, toctou_risk]
+    companions: ["367"]
+
+  - cwe: "367"
+    name: TOCTOU
+    path: cwe_367/
+    priority: P1
+    primary_queries: [toctou_risk]
+    companions: ["362"]
+
+  - cwe: "269"
+    name: Privilege Escalation
+    path: cwe_269/
+    priority: P0
+    primary_queries: [privilege_escalation, sensitive_operations]
+    companions: ["915"]
+
+  - cwe: "276"
+    name: Incorrect Default Permissions
+    path: cwe_276/
+    priority: P0
+    primary_queries: [incorrect_permissions, file_ops_risk]
+    companions: []
+
+  - cwe: "307"
+    name: Brute Force
+    path: cwe_307/
+    priority: P0
+    primary_queries: [brute_force_risk, auth_weakness]
+    companions: ["287", "521", "306"]
+
+  - cwe: "384"
+    name: Session Fixation
+    path: cwe_384/
+    priority: P0
+    primary_queries: [session_fixation_risk, auth_weakness]
+    companions: ["287", "613"]
+
+  - cwe: "521"
+    name: Weak Password Requirements
+    path: cwe_521/
+    priority: P0
+    primary_queries: [weak_password_requirements]
+    companions: ["307"]
+
+  - cwe: "610"
+    name: Payment Tampering
+    path: cwe_610/
+    priority: P0
+    primary_queries: [payment_tampering, business_logic_risk]
+    companions: []
+
+  - cwe: "613"
+    name: Session Expiration
+    path: cwe_613/
+    priority: P0
+    primary_queries: [session_expiration_risk, jwt_weakness]
+    companions: ["384", "287"]
+
+  - cwe: "640"
+    name: Password Recovery Weakness
+    path: cwe_640/
+    priority: P0
+    primary_queries: [password_recovery_weakness]
+    companions: ["287"]
+
+  - cwe: "899"
+    name: Server-Side Request Forgery (Resource Consumption)
+    path: cwe_899/
+    priority: P0
+    primary_queries: [sensitive_operations, incorrect_authz_source, business_authz_gap]
+    companions: []

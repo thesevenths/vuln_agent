@@ -1,0 +1,22 @@
+# CWE-276 Skill 元数据
+# 从 templates/cwe/cwe_276.json 迁移
+
+skill_id: cwe_276_incorrect_default_permissions
+source_cwe: CWE-276
+priority: P1
+
+related_cwes:
+  - cwe: CWE-732
+    reason: incorrect_permission_assignment_for_multiple_actors - 多用户共享环境中权限分配错误
+  - cwe: CWE-250
+    reason: execution_with_unnecessary_privileges - 进程/服务以超出所需的权限运行
+  - cwe: CWE-284
+    reason: improper_access_control - 默认权限过于宽松是访问控制缺陷的常见形态
+  - cwe: CWE-862
+    reason: missing_authorization - 默认公开权限使资源实质上无授权保护
+  - cwe: CWE-912
+    reason: hidden_functionality - 隐藏的默认管理员账户或后门凭据
+  - cwe: CWE-269
+    reason: improper_privilege_management - 默认权限过高是权限管理不当的具体表现
+
+description: 资源初始化和权限设置操作是 CWE-276 的核心攻击面

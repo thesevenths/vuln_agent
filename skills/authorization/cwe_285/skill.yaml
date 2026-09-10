@@ -1,0 +1,12 @@
+# CWE-285 Skill 元数据
+# 从 templates/cwe/cwe_285.json 迁移
+
+skill_id: cwe_285_business_logic_authorization
+source_cwe: CWE-285
+priority: P1
+
+related_cwes:
+  - CWE-862
+  - CWE-863
+  - CWE-639
+  - CWE-284

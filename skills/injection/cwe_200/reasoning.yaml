@@ -1,0 +1,55 @@
+# CWE-200 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别敏感数据候选】定位所有包含 PII/凭证/系统内部信息的字符串、变量或返回值。'
+  - 'Step 2: 【判断暴露方式】'
+  -    - 显式插入：代码主动将敏感数据写入响应/日志/界面？(如 JSP 直接输出 ssn)
+  - '   - 间接插入：异常/错误消息是否包含内部路径、查询语句、配置位置？(如 echo $e->getMessage())'
+  -    - 无意访问：资源(文件/DB/内存)是否被未授权方访问？(如 debug flag 控制的数据展示)
+  - 'Step 3: 【评估上下文必要性】'
+  -    - 该信息是否为当前操作所必需？(如仅需州名却获取精确坐标 → ACCESS_FINE_LOCATION 过度)
+  -    - 是否在非生产环境(测试/debug)中暴露？(如 debugEnabled=true 时显示账号)
+  -    - 是否已脱敏/加密？(如仅显示后四位、哈希值)
+  - 'Step 4: 【检查接收方授权】'
+  -    - 响应/日志的接收者是否为授权用户？(如 API 返回完整 User 对象给匿名调用者)
+  - '   - 是否存在最小化原则违反？(如登录失败提示区分''用户名错误''vs''密码错误'' → 用户名枚举)'
+  - 'Step 5: 【确认暴露面】若确认为真实暴露，判断其是否可通过公开接口/日志/错误页获取？'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'if (IsValidUsername($username)) { ... } else { print "Login Failed - unknown username"; }'
+      vulnerability_analysis: '显式插入+间接暴露：登录失败消息区分了''未知用户名''和''错误密码''，攻击者可据此枚举有效用户名。应统一为''用户名或密码错误''。这是 CWE-200 的经典案例：通过差异化响应泄露认证状态。'
+      fix_pattern: 'print "Login Failed - incorrect username or password";'
+    - code_snippet: 'catch (Exception $e) { echo ''Caught exception: '', $e->getMessage(); echo ''Check credentials in config file at: '', $Mysql_config_location; }'
+      vulnerability_analysis: 间接插入：异常处理程序打印了配置文件路径 $Mysql_config_location。攻击者可利用此路径进行路径遍历攻击或直接读取配置获取数据库凭证。即使异常本身不可控，暴露内部路径仍构成信息泄露。
+      fix_pattern: 'error_log($e->getMessage()); // 仅记录到服务端日志
+echo ''An internal error occurred. Please contact support.''; // 对用户显示通用消息'
+    - code_snippet: 'Social Security Number: <%= ssn %></br>Credit Card Number: <%= ccn %>'
+      vulnerability_analysis: '显式插入：JSP 页面直接输出 SSN 和信用卡号到 HTML 响应。即使当前用户是数据所有者，也应遵循最小化原则——除非业务绝对必要，否则不应在界面上显示完整敏感信息。若必须显示，应脱敏(如 ***-**-1234)。'
+      fix_pattern: 'SSN: <%= maskSSN(ssn) %> <!-- 显示为 ***-**-1234 -->'
+    - code_snippet: '<% if (Boolean.getBoolean("debugEnabled")) { %>User account number: <%= acctNo %><% } %>'
+      vulnerability_analysis: 无意访问：debug 标志控制敏感数据展示。若该标志在生产环境被意外启用(如配置错误、环境变量泄漏)，账户号将暴露给所有访问者。debug 功能不应与敏感数据展示耦合。
+      fix_pattern: 移除生产环境中的 debug 数据展示；使用独立的、带权限控制的调试工具
+    - code_snippet: '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>'
+      vulnerability_analysis: 过度暴露：应用仅需确定用户所在州，却请求精确位置权限 ACCESS_FINE_LOCATION。这违反了最小权限原则，即使应用本身不恶意使用，该权限也可能被其他组件滥用或在权限审查中被质疑。应降级为 ACCESS_COARSE_LOCATION。
+      fix_pattern: '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>'
+  mitigation_rules:
+    - 实施数据最小化原则：仅收集和展示业务绝对必需的敏感信息
+    - 统一错误消息：避免通过差异化响应泄露内部状态(如用户名存在性)
+    - 异常处理安全化：捕获异常后仅记录详细日志到服务端，向用户返回通用消息
+    - Debug 功能隔离：生产环境禁用 debug 数据展示；调试信息不得包含敏感数据
+    - 权限最小化：请求最低必要权限(如 COARSE_LOCATION 代替 FINE_LOCATION)
+    - 敏感数据脱敏：在传输/展示前对 PII/凭证进行掩码或哈希处理
+    - 信任边界隔离：敏感数据不得跨越未经验证的边界(如从后端直接传递到前端日志)
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-200
+  exposure_type: 'enum[''explicit_insertion'', ''indirect_insertion'', ''unintentional_access'', ''over_exposure'', ''insufficient_sanitization'']'
+  sensitive_data_type: 'enum[''pii'', ''credential'', ''system_internal'', ''business_secret'', ''metadata'', ''indirect_info'']'
+  exposure_vector: 'string (如 ''error message'', ''api response'', ''log file'', ''html page'', ''permission request'')'
+  false_positive_reason: string (若未确认漏洞，说明排除原因)
+  business_impact: 'string (从 common_consequences 映射: Read Application Data)'
+  risk_level: HIGH
+  remediation: string (结合 potential_mitigations 生成，区分暴露类型给出针对性修复)

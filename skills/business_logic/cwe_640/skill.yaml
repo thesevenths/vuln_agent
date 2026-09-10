@@ -1,0 +1,13 @@
+# CWE-640 Skill 元数据
+# 从 templates/cwe/cwe_640.json 迁移
+
+skill_id: cwe_640_weak_password_recovery
+source_cwe: CWE-640
+priority: P1
+
+related_cwes:
+  - CWE-287
+  - CWE-307
+  - CWE-330
+  - CWE-620
+  - CWE-863

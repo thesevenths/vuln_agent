@@ -1,0 +1,73 @@
+{
+  "skill_id": "java_attack_surface",
+  "name": "Java Web 攻击面梳理",
+  "summary": "路由静态扫描 -> 鉴权/依赖手册 -> L2 配置补证（对接 java-audit-skills）",
+  "trigger_keywords": [
+    "java",
+    "spring",
+    "springboot",
+    "代码审计",
+    "路由",
+    "controller",
+    "web",
+    "鉴权",
+    "mapper"
+  ],
+  "completion_hints": [
+    "须产出路由索引（metadata.java_routes 或 route_index 报告）",
+    "须加载 java-route-mapper 与 java-auth-audit 作战手册",
+    "L2 至少读取 pom.xml 与 Security 相关配置",
+    "高危路由标记后再进入 Joern 深扫"
+  ],
+  "min_score_to_activate": 0.24,
+  "start_node_id": "set_java_context",
+  "nodes": [
+    {
+      "node_id": "set_java_context",
+      "tool_name": "set_context",
+      "arguments": { "language": "java" },
+      "success_next": "scan_routes"
+    },
+    {
+      "node_id": "scan_routes",
+      "tool_name": "JavaAuditTool.scan_routes",
+      "arguments": {},
+      "success_next": "load_route_mapper_playbook"
+    },
+    {
+      "node_id": "load_route_mapper_playbook",
+      "tool_name": "JavaAuditTool.load_playbook",
+      "arguments": { "playbook_id": "java-route-mapper" },
+      "success_next": "load_auth_playbook"
+    },
+    {
+      "node_id": "load_auth_playbook",
+      "tool_name": "JavaAuditTool.load_playbook",
+      "arguments": { "playbook_id": "java-auth-audit" },
+      "success_next": "load_vuln_scanner_playbook"
+    },
+    {
+      "node_id": "load_vuln_scanner_playbook",
+      "tool_name": "JavaAuditTool.load_playbook",
+      "arguments": { "playbook_id": "java-vuln-scanner" },
+      "success_next": "glob_l2_parallel"
+    },
+    {
+      "node_id": "glob_l2_parallel",
+      "parallel_actions": [
+        { "tool_name": "FileTool.glob_files", "arguments": { "pattern": "**/*Controller*.java", "limit": 30 } },
+        { "tool_name": "FileTool.glob_files", "arguments": { "pattern": "**/pom.xml", "limit": 20 } },
+        { "tool_name": "FileTool.glob_files", "arguments": { "pattern": "**/*Security*.java", "limit": 20 } },
+        { "tool_name": "FileTool.glob_files", "arguments": { "pattern": "**/application*.yml", "limit": 20 } }
+      ],
+      "success_next": "write_route_index",
+      "failure_next": "write_route_index"
+    },
+    {
+      "node_id": "write_route_index",
+      "tool_name": "FileTool.write_report",
+      "arguments": { "subdir": "java_audit", "filename": "route_index.md" },
+      "completion_signal": "java_attack_surface_done"
+    }
+  ]
+}

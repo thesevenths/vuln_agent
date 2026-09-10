@@ -1,0 +1,156 @@
+# CWE-269 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别权限变更操作】定位涉及角色分配、权限授予、管理员提升的端点或函数。同时识别用户注册/创建流程（默认权限检查）。'
+  - 'Step 1: 【追踪权限参数来源】检查角色(role)、权限(permission)、管理员标志(isAdmin/is_superuser/is_staff)等参数是直接从客户端请求获取，还是由服务端根据业务规则计算。命中 anti_patterns.mass_assignment_privilege_fields 则直接标记 High 候选。'
+  - 'Step 2: 【检查操作者权限验证】执行权限变更的操作者是否经过了充分的身份验证和权限校验（如仅超级管理员才能授予角色）。对照 control_detection_patterns.operator_authorization_check 验证。'
+  - 'Step 3: 【评估自提升风险】用户是否可以通过调用该接口将自己提升为管理员或获得更高权限（如 POST /api/role {role: ''admin''}）。对照 control_detection_patterns.self_elevation_prevention 验证。'
+  - 'Step 4: 【检查批量赋值路径】权限字段是否通过 @ModelAttribute / @RequestBody 等自动绑定机制被污染（与 CWE-915 交叉）。对照 control_detection_patterns.privilege_field_isolation 验证。若无隔离，同时命中 anti_patterns.mass_assignment_privilege_fields。'
+  - 'Step 5: 【评估默认权限设置】新用户注册时是否被赋予了超出预期的默认权限（如 is_staff=True、role=admin）。对照 anti_patterns.default_excess_privilege 验证。'
+  - 'Step 5.5: 【检查角色值白名单校验】角色/权限值是否通过服务端枚举或白名单校验，拒绝客户端传入的任意值。对照 control_detection_patterns.role_value_whitelist 验证。无白名单 = 任意角色可注入。'
+  - 'Step 5.6: 【检查权限残留】角色降级（如会员降级为免费用户）后，高权限角色/权限/功能是否被清理。对照 anti_patterns.residual_privilege 验证。'
+  - 'Step 5.7: 【检查多 Profile/环境差异】搜索 application-{profile}.yml、appsettings.{env}.json 等多环境配置，验证非生产环境是否覆盖了权限配置（如 dev 环境默认赋予 admin 角色），且生产环境配置未被意外覆盖。'
+  - 'Step 5.8: 【检查认证豁免路径的权限管理操作】对 permitAll/anonymous/isPublic 等白名单端点，验证其是否误放行了权限变更操作（如注册接口同时创建 admin 用户）。白名单路径 + 权限变更 = 未授权提权。'
+  - 'Step 6: 【九项确认标准】缺一不得 confirmed：(1)权限参数来源安全 (2)操作者授权充分 (3)自提升防御存在 (4)权限字段隔离 (5)角色值白名单校验 (6)默认权限最低 (7)权限残留已清理 (8)多环境配置无安全差异 (9)认证豁免路径无权限变更操作'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: '@PutMapping("/api/users/{id}/role")
+public String updateRole(@PathVariable Long id, @RequestParam String role) {
+    User user = userRepo.findById(id);
+    user.setRole(role);
+    userRepo.save(user);
+    return "ok";
+}'
+      vulnerability_analysis: 角色更新接口接受客户端传入的 role 参数并直接持久化。任何已登录用户均可将自己的角色改为 ADMIN 或 SUPERADMIN，实现垂直越权。缺少操作者身份校验（谁可以改别人的角色）、角色值白名单校验、自提升防御。
+      fix_pattern: '1. 限制仅 SUPER_ADMIN 可调用：@PreAuthorize("hasRole(''SUPER_ADMIN'')")；2. 使用枚举/白名单校验 role 值；3. 禁止用户修改自己的角色：if (currentUserId.equals(id)) throw new AccessDeniedException()。'
+    - code_snippet: '@PostMapping("/api/users")
+public User createUser(@RequestBody UserDTO userDTO) {
+    User user = modelMapper.map(userDTO, User.class);
+    userRepo.save(user);
+    return user;
+}
+
+public class UserDTO {
+    private String username;
+    private String email;
+    private String role;      // ← 可被客户端注入
+    private Boolean isAdmin;  // ← 可被客户端注入
+}'
+      vulnerability_analysis: 'UserDTO 包含 role 和 isAdmin 字段，客户端可通过 POST /api/users 传入 {"username":"x","email":"x@x.com","role":"ADMIN","isAdmin":true} 直接创建管理员账户。ModelMapper 会自动映射所有字段，包括权限字段。'
+      fix_pattern: '1. 从 UserDTO 中移除 role/isAdmin 字段，或标注 @JsonProperty(access = READ_ONLY)；2. 使用独立的 CreateUserDTO（不含权限字段）和 RoleAssignmentDTO（需管理员权限）；3. 服务端强制设置新用户默认角色。'
+    - code_snippet: '# Django
+@login_required
+def update_profile(request, user_id):
+    user = User.objects.get(id=user_id)
+    if request.method == ''POST'':
+        user.is_staff = request.POST.get(''is_staff'', user.is_staff)
+        user.is_superuser = request.POST.get(''is_superuser'', user.is_superuser)
+        user.save()
+    return render(request, ''profile.html'', {''user'': user})'
+      vulnerability_analysis: 'is_staff 和 is_superuser 直接从 POST 参数读取，任何已登录用户均可通过 POST is_staff=true&is_superuser=true 将自己提升为超级管理员。缺少操作者权限校验和字段隔离。'
+      fix_pattern: 1. 使用 Django PermissionRequiredMixin 限制仅管理员可访问；2. 使用 Form/Serializer 的 exclude 排除 is_staff/is_superuser；3. 服务端独立处理角色变更，不从请求直接赋值。
+    - code_snippet: '# Flask
+@app.route(''/api/users'', methods=[''POST''])
+def create_user():
+    data = request.get_json()
+    user = User(**data)  # Mass Assignment!
+    db.session.add(user)
+    db.session.commit()
+    return jsonify(user.to_dict())'
+      vulnerability_analysis: 'User(**data) 将客户端 JSON 的所有字段直接映射到 User 模型。客户端传入 {"username":"x","role":"admin","is_admin":true} 即可创建管理员。Flask 无 Django 的 ModelForm 保护。'
+      fix_pattern: '1. 使用显式字段赋值：User(username=data[''username''], email=data[''email''])；2. 或使用 Marshmallow/Pydantic Schema 过滤敏感字段；3. 服务端强制设置 role=''user''。'
+    - code_snippet: '// Laravel
+public function store(Request $request)
+{
+    $user = User::create($request->all());  // Mass Assignment!
+    return redirect()->route(''users.index'');
+}
+
+// User model
+protected $fillable = [''name'', ''email'', ''role'', ''is_admin''];'
+      vulnerability_analysis: '$request->all() 将所有请求参数传入 create()，且 $fillable 包含 role 和 is_admin。攻击者通过 POST name=x&email=x@x.com&role=admin&is_admin=1 直接创建管理员账户。Laravel 的 Mass Assignment 保护失效。'
+      fix_pattern: '1. 从 $fillable 中移除 role 和 is_admin；2. 或改用 $guarded = [''role'', ''is_admin'']；3. 使用独立的 FormRequest 或 DTO；4. 服务端单独处理角色赋值：$user->assignRole(''user'')。'
+    - code_snippet: '// Express + Mongoose
+app.put(''/api/users/:id'', async (req, res) => {
+    const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { $set: req.body },  // Mass Assignment!
+        { new: true }
+    );
+    res.json(user);
+});'
+      vulnerability_analysis: '{ $set: req.body } 将请求体的所有字段写入数据库。客户端传入 {"role":"admin","isAdmin":true} 即可提权。无字段白名单过滤。'
+      fix_pattern: '1. 使用字段白名单：const { username, email } = req.body; await User.findByIdAndUpdate(id, { $set: { username, email } });2. 或使用 Zod/Joi schema 验证并过滤敏感字段；3. 添加管理员权限中间件。'
+    - code_snippet: '// Gin
+func UpdateUser(c *gin.Context) {
+    var updateData struct {
+        Name     string `json:"name"`
+        Email    string `json:"email"`
+        Role     string `json:"role"`     // ← 可被客户端注入
+        IsAdmin  bool   `json:"isAdmin"`  // ← 可被客户端注入
+    }
+    if err := c.ShouldBindJSON(&updateData); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
+    user.Role = updateData.Role
+    user.IsAdmin = updateData.IsAdmin
+    db.Save(&user)
+    c.JSON(200, user)
+}'
+      vulnerability_analysis: 更新结构体包含 Role 和 IsAdmin 字段，客户端可直接注入。Go 没有框架级的 Mass Assignment 保护，完全依赖开发者手动过滤。
+      fix_pattern: '1. 从更新结构体中移除 Role/IsAdmin 字段；2. 使用独立的 UpdateUserDTO 和 RoleAssignmentDTO；3. 添加角色变更的权限中间件：r.PUT("/users/:id/role", AdminRequired(), UpdateRole)。'
+    - code_snippet: '// ASP.NET Core
+[HttpPut("/api/users/{id}")]
+public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateModel model)
+{
+    var user = await _userManager.FindByIdAsync(id.ToString());
+    user.UserName = model.UserName;
+    user.Email = model.Email;
+    user.Role = model.Role;         // ← 可被客户端注入
+    user.IsAdmin = model.IsAdmin;   // ← 可被客户端注入
+    await _userManager.UpdateAsync(user);
+    return Ok(user);
+}'
+      vulnerability_analysis: UserUpdateModel 包含 Role 和 IsAdmin 属性，客户端可直接注入。虽有 UserManager 但未利用其角色管理 API（AddToRoleAsync/RemoveFromRoleAsync），而是直接修改实体字段。
+      fix_pattern: '1. 从 UserUpdateModel 移除 Role/IsAdmin；2. 角色变更通过 _userManager.AddToRoleAsync() 单独处理；3. 添加 [Authorize(Roles = "Admin")]; 4. 使用 [JsonIgnore] 或 [BindNever] 标注权限字段。'
+    - code_snippet: '# Rails
+def update
+    @user = User.find(params[:id])
+    @user.update(params.require(:user).permit!)  # permit! = allow all!
+    redirect_to @user
+end'
+      vulnerability_analysis: 'permit! 放行所有参数，等同于禁用 Strong Parameters。客户端传入 user[role]=admin 或 user[is_admin]=true 即可提权。'
+      fix_pattern: '1. 使用显式 permit：params.require(:user).permit(:name, :email)；2. 角色变更使用独立 action 和 Strong Parameters；3. 添加 before_action :require_admin。'
+  mitigation_rules:
+    - 权限变更操作必须由具备足够权限的管理者执行，实施严格的 RBAC 控制。
+    - 禁止用户通过自助接口提升自己的角色或权限（自提升防御）。
+    - 角色/权限值必须通过服务端枚举或白名单校验，拒绝客户端传入的任意值。
+    - 新用户注册时的默认角色必须为最低权限（如 ROLE_USER / member / basic）。
+    - 权限字段（role/isAdmin/is_superuser/is_staff）必须与用户输入物理隔离，使用独立 DTO 或字段过滤。
+    - 角色降级后必须清理残留的高权限角色、权限和功能访问。
+    - 多环境部署时，确保所有环境的权限配置（默认角色、管理员列表）不低于生产环境的安全基线。
+
+anti_patterns:
+  - description
+  - mass_assignment_privilege_fields
+  - self_elevation
+  - residual_privilege
+  - default_excess_privilege
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-269
+  privilege_change_type: 'array — 权限管理缺陷类型 (如 [''role_escalation'', ''self_elevation'', ''mass_assignment'', ''default_excess_privilege'', ''residual_privilege''])'
+  tainted_privilege_param: string (指出具体哪个角色/权限参数来自客户端且未被校验)
+  missing_auth_check: string (描述应添加但未添加的操作者权限校验逻辑)
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''mass_assignment_privilege_fields.java'', ''self_elevation.java'', ''default_excess_privilege.python''])'
+  control_missing: 'array — 缺失的安全控制 (如 [''operator_authorization_check'', ''privilege_field_isolation'', ''role_value_whitelist'', ''self_elevation_prevention''])'
+  profile_difference_found: boolean — 是否发现多环境配置安全差异
+  exemption_path_issue_found: boolean — 是否发现认证豁免路径包含权限变更操作
+  reasoning_trace: string
+  business_impact: string
+  risk_level: CRITICAL
+  remediation: string

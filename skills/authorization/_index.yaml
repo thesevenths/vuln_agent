@@ -1,0 +1,62 @@
+# authorization/ — 权限类 Skill
+# CWE 映射表 + Joern 主查询 + 伴随 CWE
+
+category: authorization
+description: 授权缺失、授权不当、认证绕过等权限相关漏洞
+
+skills:
+  - cwe: "862"
+    name: Missing Authorization
+    path: cwe_862/
+    priority: P0
+    primary_queries: [sensitive_operations, admin_ops_no_auth]
+    companions: ["863", "285", "284", "306"]
+
+  - cwe: "863"
+    name: Incorrect Authorization
+    path: cwe_863/
+    priority: P0
+    primary_queries: [incorrect_authz_source]
+    companions: ["862", "285", "284"]
+
+  - cwe: "287"
+    name: Authentication Using an Alternate Path or Mechanism
+    path: cwe_287/
+    priority: P0
+    primary_queries: [auth_weakness, jwt_endpoints, jwt_weakness]
+    companions: ["384", "613", "640", "306", "307", "798"]
+
+  - cwe: "306"
+    name: Missing Authentication for Critical Function
+    path: cwe_306/
+    priority: P0
+    primary_queries: [public_endpoints]
+    companions: ["862", "287", "307"]
+
+  - cwe: "352"
+    name: Cross-Site Request Forgery
+    path: cwe_352/
+    priority: P0
+    primary_queries: [csrf_gap]
+    companions: []
+
+  - cwe: "836"
+    name: Client-Side Hash Comparison
+    path: cwe_836/
+    priority: P1
+    primary_queries: [client_hash_auth]
+    companions: []
+
+  - cwe: "285"
+    name: Improper Authorization
+    path: cwe_285/
+    priority: P0
+    primary_queries: [business_authz_gap]
+    companions: ["862", "863", "639"]
+
+  - cwe: "284"
+    name: Improper Access Control
+    path: cwe_284/
+    priority: P2
+    primary_queries: [cors_config]
+    companions: ["862", "863"]

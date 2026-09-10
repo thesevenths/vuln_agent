@@ -1,0 +1,22 @@
+# CWE-306 Skill 元数据
+# 从 templates/cwe/cwe_306.json 迁移
+
+skill_id: cwe_306_missing_auth_critical_function
+source_cwe: CWE-306
+priority: P0
+
+related_cwes:
+  - cwe: CWE-287
+    reason: improper_authentication - 认证机制存在缺陷使关键功能实质上无认证保护
+  - cwe: CWE-307
+    reason: brute_force - 关键功能缺少认证 + 无暴力破解防护 = 完全暴露
+  - cwe: CWE-602
+    reason: client_side_enforcement - 仅依赖前端认证检查，服务端关键功能无保护
+  - cwe: CWE-919
+    reason: weakness_in_mobile_app - 移动端 API 关键功能常遗漏服务端认证
+  - cwe: CWE-862
+    reason: missing_authorization - 缺少认证通常伴随缺少授权：无身份验证即无权限检查
+  - cwe: CWE-269
+    reason: improper_privilege_management - 无认证的关键功能可能被利用进行权限提升
+
+description: 关键功能端点是 CWE-306 的核心攻击面，必须确认每个端点都有认证保护

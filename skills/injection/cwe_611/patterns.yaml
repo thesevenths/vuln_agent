@@ -1,0 +1,46 @@
+# CWE-611 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(SAXParser|DocumentBuilder|XMLReader|TransformerFactory|XMLInputFactory|Unmarshaller|SAXReader|XMLHelper)/i]'
+  - 'Call[name=~/(parse|unmarshal|readValue|newDocumentBuilder|newSAXParser|newInstance)/i]'
+
+semantic_keywords:
+  - XML
+  - parse
+  - SAX
+  - DOM
+  - unmarshal
+  - entity
+  - DTD
+  - external entity
+  - Xerces
+  - XercesDOM
+  - Document
+
+file_context:
+  - xml_handler
+  - parser
+  - import_export
+  - api_endpoint
+
+logic_query_keywords_generic:
+  xml_parsers:
+    - etree.parse
+    - ElementTree
+    - lxml
+    - xml.dom.minidom
+    - xml.sax
+  dangerous_features:
+    - resolve_entities
+    - load_dtd
+    - no_network
+  safe_features:
+    - defusedxml
+    - resolve_entities=False
+
+sanitizers:
+  - '禁用DOCTYPE: setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)'
+  - '禁用外部通用实体: setFeature("http://xml.org/sax/features/external-general-entities", false)'
+  - '禁用外部参数实体: setFeature("http://xml.org/sax/features/external-parameter-entities", false)'
+  - '禁用外部DTD/Schema: setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")'
+  - 使用 defusedxml / 不支持实体引用的解析器

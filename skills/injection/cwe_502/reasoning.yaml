@@ -1,0 +1,46 @@
+# CWE-502 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别反序列化操作】是否存在对象反序列化/数据解包操作？'
+  - 'Step 2: 【检查数据来源】反序列化的数据是否来自不可信源？'
+  -    - ❌ HTTP请求体 / Cookie / 消息队列 / 用户上传文件
+  -    - ✅ 仅内部可信系统间传输（仍需验证完整性）
+  - 'Step 3: 【检查类型过滤】是否配置了反序列化白名单/黑名单？'
+  -    - ❌ 无类型过滤（默认接受所有类）
+  -    - ✅ ObjectInputFilter 白名单限制可反序列化的类
+  - 'Step 4: 【评估Gadget链】项目依赖中是否存在已知的反序列化利用链？'
+  -    - Apache Commons Collections / Spring / Jackson 等
+  -    - 检查 pom.xml 中是否包含高危版本的依赖
+  - 'Step 5: 【确认影响】反序列化漏洞可能实现什么？（远程代码执行RCE、权限提升、数据篡改）'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: >-
+        ObjectInputStream ois = new ObjectInputStream(request.getInputStream());
+        Object obj = ois.readObject();
+      vulnerability_analysis: >-
+        直接从HTTP请求体反序列化Java对象，无任何类型过滤。攻击者可构造恶意序列化数据触发
+        Runtime.exec()执行任意命令（通过Commons Collections gadget chain）。
+        这是CWE-502的经典案例，可直接导致RCE。
+      fix_pattern: >-
+        方案1: 使用白名单 ObjectInputFilter
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter("com.myapp.*;!*.*");
+        ois.setObjectInputFilter(filter);
+        方案2: 使用 JSON 替代 Java 原生序列化
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.deactivateDefaultTyping();
+  mitigation_rules:
+    - 避免使用Java原生序列化，改用JSON/XML等文本格式
+    - 如必须反序列化，使用 ObjectInputFilter 严格限制允许的类
+    - 'Jackson 禁用 enableDefaultTyping()，使用 @JsonTypeInfo(use = NAME)'
+    - YAML 使用 safe_load 代替 load
+    - 定期升级依赖，消除已知 gadget chain
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-502
+  deserialization_type: 'enum[''java_native'', ''jackson'', ''yaml'', ''xml'', ''pickle'', ''custom'']'
+  type_filtering: boolean
+  risk_level: CRITICAL
+  remediation: string

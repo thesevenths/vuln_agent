@@ -1,0 +1,16 @@
+# CWE-352 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 识别改变服务端状态的操作（转账、改密、删数据、下单、授权变更）。'
+  - 'Step 2: 检查是否仅依赖 Cookie 会话而无 CSRF token、Referer/Origin 校验或 SameSite 保护。'
+  - 'Step 3: 评估攻击面：该操作是否可在受害者已登录时被第三方站点以表单/fetch 触发。'
+  - 'Step 4: 区分只读 GET 与状态变更接口；仅对后者要求 CSRF 防护。'
+  - 'Step 5: 若状态变更接口缺少有效 CSRF 防护且依赖会话 Cookie → CWE-352。'
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-352
+  state_changing_endpoint: string
+  missing_csrf_control: string
+  remediation: string

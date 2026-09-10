@@ -1,0 +1,88 @@
+# CWE-613 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别会话管理机制】定位系统使用的会话存储与维持方式（服务端 Session、Redis、JWT、Cookie）及其配置入口。优先检查 config_files 中的配置。'
+  - 'Step 1: 【检查空闲超时 (Idle Timeout)】验证用户在一段时间无操作后，会话是否会自动失效（如 Spring 的 setMaxInactiveInterval 或 Redis TTL）。比对 anti_patterns 中永不过期的配置。'
+  - 'Step 2: 【检查绝对超时 (Absolute Timeout)】验证无论用户是否活跃，会话在达到最大生命周期后是否强制失效，以防止长连接被劫持或重用。注意：很多框架默认无绝对超时。'
+  - 'Step 3: 【检查客户端 Cookie 属性】验证 Session ID Cookie 是否设置了合理的 Max-Age 或 Expires，且与服务端超时时间一致或更短，避免客户端残留有效 Cookie。同时检查 Secure/HttpOnly/SameSite 标志。'
+  - 'Step 4: 【评估 JWT 过期策略】若使用 JWT，检查 Token 的 exp 声明是否设置合理（如 15-30 分钟），并配合 Refresh Token 机制，而非颁发长期有效的单 Token。检查 Refresh Token 是否有轮换和撤销机制。'
+  - 'Step 5: 【检查登出与状态清理】用户主动登出或密码修改时，服务端是否真正销毁了 Session 或将 JWT 加入黑名单（Blocklist/Revocation List）。无状态 JWT 不等于无法撤销。'
+  - 'Step 5.5: 【检查多 Profile/环境差异】搜索 application-{profile}.yml、appsettings.{env}.json 等多环境配置，验证非生产环境是否覆盖了会话超时配置（如 dev/staging 环境的 timeout=0），且生产环境配置未被意外覆盖。同一应用的不同部署模式可能有不同的会话安全策略。'
+  - 'Step 5.6: 【检查认证豁免路径的会话有效性】对 permitAll/anonymous/isPublic/@AllowAnonymous 等白名单端点，验证其是否误放行了需要有效会话才能安全执行的操作。白名单路径 + 敏感操作 = 无需有效会话即可执行。特别注意：数据导出、批量操作、管理配置端点可能被误设为豁免。'
+  - 'Step 6: 【七项确认标准】缺一不得 confirmed：(1)空闲超时存在且合理 (2)绝对超时存在 (3)Cookie属性完整 (4)JWT过期策略安全 (5)登出真正失效 (6)多环境配置无安全差异 (7)认证豁免路径无不安全操作'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'Jwts.builder().setSubject(userId).setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24 * 30)).signWith(key).compact();'
+      vulnerability_analysis: JWT 被设置为 30 天有效期，且系统未实现 Refresh Token 轮换与 Token 撤销机制。一旦 Token 泄露（如通过 XSS 或日志），攻击者可在长达一个月的时间内无限制接管账户。
+      fix_pattern: 将 Access Token 有效期缩短至 15-30 分钟；引入 Refresh Token 机制并存储在 HttpOnly Cookie 中；在 Redis 中维护 Token 黑名单以支持主动登出和撤销。
+    - code_snippet: 'server.servlet.session.timeout=0
+# 或在 web.xml 中配置 <session-timeout>0</session-timeout>'
+      vulnerability_analysis: 将 Session 超时时间配置为 0，在多数容器（如 Tomcat）中意味着会话永不过期。若用户离开但未主动登出，其会话将永久保持有效，极易被会话劫持。
+      fix_pattern: 设置合理的空闲超时时间（如 server.servlet.session.timeout=30m），并结合业务需求配置绝对超时时间。
+    - code_snippet: '# Flask
+app.config[''PERMANENT_SESSION_LIFETIME''] = None
+app.config[''SESSION_COOKIE_MAX_AGE''] = None'
+      vulnerability_analysis: Flask 中将 PERMANENT_SESSION_LIFETIME 设为 None 导致会话永不过期，SESSION_COOKIE_MAX_AGE 为 None 使 Cookie 在浏览器关闭后仍保留。攻击者获取 Cookie 后可无限期使用。
+      fix_pattern: 设置 PERMANENT_SESSION_LIFETIME = timedelta(hours=8)，SESSION_COOKIE_MAX_AGE = 28800，并启用 SESSION_COOKIE_SECURE=True。
+    - code_snippet: '// Go
+session.Options(sessions.Options{
+    MaxAge: -1,
+})'
+      vulnerability_analysis: gorilla/sessions 中 MaxAge 设为 -1 表示会话不过期。虽然代码看似设置了 Options，但 -1 使会话永久有效，等价于无超时保护。
+      fix_pattern: '设置 MaxAge: 1800（30分钟），配合 Secure:true, HttpOnly:true, SameSite:http.SameSiteLaxMode。'
+    - code_snippet: '// Node.js / Express
+app.use(session({
+  secret: ''keyboard cat'',
+  cookie: { maxAge: null },
+  resave: false,
+  saveUninitialized: true
+}));'
+      vulnerability_analysis: Express-session 中 cookie.maxAge 为 null 导致会话为浏览器会话 Cookie（浏览器关闭即失效），但服务端会话永不过期。若浏览器保持打开（常见于桌面应用），会话无限有效。
+      fix_pattern: '设置 cookie.maxAge: 30 * 60 * 1000（30分钟），store 配合 connect-redis 并设置 TTL，启用 rolling: true 使每次请求重置超时。'
+    - code_snippet: '// .NET
+services.AddAuthentication().AddCookie(options => {
+    options.ExpireTimeSpan = TimeSpan.Zero;
+    options.SlidingExpiration = false;
+});'
+      vulnerability_analysis: ExpireTimeSpan 为 TimeSpan.Zero 且 SlidingExpiration 为 false，意味着认证 Cookie 一旦颁发就不会过期也不会滑动延长，但在某些 ASP.NET Core 版本中 Zero 行为等价于 Session Cookie（无 Max-Age），服务端 Claims 仍有效。
+      fix_pattern: 设置 ExpireTimeSpan = TimeSpan.FromMinutes(30)，SlidingExpiration = true，配合 SecurityStampValidatorOptions.ValidationInterval 实现绝对超时。
+    - code_snippet: '# Ruby / Devise
+Devise.setup do |config|
+  config.timeout_in = nil
+end'
+      vulnerability_analysis: 'Devise timeout_in 设为 nil 禁用了超时模块。即使引入了 :timeoutable，nil 配置也会使其不生效，用户会话永不过期。'
+      fix_pattern: '设置 config.timeout_in = 30.minutes，确保 User model 中包含 :timeoutable，并在 production 环境中配置 session_store 的 expire_after。'
+  mitigation_rules:
+    - 实施双重超时机制：空闲超时（Idle Timeout，如 15-30 分钟）和绝对超时（Absolute Timeout，如 8-12 小时）。
+    - 确保服务端会话销毁与客户端 Cookie 过期时间同步，避免客户端残留有效 Cookie。
+    - JWT 应保持短生命周期（Access Token 15-30 分钟），配合 Refresh Token 轮换机制，并实现服务端撤销能力。
+    - 用户主动登出、密码修改或权限变更时，必须立即使现有会话/Token 失效。
+    - 多环境部署时，确保所有环境（含 dev/staging）的会话超时配置不低于生产环境的安全基线。
+    - 认证豁免路径仅允许真正的公开操作（登录、注册、健康检查），敏感操作端点不得被豁免。
+
+anti_patterns:
+  - description
+  - java
+  - python
+  - php
+  - go
+  - javascript
+  - dotnet
+  - ruby
+  - rust
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-613
+  session_type: 'enum[''server_side_session'', ''jwt_token'', ''cookie_based'', ''hybrid'']'
+  missing_expiration_type: 'array — 缺失的过期机制 (如 [''idle_timeout'', ''absolute_timeout'', ''logout_invalidation'', ''jwt_exp_too_long'', ''cookie_residual'', ''profile_override'', ''exemption_bypass''])'
+  configured_timeout_value: 'string (提取到的实际超时配置值，如 ''30 days'' 或 ''0 (never)'')'
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''session-timeout=0'', ''setMaxInactiveInterval(-1)''])'
+  profile_difference_found: boolean — 是否发现多环境配置安全差异
+  exemption_path_issue_found: boolean — 是否发现认证豁免路径包含敏感操作
+  reasoning_trace: string
+  business_impact: string
+  risk_level: MEDIUM
+  remediation: string

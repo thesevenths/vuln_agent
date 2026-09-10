@@ -1,0 +1,46 @@
+# CWE-640 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(forgotPassword|resetPassword|recover|verifyOTP|sendResetLink|securityQuestion)/i]'
+  - 'ClassDef[name=~/(PasswordRecovery|ResetService|AccountSecurity|AuthController)/i]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*(reset|recover|forgot|otp)/i]'
+
+semantic_keywords:
+  - forgot
+  - reset
+  - recover
+  - security question
+  - secret answer
+  - otp
+  - sms code
+  - reset token
+  - email link
+  - password change
+
+file_context:
+  - auth_controller
+  - password_service
+  - user_recovery
+  - account_security
+  - notification_service
+
+logic_query_keywords_generic:
+  recovery_ops:
+    - recover_account
+    - request_reset
+    - verify_code
+    - change_password
+    - answer_question
+  token_ops:
+    - reset_token
+    - expiry_time
+    - consume_token
+    - invalidate_token
+    - one_time_use
+
+sanitizers:
+  - 密码重置由成熟的外部 IdP (OAuth2/OIDC/SAML) 全权接管，且 IdP 具备完善的防暴破与身份验证策略
+  - 使用了 FIDO2/WebAuthn 等无密码恢复机制（如通过硬件密钥、Passkey 或受信任设备恢复）
+  - 重置 Token 由强加密算法（如 CSPRNG）生成，且服务端严格校验签名、短时效（<30min）和一次性消费
+  - 更新密码接口仅依赖服务端 Session/Token 解析用户身份，无任何客户端可控的 userId/username 参数
+  - OTP 验证码具备严格的防暴破机制（如 5 次失败锁定，且验证码生命周期极短）

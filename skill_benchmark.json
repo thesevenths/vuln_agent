@@ -1,0 +1,235 @@
+{
+  "skills": {
+    "expert_cpp_buffer_overflow": {
+      "attempts": 7.0,
+      "success": 7.0
+    },
+    "expert_cpp_uaf_double_free": {
+      "attempts": 3.0,
+      "success": 3.0
+    },
+    "expert_cpp_integer_overflow": {
+      "attempts": 2.0,
+      "success": 2.0
+    },
+    "expert_cpp_memory_leak": {
+      "attempts": 2.0,
+      "success": 2.0
+    },
+    "expert_java_injection_suite": {
+      "attempts": 2.0,
+      "success": 2.0
+    },
+    "java_web_audit_pipeline": {
+      "attempts": 25.0,
+      "success": 25.0
+    },
+    "java_attack_surface": {
+      "attempts": 25.0,
+      "success": 25.0
+    }
+  },
+  "nodes": {
+    "source_0day_pipeline::set_context": {
+      "attempts": 11.0,
+      "success": 11.0,
+      "last_tool_name": "set_context"
+    },
+    "expert_cpp_uaf_double_free::set_context": {
+      "attempts": 2.0,
+      "success": 2.0,
+      "last_tool_name": "set_context"
+    },
+    "expert_cpp_buffer_overflow::set_context": {
+      "attempts": 3.0,
+      "success": 3.0,
+      "last_tool_name": "set_context"
+    },
+    "expert_cpp_uaf_double_free::targeted_scan": {
+      "attempts": 1.0,
+      "success": 1.0,
+      "last_tool_name": "JoernTool.run_targeted_scan"
+    },
+    "expert_cpp_buffer_overflow::targeted_scan": {
+      "attempts": 1.0,
+      "success": 1.0,
+      "last_tool_name": "JoernTool.run_targeted_scan"
+    },
+    "java_attack_surface::set_java_context": {
+      "attempts": 37.0,
+      "success": 37.0,
+      "last_tool_name": "set_context"
+    },
+    "java_attack_surface::scan_routes": {
+      "attempts": 33.0,
+      "success": 33.0,
+      "last_tool_name": "JavaAuditTool.scan_routes"
+    },
+    "java_attack_surface::load_route_mapper_playbook": {
+      "attempts": 30.0,
+      "last_tool_name": "FileTool.glob_files",
+      "success": 22.0
+    },
+    "java_attack_surface::load_auth_playbook": {
+      "attempts": 27.0,
+      "last_tool_name": "FileTool.glob_files",
+      "success": 19.0
+    },
+    "java_attack_surface::load_vuln_scanner_playbook": {
+      "attempts": 23.0,
+      "last_tool_name": "FileTool.glob_files",
+      "success": 17.0
+    },
+    "java_attack_surface::glob_l2_parallel": {
+      "attempts": 21.0,
+      "success": 21.0,
+      "last_tool_name": "Skill.parallel",
+      "last_parallel_count": 4
+    },
+    "java_attack_surface::write_route_index": {
+      "attempts": 20.0,
+      "success": 20.0,
+      "last_tool_name": "FileTool.write_report"
+    },
+    "source_0day_pipeline::source_scan": {
+      "attempts": 7.0,
+      "last_tool_name": "JoernTool.run_source_scan"
+    },
+    "source_0day_pipeline::glob_l2": {
+      "attempts": 6.0,
+      "success": 6.0,
+      "last_tool_name": "Skill.parallel",
+      "last_parallel_count": 2
+    },
+    "source_0day_pipeline::read_l2": {
+      "attempts": 5.0,
+      "success": 5.0,
+      "last_tool_name": "FileTool.glob_files"
+    },
+    "java_web_audit_pipeline::bootstrap": {
+      "attempts": 4.0,
+      "success": 4.0,
+      "last_tool_name": "set_context"
+    },
+    "java_web_audit_pipeline::noop_done": {
+      "attempts": 3.0,
+      "success": 3.0,
+      "last_tool_name": "set_context"
+    }
+  },
+  "rewrites": [
+    {
+      "skill_id": "java_attack_surface",
+      "node_id": "load_route_mapper_playbook",
+      "attempts": 12.0,
+      "success_rate": 0.333,
+      "reason": "节点低表现触发策略选择器，选择策略 security_focus_glob (score=0.4)",
+      "replacement_tool": "FileTool.glob_files",
+      "strategy_id": "security_focus_glob",
+      "strategy_score": 0.4,
+      "selector_features": {
+        "tool_name": "JavaAuditTool.load_playbook",
+        "tool_family": "other",
+        "is_parallel": false,
+        "attempts": 12.0,
+        "success_rate": 0.3333333333333333,
+        "has_direct_file_read": false,
+        "has_file_glob": false
+      },
+      "family_success_rate": 0.5926,
+      "replacement_node": {
+        "tool_name": "FileTool.glob_files",
+        "arguments": {
+          "pattern": "**/*Security*.java",
+          "limit": 12
+        },
+        "parallel_actions": [],
+        "success_next": "load_auth_playbook",
+        "failure_next": null,
+        "completion_signal": null,
+        "expert_guidance": {}
+      },
+      "draft_path": "E:\\agent\\skills\\generated\\java_attack_surface_load_route_mapper_playbook_1782621268.json",
+      "promotion": {
+        "canary_attempts": 5,
+        "canary_success_rate": 1.0
+      }
+    },
+    {
+      "skill_id": "java_attack_surface",
+      "node_id": "load_auth_playbook",
+      "attempts": 12.0,
+      "success_rate": 0.333,
+      "reason": "节点低表现触发策略选择器，选择策略 security_focus_glob (score=0.4)",
+      "replacement_tool": "FileTool.glob_files",
+      "strategy_id": "security_focus_glob",
+      "strategy_score": 0.4,
+      "selector_features": {
+        "tool_name": "JavaAuditTool.load_playbook",
+        "tool_family": "other",
+        "is_parallel": false,
+        "attempts": 12.0,
+        "success_rate": 0.3333333333333333,
+        "has_direct_file_read": false,
+        "has_file_glob": false
+      },
+      "family_success_rate": 0.6,
+      "replacement_node": {
+        "tool_name": "FileTool.glob_files",
+        "arguments": {
+          "pattern": "**/*Security*.java",
+          "limit": 12
+        },
+        "parallel_actions": [],
+        "success_next": "load_vuln_scanner_playbook",
+        "failure_next": null,
+        "completion_signal": null,
+        "expert_guidance": {}
+      },
+      "draft_path": "E:\\agent\\skills\\generated\\java_attack_surface_load_auth_playbook_1782621271.json",
+      "promotion": {
+        "canary_attempts": 5,
+        "canary_success_rate": 1.0
+      }
+    },
+    {
+      "skill_id": "java_attack_surface",
+      "node_id": "load_vuln_scanner_playbook",
+      "attempts": 9.0,
+      "success_rate": 0.333,
+      "reason": "节点低表现触发策略选择器，选择策略 security_focus_glob (score=0.4)",
+      "replacement_tool": "FileTool.glob_files",
+      "strategy_id": "security_focus_glob",
+      "strategy_score": 0.4,
+      "selector_features": {
+        "tool_name": "JavaAuditTool.load_playbook",
+        "tool_family": "other",
+        "is_parallel": false,
+        "attempts": 9.0,
+        "success_rate": 0.3333333333333333,
+        "has_direct_file_read": false,
+        "has_file_glob": false
+      },
+      "family_success_rate": 0.5769,
+      "replacement_node": {
+        "tool_name": "FileTool.glob_files",
+        "arguments": {
+          "pattern": "**/*Security*.java",
+          "limit": 12
+        },
+        "parallel_actions": [],
+        "success_next": "glob_l2_parallel",
+        "failure_next": null,
+        "completion_signal": null,
+        "expert_guidance": {}
+      },
+      "draft_path": "E:\\model-similarity\\agent\\skills\\generated\\java_attack_surface_load_vuln_scanner_playbook_1782394630.json",
+      "promotion": {
+        "canary_attempts": 5,
+        "canary_success_rate": 1.0
+      }
+    }
+  ],
+  "pending_rewrites": {},
+  "applied_rewrites": {}
+}

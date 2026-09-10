@@ -1,0 +1,49 @@
+# CWE-610 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(checkout|pay|createOrder|transfer|calculate|applyCoupon|addCart)/i]'
+  - 'ClassDef[name=~/(Payment|Order|Checkout|Cart|Transaction|Billing)/i]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*(pay|order|checkout|transfer)/i]'
+
+semantic_keywords:
+  - price
+  - amount
+  - total
+  - discount
+  - coupon
+  - quantity
+  - qty
+  - fee
+  - cost
+  - shipping
+  - exchange_rate
+  - hidden_field
+
+file_context:
+  - payment_controller
+  - order_service
+  - checkout_manager
+  - cart_service
+  - transfer_service
+  - billing_api
+
+logic_query_keywords_generic:
+  business_ops:
+    - pay
+    - buy
+    - transfer
+    - checkout
+    - purchase
+  tainted_params:
+    - price
+    - amount
+    - total_fee
+    - discount_amount
+    - quantity
+
+sanitizers:
+  - 金额和价格完全由服务端根据 product_id 和 quantity 从数据库实时查询并计算，客户端传入的金额字段被直接忽略或覆盖
+  - 使用了成熟支付网关的“服务端统一下单”API，且网关回调时严格校验了订单状态和实际支付金额
+  - 客户端传递的订单摘要包含了强密码学签名（如 RSA/HMAC），且服务端在执行业务前严格验证了签名、时效和防重放
+  - '对所有的数量、金额参数实施了严格的 >0 校验，并使用了高精度数据类型（如 BigDecimal）防止溢出'
+  - 系统为纯内部测试环境，且不涉及真实资金流转或高价值虚拟资产

@@ -1,0 +1,22 @@
+# CWE-863 Skill 元数据
+# 从 templates/cwe/cwe_863.json 迁移
+
+skill_id: cwe_863_incorrect_authorization
+source_cwe: CWE-863
+priority: P0
+
+related_cwes:
+  - cwe: CWE-285
+    reason: improper_authorization_general - CWE-863 是其在授权逻辑错误维度的具体化
+  - cwe: CWE-284
+    reason: improper_access_control - 访问控制机制存在但逻辑错误
+  - cwe: CWE-302
+    reason: authentication_bypass_by_assumed_immutable - 基于不可变属性（如 cookie 中的角色）的认证可被伪造
+  - cwe: CWE-613
+    reason: insufficient_session_expiration - 会话过期不足使过期的授权决策继续有效
+  - cwe: CWE-862
+    reason: missing_authorization - 授权不当与授权缺失常共现：有授权但逻辑错误 + 部分路径完全无授权
+  - cwe: CWE-269
+    reason: improper_privilege_management - 授权不当可导致权限管理缺陷：如仅校验登录状态未校验角色
+
+description: 授权决策点是 CWE-863 的核心攻击面，必须验证授权逻辑的正确性和完整性

@@ -1,0 +1,176 @@
+{
+  "skill_id": "cwe_610_externally_controlled_reference",
+  "source_cwe": [
+    "CWE-610"
+  ],
+  "related_cwes": [
+    "CWE-472",
+    "CWE-345",
+    "CWE-863",
+    "CWE-602",
+    "CWE-190"
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(checkout|pay|createOrder|transfer|calculate|applyCoupon|addCart)/i]",
+      "ClassDef[name=~/(Payment|Order|Checkout|Cart|Transaction|Billing)/i]",
+      "Annotation[name=~/(PostMapping|RequestMapping).*(pay|order|checkout|transfer)/i]"
+    ],
+    "semantic_keywords": [
+      "price",
+      "amount",
+      "total",
+      "discount",
+      "coupon",
+      "quantity",
+      "qty",
+      "fee",
+      "cost",
+      "shipping",
+      "exchange_rate",
+      "hidden_field"
+    ],
+    "file_context": [
+      "payment_controller",
+      "order_service",
+      "checkout_manager",
+      "cart_service",
+      "transfer_service",
+      "billing_api"
+    ]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "business_ops": [
+        "checkout",
+        "payOrder",
+        "createOrder",
+        "transferFunds",
+        "calculateTotal",
+        "applyCoupon",
+        "unifiedOrder"
+      ],
+      "tainted_params": [
+        "@RequestParam(\"amount\")",
+        "@RequestParam(\"price\")",
+        "@RequestBody OrderRequest",
+        "request.getParameter(\"total\")",
+        "@ModelAttribute"
+      ],
+      "trust_checks": [
+        "verifySign",
+        "hmac",
+        "comparePrice",
+        "db.getPrice",
+        "itemRepository.findById"
+      ]
+    },
+    "flask": {
+      "business_ops": [
+        "checkout",
+        "process_payment",
+        "create_order",
+        "transfer",
+        "calculate_cart"
+      ],
+      "tainted_params": [
+        "request.form.get('amount')",
+        "request.json.get('price')",
+        "request.args.get('qty')",
+        "request.values"
+      ]
+    },
+    "generic": {
+      "business_ops": [
+        "pay",
+        "buy",
+        "transfer",
+        "checkout",
+        "purchase"
+      ],
+      "tainted_params": [
+        "price",
+        "amount",
+        "total_fee",
+        "discount_amount",
+        "quantity"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别核心交易链路】定位涉及订单创建、价格计算、支付发起、资金转账、优惠券核销的核心业务端点。",
+    "Step 1: 【追踪关键参数来源】检查金额(amount)、单价(price)、数量(quantity)、折扣(discount)等核心财务参数是直接从客户端请求（HTTP Body/Query/Hidden Field）获取，还是从服务端数据库重新计算获取。",
+    "Step 2: 【评估服务端校验与覆盖逻辑】如果参数来自客户端，检查服务端是否使用可信数据源（如商品库）对其进行了严格的二次校验和覆盖计算（如 `actual_price = db_price * qty`），而非直接将其写入订单表或传给支付网关。",
+    "Step 3: 【检查签名与防篡改机制】对于必须在客户端传递的复杂订单摘要对象，检查是否实施了严格的服务端签名校验（如 HMAC/RSA），且签名密钥未泄露到前端。",
+    "Step 4: 【识别负数与边界风险】检查是否允许传入负数金额、负数数量（导致退款或增加余额），或是否存在整数溢出（CWE-190）导致金额校验绕过。",
+    "Step 5: 【检查运费与汇率逻辑】检查运费计算、优惠券抵扣金额、汇率转换是否完全依赖客户端传入的值，而未在服务端重新核算。",
+    "Step 6: 【六项确认标准】缺一不得 confirmed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "public String createOrder(@RequestBody OrderReq req) {\n    Order order = new Order();\n    order.setProductId(req.getProductId());\n    order.setTotalAmount(req.getTotalAmount()); // 直接使用客户端传入的金额\n    orderRepo.save(order);\n    return paymentGateway.pay(order);\n}",
+        "vulnerability_analysis": "存在严重的支付逻辑漏洞（订单金额篡改）。服务端直接信任客户端传入的 `totalAmount` 并用于创建支付单。攻击者可通过抓包将金额修改为 0.01 元，从而以极低成本购买高价商品。",
+        "fix_pattern": "服务端必须根据 `productId` 从数据库查询真实单价，结合 `quantity` 重新计算总价：`BigDecimal realPrice = productRepo.getPrice(req.getProductId()).multiply(req.getQuantity()); order.setTotalAmount(realPrice);`，忽略客户端传入的金额字段。"
+      },
+      {
+        "code_snippet": "def apply_coupon(user_id, coupon_code, discount_amount):\n    db.execute('UPDATE cart SET total = total - %s WHERE user_id = %s', (discount_amount, user_id))",
+        "vulnerability_analysis": "存在折扣金额篡改漏洞。抵扣金额 `discount_amount` 由客户端控制，攻击者可传入大于订单总价的数值，导致订单金额变为负数，甚至可能触发系统的“负数订单退款”逻辑，实现薅羊毛或盗刷。",
+        "fix_pattern": "服务端应根据 `coupon_code` 查询优惠券规则（如满减条件、折扣比例），在服务端计算实际抵扣金额，并校验抵扣后金额是否 >= 0。"
+      }
+    ],
+    "mitigation_rules": [
+      "核心交易金额、单价、折扣、运费必须由服务端根据数据库实时计算，严禁信任客户端传入的财务数值。",
+      "若业务架构必须传递复杂订单摘要给前端，必须使用服务端私钥进行强密码学签名（如 HMAC-SHA256），并在服务端验签。",
+      "对数量、金额等数值型参数进行严格的边界校验（必须 > 0），防御负数订单和整数溢出攻击。",
+      "支付网关回调时，必须严格校验网关返回的实际支付金额与系统订单应付金额是否完全一致。"
+    ],
+    "refutation_checklist": [
+      "系统是否采用了“购物车仅存商品ID和数量，结算时服务端动态计算总价”的安全架构？",
+      "支付网关（如 Stripe, 支付宝, 微信支付）是否在服务端通过统一下单 API 生成支付链接，且网关侧锁定了金额？",
+      "前端传递的订单对象是否包含了强签名，且服务端在执行业务前严格验证了签名和时效性？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_transaction_endpoints",
+      "desc": "识别支付、下单、转账、购物车结算等核心交易端点。"
+    },
+    {
+      "name": "trace_financial_parameters",
+      "desc": "追踪金额、价格、数量、折扣等关键财务参数的数据流来源（客户端请求 vs 服务端DB）。"
+    },
+    {
+      "name": "verify_server_side_calculation",
+      "desc": "检查服务端是否存在基于可信数据源的金额重新计算和覆盖逻辑，确认客户端参数是否被忽略。"
+    },
+    {
+      "name": "check_signature_verification",
+      "desc": "分析订单对象或支付请求是否具备防篡改的密码学签名校验机制（如 HMAC/RSA）。"
+    },
+    {
+      "name": "analyze_boundary_conditions",
+      "desc": "检查数值型参数是否防御了负数、零或极值溢出攻击（如负数购买导致退款）。"
+    }
+  ],
+  "sanitizers": [
+    "金额和价格完全由服务端根据 product_id 和 quantity 从数据库实时查询并计算，客户端传入的金额字段被直接忽略或覆盖",
+    "使用了成熟支付网关的“服务端统一下单”API，且网关回调时严格校验了订单状态和实际支付金额",
+    "客户端传递的订单摘要包含了强密码学签名（如 RSA/HMAC），且服务端在执行业务前严格验证了签名、时效和防重放",
+    "对所有的数量、金额参数实施了严格的 >0 校验，并使用了高精度数据类型（如 BigDecimal）防止溢出",
+    "系统为纯内部测试环境，且不涉及真实资金流转或高价值虚拟资产"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-610",
+    "tampered_parameter_type": "enum['unit_price', 'total_amount', 'quantity', 'discount_amount', 'shipping_fee', 'exchange_rate']",
+    "data_source_flaw": "string (如 '直接信任 request body 中的 total_price 并写入订单表')",
+    "missing_validation": "string (如 '缺少服务端基于商品库的价格重算逻辑' 或 '缺少负数金额拦截')",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "CRITICAL",
+    "remediation": "string"
+  }
+}

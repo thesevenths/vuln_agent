@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph runtime [运行时读入]
+        LS_SET["logic_scan_settings.py<br/>CATALOG / P0-P2 / L2_SENSITIVE<br/>LOGIC_SCAN_CONTEXT_EXPANSION_TYPES<br/>detect_logic_only_intent"]
+        PFI["project_file_index.py<br/>build / resolve_l2_path<br/>_live_file_index 完整路径"]
+        CWE_MAP["_LOGIC_CWE_QUERY_MAP<br/>_LOGIC_QUERY_AFFECTED_CANDIDATE_TYPES"]
+        CWE_JSON["skills/templates/cwe/*.json"]
+        COMMON[cwe_logic_common.json]
+        PROMPT["prompts.py<br/>VERDICT / LOGIC_VERDICT<br/>refutation_check_prompt 仅污点<br/>rules: available_source_files"]
+        GATES[logic_verdict_gates.py]
+        VAL[logic_query_validate.py<br/>全 query 集 semanticcpg import 校验]
+    end
+
+    LS_SET --> EXT[_extract_logic_candidates / prioritize]
+    LS_SET --> EXP[_expand_logic_candidate_context]
+    LS_SET --> PLAN[planner logic_only gate]
+    PFI --> PLAN
+    PFI --> READ[FileTool / forced_l2_read]
+    CWE_MAP --> RLS[run_logic_scan query 过滤]
+    CWE_MAP --> CACHE[增量 affected_types 映射]
+    CWE_JSON --> ANA[_analyze_logic_candidate]
+    COMMON --> ANA
+    PROMPT --> ASF[_analyze_single_taint_flow]
+    PROMPT --> ANA
+    PROMPT --> REF[_run_refutation_check 污点专用]
+    GATES --> ANA
+    VAL --> Q[queries.py 全部注册表]

@@ -1,0 +1,33 @@
+# Web 渗透 / 动态验证作战配置（借鉴 Shannon docs/configuration.md）
+# 复制为 engagement.yaml 并按靶场填写；Planner / 未来 DynamicVerifyTool 可读取。
+
+authorized: true  # 必须为 true；表示你对 base_url 与 repo 有书面授权
+
+target:
+  base_url: "http://localhost:3000"
+  repo_path: "."  # 源码根目录，供 Joern / java_attack_surface
+
+scope:
+  focus_paths:
+    - "/api/"
+    - "/rest/"
+  exclude_paths:
+    - "/static/"
+  max_requests_per_minute: 30
+
+auth:
+  # 示例：表单登录；实际字段名因应用而异
+  login_url: "/rest/user/login"
+  username: "test@example.com"
+  password: "changeme"
+  # totp_secret: ""  # 若启用 2FA
+
+rules_of_engagement:
+  allow_state_mutation: true   # Shannon Exploit 可能建用户、改数据
+  allow_outbound_ssrf_probes: false
+  environment: "staging"       # local | staging — 禁止填 production
+
+reporting:
+  no_exploit_no_report: true   # 与 evidence_levels L3 对齐
+  include_hypotheses_section: true
+  include_scan_coverage: true

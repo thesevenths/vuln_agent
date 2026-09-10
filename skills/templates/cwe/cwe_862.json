@@ -1,0 +1,458 @@
+{
+  "skill_id": "cwe_862_missing_authorization",
+  "source_cwe": ["CWE-862"],
+  "related_cwes": [
+    {"cwe": "CWE-285", "reason": "improper_authorization_general - CWE-862 是授权完全缺失的特殊情况"},
+    {"cwe": "CWE-284", "reason": "improper_access_control - 访问控制机制存在但覆盖不完整"},
+    {"cwe": "CWE-639", "reason": "idor - 水平越权是 CWE-862 最常见的利用方式"},
+    {"cwe": "CWE-306", "reason": "missing_auth_for_critical_function - 缺少认证使授权检查无从谈起"},
+    {"cwe": "CWE-863", "reason": "incorrect_authorization - 授权不当与授权缺失常共现：部分路径有授权但不正确，部分路径完全无授权"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[access_modifier=public]",
+      "RouteHandler[method=~/(GET|POST|PUT|DELETE)/i]",
+      "DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i]",
+      "Annotation[name=~/(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping)/i]",
+      "Call[name=~/(findById|getById|findOne|findAll|deleteById|updateById|execute|query|save|remove)/i]"
+    ],
+    "semantic_keywords": [
+      "sensitive", "private", "admin", "employee", "record",
+      "user_data", "message", "config", "secret",
+      "order", "invoice", "payment", "profile", "document",
+      "tenant", "organization", "department"
+    ],
+    "file_context": [
+      "controller", "api_handler", "service_layer",
+      "repository", "data_access", "resource_handler"
+    ],
+    "operation_triggers": {
+      "description": "所有涉及数据读写、状态变更或资源访问的端点是 CWE-862 的攻击面",
+      "sensitive_operations": [
+        "read_user_data", "modify_record", "delete_entity",
+        "access_config", "execute_command", "transfer_resource",
+        "export_data", "import_data", "view_private_content"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Get|Post|Put|Delete|Patch)Mapping.*/(api|v[0-9])/",
+          "@RequestMapping.*/(api|rest|service)"
+        ],
+        "python": [
+          "@app\\.route.*/(api|v[0-9])/",
+          "@router\\.(get|post|put|delete).*/(api|v[0-9])/"
+        ],
+        "go": [
+          "\\.(GET|POST|PUT|DELETE)\\(.*/(api|v[0-9])/",
+          "r\\.(GET|POST)"
+        ],
+        "javascript": [
+          "router\\.(get|post|put|delete).*/(api|v[0-9])/",
+          "app\\.(get|post|put|delete)"
+        ],
+        "php": [
+          "Route::(get|post|put|delete).*/(api|v[0-9])/",
+          "@Route.*/(api|v[0-9])/"
+        ],
+        "dotnet": [
+          "\\[Http(Get|Post|Put|Delete)\\].*/(api|v[0-9])/",
+          "\\[Route.*api"
+        ],
+        "ruby": [
+          "(get|post|put|delete)\\s+\"/(api|v[0-9])/",
+          "resources\\s+:"
+        ],
+        "rust": [
+          "\\.route.*/(api|v[0-9])/.*method.*(?:GET|POST|PUT|DELETE)",
+          "\\.get\\(.*/(api)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "auth_annotations": [
+        "PreAuthorize", "Secured", "RolesAllowed", "RequiresAuthentication",
+        "RequiresPermissions", "RequiresRoles", "DenyAll", "PermitAll"
+      ],
+      "shiro_guards": [
+        "RequiresAuthentication", "RequiresPermissions", "RequiresRoles",
+        "RequiresGuest", "RequiresUser", "SecurityUtils.getSubject"
+      ],
+      "jaxrs_guards": [
+        "RolesAllowed", "PermitAll", "DenyAll", "@Path",
+        "ContainerRequestFilter"
+      ],
+      "security_config": [
+        "SecurityFilterChain", "authorizeHttpRequests", "authorizeRequests",
+        "permitAll", "antMatchers", "requestMatchers",
+        "filterChainDefinitions", "shiro.ini"
+      ],
+      "auth_code_calls": [
+        "isAuthenticated", "hasRole", "hasPermission", "checkPermission",
+        "authorize", "getAuthentication", "getPrincipal",
+        "Subject.isAuthenticated"
+      ],
+      "sensitive_ops": [
+        "save", "delete", "update", "remove", "execute", "transfer",
+        "payment", "createUser", "deleteUser", "grantRole"
+      ]
+    },
+    "python": {
+      "django_auth_decorators": [
+        "login_required", "permission_required", "permission_classes",
+        "IsAuthenticated", "user_passes_test"
+      ],
+      "flask_auth_decorators": [
+        "login_required", "requires_auth", "auth_required",
+        "roles_required", "flask_login"
+      ],
+      "fastapi_auth_deps": [
+        "Depends(get_current_user)", "Depends(oauth2_scheme)",
+        "HTTPBearer", "OAuth2PasswordBearer"
+      ],
+      "auth_code_calls": [
+        "is_authenticated", "check_auth", "verify_token",
+        "has_perm", "check_permissions"
+      ],
+      "sensitive_ops": [
+        "commit", "delete", "execute", "system", "send_mail",
+        "save", "create", "update", "raw"
+      ]
+    },
+    "php": {
+      "laravel_auth_middleware": [
+        "middleware.*auth", "Auth::check", "auth()",
+        "Gate::allows", "authorize", "@can"
+      ],
+      "symfony_auth_guards": [
+        "isGranted", "denyAccessUnlessGranted",
+        "@IsGranted", "Security::getUser"
+      ],
+      "auth_code_calls": [
+        "Auth::check", "auth()->check", "auth()->user",
+        "Gate::allows", "can"
+      ],
+      "sensitive_ops": [
+        "save", "delete", "update", "create", "destroy"
+      ]
+    },
+    "go": {
+      "auth_middleware": [
+        "AuthRequired", "JWTMiddleware", "RequireAuth",
+        "AuthMiddleware", "checkAuth", "isAdmin"
+      ],
+      "auth_code_calls": [
+        "isAuthenticated", "checkPermission", "hasRole",
+        "casbin.Enforce", "rbac.Check"
+      ],
+      "sensitive_ops": [
+        "Create", "Delete", "Update", "Find", "Execute",
+        "Transfer", "Save"
+      ]
+    },
+    "javascript": {
+      "express_auth_middleware": [
+        "authenticate", "authorize", "verify", "isAuthenticated",
+        "ensureAuthenticated", "requireAuth", "passport.authenticate"
+      ],
+      "nestjs_auth_guards": [
+        "AuthGuard", "JwtAuthGuard", "@UseGuards",
+        "@Roles", "RolesGuard", "PermissionsGuard"
+      ],
+      "auth_code_calls": [
+        "checkAuth", "verifyToken", "hasRole",
+        "hasPermission", "CASL"
+      ],
+      "sensitive_ops": [
+        "query", "exec", "save", "delete", "update",
+        "findById", "sendFile", "create", "destroy"
+      ]
+    },
+    "dotnet": {
+      "auth_attributes": [
+        "[Authorize]", "[Authorize(Roles", "[Authorize(Policy",
+        "[AllowAnonymous]", "RequireAuthenticatedUser"
+      ],
+      "auth_code_calls": [
+        "User.Identity.IsAuthenticated", "User.IsInRole",
+        "IsInRoleAsync", "HasClaim", "ClaimsPrincipal"
+      ],
+      "sensitive_ops": [
+        "Create", "Delete", "Update", "Find", "Execute",
+        "Remove", "Save"
+      ]
+    },
+    "ruby": {
+      "auth_filters": [
+        "before_action.*:authenticate", "before_action.*:require_login",
+        "before_action.*:authorize", "devise.*authenticate"
+      ],
+      "auth_code_calls": [
+        "current_user", "authenticate_user!", "authorize!",
+        "can?", "has_role?"
+      ],
+      "sensitive_ops": [
+        "create", "destroy", "update", "save", "delete"
+      ]
+    },
+    "rust": {
+      "auth_middleware": [
+        "#[authorize]", "AuthMiddleware", ".wrap(Auth)",
+        "require_auth", "is_authenticated"
+      ],
+      "auth_code_calls": [
+        "Identity", "Claims", "has_role",
+        "check_permission", "is_admin"
+      ],
+      "sensitive_ops": [
+        "create", "delete", "update", "find", "execute"
+      ]
+    },
+    "generic": {
+      "auth_checks": [
+        "authenticate", "authorize", "isAuthenticated",
+        "is_authenticated", "hasPermission", "checkAuth"
+      ],
+      "sensitive_ops": [
+        "create", "read", "update", "delete", "execute",
+        "query", "save", "remove", "transfer"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表授权缺失的高风险反模式",
+    "no_authorization_check": {
+      "description": "敏感操作前完全无授权检查",
+      "java": [
+        "@(Get|Post|Put|Delete)Mapping.*without.*@PreAuthorize",
+        "public.*void.*(delete|update|create).*without.*hasRole",
+        "repository\\.(delete|save|update).*without.*checkPermission"
+      ],
+      "python": [
+        "def.*(delete|update|create).*without.*login_required",
+        "Model\\.objects\\.(delete|update).*without.*permission_required",
+        "@app\\.(post|put|delete).*without.*@login_required"
+      ],
+      "javascript": [
+        "app\\.(post|put|delete).*without.*authMiddleware",
+        "router\\.(post|put|delete).*without.*isAuthenticated",
+        "Model\\.(delete|update|create).*without.*checkAuth"
+      ],
+      "go": [
+        "r\\.(POST|PUT|DELETE).*without.*AuthRequired",
+        "db\\.(Delete|Update|Create).*without.*checkPermission"
+      ],
+      "generic": [
+        "sensitive.*operation.*without.*authorization",
+        "data.*modification.*without.*permission.*check"
+      ]
+    },
+    "authentication_only_no_authorization": {
+      "description": "仅有认证（登录检查）而无授权（权限/角色检查）",
+      "java": [
+        "isAuthenticated.*without.*hasRole",
+        "@PreAuthorize.*isAuthenticated.*without.*hasRole",
+        "login_required.*without.*permission_required"
+      ],
+      "python": [
+        "login_required.*without.*permission_required",
+        "is_authenticated.*without.*has_perm"
+      ],
+      "generic": [
+        "check.*login.*not.*role",
+        "authenticated.*not.*authorized",
+        "login.*check.*without.*permission"
+      ]
+    },
+    "public_sensitive_data": {
+      "description": "敏感数据端点对公众开放",
+      "java": [
+        "@GetMapping.*employee.*without.*auth",
+        "@GetMapping.*user.*list.*without.*@PreAuthorize",
+        "findAll.*without.*filter.*user"
+      ],
+      "generic": [
+        "public.*endpoint.*sensitive.*data",
+        "unauthenticated.*api.*private.*info",
+        "open.*access.*confidential"
+      ]
+    },
+    "endpoint_not_in_security_config": {
+      "description": "端点未被安全配置覆盖",
+      "java": [
+        "anyRequest.*permitAll.*without.*antMatchers.*admin",
+        "filterChainDefinitions.*anon.*\\*\\*"
+      ],
+      "generic": [
+        "security.*config.*misses.*endpoint",
+        "route.*not.*in.*security.*policy"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "global_default_deny": {
+      "description": "是否配置了全局默认拒绝策略",
+      "java": [
+        "anyRequest\\(\\)\\.authenticated\\(\\)",
+        "anyRequest\\(\\)\\.denyAll\\(\\)",
+        "filterChainDefinitions.*\\*\\*.*authc"
+      ],
+      "python": [
+        "@app\\.before_request.*check_auth",
+        "middleware.*AuthenticationMiddleware"
+      ],
+      "javascript": [
+        "app\\.use.*authMiddleware",
+        "router\\.use.*isAuthenticated"
+      ],
+      "go": [
+        "r\\.Use\\(AuthMiddleware\\)",
+        "router\\.Group.*\\.Use\\(AuthRequired\\)"
+      ],
+      "dotnet": [
+        "RequireAuthenticatedUser",
+        "\\[Authorize\\].*class.*level"
+      ],
+      "generic": [
+        "default.*deny",
+        "global.*authenticated",
+        "all.*routes.*require.*auth"
+      ]
+    },
+    "resource_ownership_check": {
+      "description": "是否存在资源所有权校验",
+      "java": [
+        "record\\.getUserId\\(\\)\\.equals\\(.*principal",
+        "entity\\.getOwner\\(\\).*equals.*currentUser",
+        "@PreAuthorize.*#.*\\.userId.*==.*authentication"
+      ],
+      "python": [
+        "record\\.user_id\\s*==\\s*current_user\\.id",
+        "resource\\.owner\\s*==\\s*request\\.user"
+      ],
+      "generic": [
+        "resource\\.owner.*==.*current.*user",
+        "record\\.user.*==.*session.*user",
+        "ownership.*verification"
+      ]
+    },
+    "rbac_enforcement": {
+      "description": "是否使用了 RBAC/ABAC 框架强制授权",
+      "java": [
+        "@PreAuthorize.*hasRole", "@Secured.*ROLE_",
+        "@RolesAllowed", "RequiresPermissions",
+        "SpringSecurity", "Shiro", "Casbin"
+      ],
+      "python": [
+        "permission_required", "roles_required",
+        "django-guardian", "flask-principal"
+      ],
+      "javascript": [
+        "CASL", "casl", "accesscontrol",
+        "rbac", "RolesGuard"
+      ],
+      "generic": [
+        "rbac.*framework",
+        "abac.*policy",
+        "authorization.*enforcement"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【路由×安全配置交叉】若有 route_index/public_endpoints/security_filter_chain/shiro_security_config 结果：建立端点认证状态表（需登录/permitAll/方法级注解/未配置）；全局缺认证→862/306；有登录但无资源归属→转 639/285。",
+    "Step 0b: 【组件扫描联动】若有组件扫描命中 auth_bypass/missing_auth 类规则：先查该组件配置与已知绕过路径，再分析本候选方法。",
+    "Step 1: 【识别敏感操作】当前函数是否执行了数据读写、状态变更或资源访问？对照 semantic_keywords 和 logic_query_keywords.sensitive_ops。",
+    "Step 2: 【检查显式鉴权】函数入口或前置中间件是否存在身份验证？注意：认证≠授权。对照 anti_patterns.no_authorization_check 和 authentication_only_no_authorization。",
+    "Step 3: 【追踪授权逻辑】敏感操作前是否有当前用户与目标资源归属校验？对照 control_detection_patterns.resource_ownership_check。",
+    "Step 4: 【评估业务边界】即使有 RBAC，是否忽略水平越权？角色检查通过但资源不属于当前用户？",
+    "Step 5: 【反证清单】permitAll 是否仅覆盖 /login、/health；是否存在 anyRequest().authenticated()；路径前缀绕过。对照 anti_patterns.endpoint_not_in_security_config。",
+    "Step 6: 【检查全局默认策略】是否配置了全局默认拒绝（Default Deny）策略。对照 control_detection_patterns.global_default_deny。",
+    "Step 7: 【八项确认标准】缺一不得 confirmed：(1)操作涉及敏感数据/功能 (2)无显式授权检查 (3)无全局默认拒绝覆盖 (4)认证≠授权 (5)无资源归属校验 (6)permitAll 未误覆盖 (7)RBAC 未遗漏该端点 (8)组件无已知绕过"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "php",
+        "code_snippet": "function runEmployeeQuery($dbName, $name){\n    ...\n    SELECT * FROM employees WHERE name = :name\n    ...\n}",
+        "vulnerability_analysis": "虽然使用了预编译语句防止了 SQL 注入（CWE-89），但函数内部完全没有检查调用者是否有权查询员工表。攻击者可遍历姓名获取所有员工信息。",
+        "fix_pattern": "在查询前增加权限校验：if (!currentUser.canAccess('employees')) throw new ForbiddenException();"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@GetMapping(\"/api/orders/{orderId}\")\npublic Order getOrder(@PathVariable Long orderId) {\n    return orderRepository.findById(orderId).orElseThrow();\n}",
+        "vulnerability_analysis": "订单查询接口使用 @PathVariable 接收 orderId，直接传给 findById 查询。虽然有全局认证（用户必须登录），但未验证当前用户是否为该订单的所有者。已认证用户可遍历 orderId 查看他人订单（水平越权 IDOR）。",
+        "fix_pattern": "@GetMapping(\"/api/orders/{orderId}\") public Order getOrder(@PathVariable Long orderId, @AuthenticationPrincipal User user) { Order order = orderRepository.findById(orderId).orElseThrow(); if (!order.getUserId().equals(user.getId())) throw new AccessDeniedException(); return order; }"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.put(\"/api/users/{user_id}\")\nasync def update_user(user_id: int, data: UserUpdate):\n    await User.filter(id=user_id).update(**data.dict())",
+        "vulnerability_analysis": "用户更新接口无所有权检查。任何已认证用户可通过修改 user_id 更新任意用户的资料。缺少 current_user 参数和所有权验证。",
+        "fix_pattern": "async def update_user(user_id: int, data: UserUpdate, current_user: User = Depends(get_current_user)): if user_id != current_user.id and not current_user.is_admin: raise HTTPException(403)"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.get('/api/documents/:docId', authMiddleware, async (req, res) => {\n    const doc = await Document.findByPk(req.params.docId);\n    res.json(doc);\n});",
+        "vulnerability_analysis": "虽然有 authMiddleware 确保用户已登录，但 Document.findByPk 仅按 docId 查询，未绑定 req.user.id。这是典型的'有认证无授权'缺陷——用户可访问任何文档（水平越权）。",
+        "fix_pattern": "const doc = await Document.findOne({ where: { id: req.params.docId, userId: req.user.id } }); if (!doc) return res.status(404).json({error: 'Not found'});"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func DeleteRecord(c *gin.Context) {\n    id := c.Param(\"id\")\n    db.Delete(&Record{}, id)\n    c.JSON(200, gin.H{\"status\": \"deleted\"})\n}",
+        "vulnerability_analysis": "删除操作仅按 id 执行，无所有权检查。Go 无框架级授权保护，完全依赖开发者手动添加。任何已认证用户可删除任意记录。",
+        "fix_pattern": "userID := c.GetUint(\"userID\"); result := db.Where(\"id = ? AND user_id = ?\", id, userID).Delete(&Record{}); if result.RowsAffected == 0 { c.JSON(404, gin.H{\"error\": \"not found\"}); return }"
+      }
+    ],
+    "mitigation_rules": [
+      "采用 RBAC/ABAC 框架，在架构层面强制授权检查，减少遗漏。",
+      "Web 应用必须在服务端对每个敏感页面/接口执行授权校验，不可依赖前端隐藏。",
+      "实施 Default Deny 策略，未明确允许的访问一律拒绝。",
+      "区分认证绕过（未登录可访问）与越权/BOLA（登录后访问他人资源）。",
+      "敏感数据访问必须同时校验角色权限和资源所有权。",
+      "在多租户系统中，所有查询必须包含租户 ID 过滤。"
+    ],
+    "refutation_checklist": [
+      "permitAll 是否仅覆盖公开端点（/login, /register, /health）？",
+      "是否有默认认证 anyRequest().authenticated()？",
+      "Shiro filterChainDefinitions 是否对 /** 要求 authc？",
+      "JAX-RS 类/方法是否有 @RolesAllowed 或全局 ContainerRequestFilter？",
+      "敏感数据端点是否同时校验了角色和资源所有权？",
+      "多租户系统中查询是否包含租户 ID 过滤？",
+      "批量导出/列表接口是否也需要授权过滤？",
+      "GraphQL/API 的关联查询是否也需要授权检查？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "get_preceding_auth_checks", "desc": "获取敏感操作之前的所有认证/授权相关条件判断。"},
+    {"name": "trace_resource_ownership", "desc": "分析目标资源的归属字段与当前会话用户的关联关系。对照 control_detection_patterns.resource_ownership_check。"},
+    {"name": "check_route_protection", "desc": "交叉检查路由列表与安全配置，输出端点认证映射表。对照 control_detection_patterns.global_default_deny。"},
+    {"name": "detect_auth_vs_authz_gap", "desc": "区分认证（登录检查）与授权（权限检查），识别仅有认证而无授权的端点。"},
+    {"name": "check_rbac_coverage", "desc": "验证 RBAC/ABAC 框架是否覆盖了当前端点。对照 control_detection_patterns.rbac_enforcement。"},
+    {"name": "check_multi_tenant_isolation", "desc": "在多租户系统中验证查询是否包含租户 ID 过滤。"}
+  ],
+  "sanitizers": [
+    "存在明确的资源所有权校验（如 record.user_id == session.user_id）",
+    "使用了经过审计的授权框架注解（如 @PreAuthorize, @Secured）且参数正确绑定",
+    "该接口/资源在安全设计文档中明确定义为公开（public）且经评审确认",
+    "敏感操作前有二次确认机制（如支付密码、MFA）且覆盖了所有路径",
+    "SecurityFilterChain 显示全局 authenticated 且该路径不在 permitAll 白名单",
+    "RBAC/ABAC 框架覆盖了该端点的所有敏感操作",
+    "多租户场景下查询同时包含租户 ID 过滤",
+    "批量导出/列表接口也实施了授权过滤"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-862",
+    "missing_check_type": "array — 缺失检查类型 (如 ['no_auth_check', 'auth_only_no_authz', 'horizontal_privilege_missing', 'vertical_privilege_missing', 'endpoint_not_in_security_config'])",
+    "endpoint_auth_map": "array — [{path, method, auth_status: required|permitAll|method_guard|unconfigured}]",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['no_authorization_check.java', 'authentication_only_no_authorization.python'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['global_default_deny', 'resource_ownership_check', 'rbac_enforcement'])",
+    "reasoning_trace": "string (必须引用端点认证状态表作为推理依据)",
+    "business_impact": "string (从 common_consequences 映射: Confidentiality/Integrity/Access Control)",
+    "risk_level": "CRITICAL",
+    "remediation": "string (结合 potential_mitigations 生成具体修复建议)"
+  }
+}

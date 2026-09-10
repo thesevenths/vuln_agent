@@ -1,0 +1,47 @@
+# CWE-502 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(ObjectInputStream|readObject|readUnshared|XMLDecoder|readValue|deserialize|fromJson|ObjectMapper)/i]'
+  - 'Call[name=~/(Yaml\.load|pickle\.loads|Marshal\.load|unserialize)/i]'
+
+semantic_keywords:
+  - deserialize
+  - unmarshal
+  - readObject
+  - pickle
+  - yaml
+  - serialization
+  - ObjectInputStream
+  - XMLDecoder
+  - fromJson
+
+file_context:
+  - api_endpoint
+  - message_handler
+  - cache
+  - session
+  - rpc
+
+logic_query_keywords_generic:
+  dangerous_calls:
+    - pickle.loads
+    - yaml.load
+    - Marshal.load
+    - unserialize
+    - eval
+  safe_patterns:
+    - pickle.Unpickler with restricted
+    - yaml.safe_load
+    - json.loads
+  gadget_classes:
+    - os.system
+    - subprocess
+    - eval
+    - exec
+
+sanitizers:
+  - 使用 ObjectInputFilter 白名单限制反序列化类
+  - 使用 ValidatingObjectInputStream（Apache Commons IO）
+  - Jackson ObjectMapper 禁用了 defaultTyping
+  - YAML 使用 yaml.safe_load() 代替 yaml.load()
+  - 数据来自可信源且有数字签名/完整性校验

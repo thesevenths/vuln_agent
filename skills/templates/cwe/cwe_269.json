@@ -1,0 +1,1204 @@
+{
+  "skill_id": "cwe_269_improper_privilege_management",
+  "source_cwe": [
+    "CWE-269"
+  ],
+  "related_cwes": [
+    {
+      "cwe": "CWE-862",
+      "reason": "missing_authorization - 权限管理不当的根本表现之一：变更操作缺少操作者授权校验"
+    },
+    {
+      "cwe": "CWE-863",
+      "reason": "improper_authorization - 授权检查存在但逻辑错误，如仅校验登录状态未校验角色"
+    },
+    {
+      "cwe": "CWE-285",
+      "reason": "improper_authorization_general - 授权逻辑整体缺陷，CWE-269 是其在权限管理维度的具体化"
+    },
+    {
+      "cwe": "CWE-276",
+      "reason": "incorrect_default_permissions - 新用户或新资源被赋予过高的默认权限，是权限管理不当的常见形态"
+    },
+    {
+      "cwe": "CWE-915",
+      "reason": "mass_assignment - 通过自动绑定机制污染权限字段（role/isAdmin），是 CWE-269 的高频攻击路径"
+    },
+    {
+      "cwe": "CWE-250",
+      "reason": "execution_with_unnecessary_privileges - 运行时持有超出当前操作所需的权限，是权限管理粗放的另一面"
+    },
+    {
+      "cwe": "CWE-639",
+      "reason": "idor - 水平越权与垂直越权常组合出现：IDOR 访问他人资源后通过权限管理缺陷提升角色"
+    }
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(updateRole|grantRole|revokeRole|setAdmin|elevatePrivilege|changeRole|assignPermission|promoteUser|setPrivilege|downgrade|modifyPermission)/i]",
+      "ClassDef[name=~/(AdminController|RoleController|UserController|PermissionController|AuthController|AccountController|RoleManager|UserManager)/i]",
+      "Call[name=~/(setRole|addRole|grantAuthority|changePermission|makeAdmin|elevateRole|setAdmin|addAuthority)/i]",
+      "Annotation[name=~/(PostMapping|PutMapping|RequestMapping|PatchMapping).*(role|admin|privilege|permission|authority|user|account)/i]"
+    ],
+    "semantic_keywords": [
+      "role",
+      "admin",
+      "privilege",
+      "permission",
+      "authority",
+      "elevate",
+      "promote",
+      "grant",
+      "revoke",
+      "isAdmin",
+      "setRole",
+      "updateRole",
+      "default_role",
+      "user_type",
+      "account_type",
+      "is_superuser",
+      "is_staff",
+      "group",
+      "membership"
+    ],
+    "file_context": [
+      "user_service",
+      "admin_controller",
+      "role_manager",
+      "auth_service",
+      "permission_service",
+      "account_controller",
+      "security_config",
+      "registration",
+      "signup",
+      "user_model",
+      "role_entity",
+      "rbac",
+      "acl"
+    ],
+    "operation_triggers": {
+      "description": "权限变更端点和用户管理端点是 CWE-269 的核心攻击面，必须逐一验证操作者授权和参数来源",
+      "sensitive_operations": [
+        "update_role",
+        "grant_permission",
+        "revoke_permission",
+        "promote_user",
+        "demote_user",
+        "create_user",
+        "delete_user",
+        "update_user",
+        "register",
+        "signup",
+        "import_users",
+        "batch_assign_role",
+        "change_password",
+        "reset_password"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Post|Put|Patch|Delete)Mapping.*/(role|admin|permission|user|account|privilege|authority)",
+          "@RequestMapping.*/(role|admin|permission|user|account)"
+        ],
+        "python": [
+          "@app\\.route.*/(role|admin|permission|user|account)",
+          "@router\\.(post|put|patch|delete).*/(role|admin|permission|user|account)",
+          "@api_view.*\\[.*(?:POST|PUT|PATCH|DELETE)"
+        ],
+        "go": [
+          "\\.(POST|PUT|PATCH|DELETE)\\(.*/(role|admin|permission|user|account)",
+          "r\\.(POST|PUT|PATCH|DELETE)"
+        ],
+        "javascript": [
+          "router\\.(post|put|patch|delete).*/(role|admin|permission|user|account)",
+          "@(Post|Put|Patch|Delete)\\(.*/(role|admin|permission|user)",
+          "app\\.(post|put|patch|delete)"
+        ],
+        "php": [
+          "Route::(post|put|patch|delete).*/(role|admin|permission|user|account)",
+          "@Route.*methods.*(?:POST|PUT|PATCH|DELETE).*/(role|admin|user)"
+        ],
+        "dotnet": [
+          "\\[Http(Post|Put|Patch|Delete)\\].*/(role|admin|permission|user|account)",
+          "\\[Authorize.*Roles"
+        ],
+        "ruby": [
+          "(post|put|patch|delete)\\s+\"/(role|admin|permission|user|account)",
+          "resources\\s+:(users|roles|admins|permissions)"
+        ],
+        "rust": [
+          "\\.route.*/(role|admin|permission|user|account).*method.*(?:POST|PUT|PATCH|DELETE)",
+          "\\.post\\(.*/(role|admin|user)",
+          "\\.put\\(.*/(role|admin|user)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "spring_privilege_ops": [
+        "setRole",
+        "grantRole",
+        "revokeRole",
+        "updateRole",
+        "addRole",
+        "setAdmin",
+        "makeAdmin",
+        "changePermission",
+        "grantAuthority",
+        "setPrivilege",
+        "elevateRole",
+        "addAuthority",
+        "SimpleGrantedAuthority",
+        "GrantedAuthority",
+        "Collection<GrantedAuthority>",
+        "UserDetails",
+        "user.getAuthorities()",
+        "Authentication.getAuthorities()"
+      ],
+      "shiro_privilege_ops": [
+        "addRole",
+        "addRoles",
+        "setRoles",
+        "addStringPermission",
+        "addStringPermissions",
+        "setPermissions",
+        "SimpleAuthorizationInfo",
+        "subject.hasRole",
+        "subject.isPermitted"
+      ],
+      "tainted_params": [
+        "@RequestParam(\"role\")",
+        "@RequestParam(\"isAdmin\")",
+        "@RequestBody RoleRequest",
+        "@RequestBody UserDTO",
+        "@ModelAttribute",
+        "request.getParameter(\"role\")",
+        "request.getParameter(\"isAdmin\")",
+        "request.getParameter(\"privilege\")",
+        "@PathVariable.*role",
+        "bindingResult"
+      ],
+      "default_privilege_patterns": [
+        "new User(role=",
+        "setDefaultRole",
+        "DEFAULT_ROLE",
+        "ROLE_USER",
+        "createUser",
+        "register",
+        "signup"
+      ],
+      "config_files": [
+        "application.properties",
+        "application.yml",
+        "application-*.yml",
+        "application-*.properties",
+        "SecurityConfig.java",
+        "WebSecurityConfig.java",
+        "ShiroConfig.java"
+      ]
+    },
+    "python": {
+      "django_privilege_ops": [
+        "is_superuser",
+        "is_staff",
+        "is_admin",
+        "user.is_superuser",
+        "user.is_staff",
+        "groups.add",
+        "user_permissions.add",
+        "User.objects.create_superuser",
+        "User.objects.create_user",
+        "Group.objects.create",
+        "Permission.objects.create",
+        "user.user_permissions.set",
+        "user.groups.set"
+      ],
+      "flask_privilege_ops": [
+        "set_role",
+        "grant_admin",
+        "update_permissions",
+        "change_role",
+        "make_admin",
+        "is_admin",
+        "is_administrator",
+        "add_role",
+        "user.role",
+        "user.is_admin",
+        "UserRole",
+        "current_user.role"
+      ],
+      "fastapi_privilege_ops": [
+        "set_role",
+        "is_admin",
+        "is_superuser",
+        "role",
+        "permissions",
+        "grant_permission",
+        "revoke_permission",
+        "user.role",
+        "UserRole",
+        "update_role"
+      ],
+      "tainted_params": {
+        "django": [
+          "request.POST.get('role')",
+          "request.POST.get('is_admin')",
+          "request.data.get('is_superuser')",
+          "is_staff.*=.*request",
+          "is_superuser.*=.*request",
+          "ModelForm",
+          "UserCreationForm",
+          "**request.POST"
+        ],
+        "flask": [
+          "request.form.get('role')",
+          "request.json.get('is_admin')",
+          "request.args.get('privilege')",
+          "request.get_json().get('role')"
+        ],
+        "fastapi": [
+          "role.*:.*str",
+          "is_admin.*:.*bool",
+          "UserUpdate.*role",
+          "UserCreate.*is_admin"
+        ]
+      },
+      "default_privilege_patterns": [
+        "is_staff.*=.*True",
+        "is_superuser.*=.*True",
+        "default_role.*=.*admin",
+        "role.*=.*'admin'",
+        "UserRole.ADMIN",
+        "create_user.*role"
+      ],
+      "config_files": [
+        "settings.py",
+        "config.py",
+        "app.py",
+        ".env",
+        "models.py"
+      ]
+    },
+    "php": {
+      "laravel_privilege_ops": [
+        "assignRole",
+        "removeRole",
+        "syncRoles",
+        "givePermissionTo",
+        "revokePermissionTo",
+        "syncPermissions",
+        "is_admin",
+        "is_super_admin",
+        "->role",
+        "User::create",
+        "Spatie\\Permission"
+      ],
+      "symfony_privilege_ops": [
+        "addRole",
+        "removeRole",
+        "setRoles",
+        "isGranted",
+        "ROLE_ADMIN",
+        "ROLE_SUPER_ADMIN",
+        "Voter",
+        "AccessDecisionManager"
+      ],
+      "thinkphp_privilege_ops": [
+        "setRole",
+        "isAdmin",
+        "checkAuth",
+        "checkRule",
+        "auth_group",
+        "auth_rule",
+        "auth_access"
+      ],
+      "wordpress_privilege_ops": [
+        "add_role",
+        "remove_role",
+        "set_role",
+        "add_cap",
+        "remove_cap",
+        "current_user_can",
+        "administrator",
+        "editor",
+        "update_user_meta"
+      ],
+      "native_privilege_ops": [
+        "setRole",
+        "isAdmin",
+        "user_type",
+        "access_level",
+        "privilege",
+        "is_admin",
+        "role_id"
+      ],
+      "tainted_params": {
+        "laravel": [
+          "$request->input('role')",
+          "$request->input('is_admin')",
+          "$request->all()",
+          "$request->only",
+          "User::create($request->all())",
+          "mass assignment",
+          "$fillable",
+          "$guarded"
+        ],
+        "symfony": [
+          "$request->get('role')",
+          "$form->submit($request)",
+          "$request->request->get"
+        ],
+        "native": [
+          "$_POST['role']",
+          "$_POST['is_admin']",
+          "$_REQUEST['role']",
+          "$_GET['privilege']"
+        ]
+      },
+      "default_privilege_patterns": [
+        "default_role.*=.*admin",
+        "is_admin.*=.*1",
+        "role.*=.*'admin'",
+        "user_type.*=.*'admin'",
+        "INSERT.*role.*admin"
+      ],
+      "config_files": [
+        "config/auth.php",
+        "config/permission.php",
+        "app/Models/User.php",
+        "config/packages/security.yaml",
+        "wp-config.php"
+      ]
+    },
+    "go": {
+      "privilege_ops": [
+        "SetRole",
+        "AddRole",
+        "GrantPermission",
+        "RevokePermission",
+        "IsAdmin",
+        "is_admin",
+        "UserRole",
+        "Permission",
+        "casbin",
+        "rbac",
+        "AddPolicy",
+        "AddRoleForUser",
+        "DeleteRoleForUser"
+      ],
+      "tainted_params": [
+        "c.PostForm(\"role\")",
+        "c.Param(\"role\")",
+        "c.BindJSON",
+        "ShouldBindJSON",
+        "json.Decode.*role",
+        "role.*string.*json"
+      ],
+      "default_privilege_patterns": [
+        "DefaultRole",
+        "Role:.*admin",
+        "IsAdmin:.*true"
+      ],
+      "config_files": [
+        "config.yaml",
+        "config.json",
+        ".env",
+        "rbac_model.conf",
+        "rbac_policy.csv"
+      ]
+    },
+    "javascript": {
+      "express_privilege_ops": [
+        "setRole",
+        "isAdmin",
+        "is_admin",
+        "role",
+        "permissions",
+        "grantPermission",
+        "revokePermission",
+        "user.role",
+        "user.isAdmin",
+        "user.is_admin",
+        "userType",
+        "accessLevel"
+      ],
+      "nestjs_privilege_ops": [
+        "@Roles(",
+        "@Permissions(",
+        "RolesGuard",
+        "PermissionsGuard",
+        "SetMetadata.*role",
+        "CASL",
+        "casl",
+        "Ability",
+        "AbilityBuilder",
+        "defineAbility",
+        "can.*manage",
+        "cannot.*manage"
+      ],
+      "fastify_privilege_ops": [
+        "role",
+        "permissions",
+        "isAdmin",
+        "preHandler.*auth",
+        "preValidation.*role"
+      ],
+      "koa_privilege_ops": [
+        "ctx.state.user.role",
+        "isAdmin",
+        "role",
+        "permissions"
+      ],
+      "tainted_params": {
+        "express": [
+          "req.body.role",
+          "req.body.isAdmin",
+          "req.body.is_admin",
+          "req.body.permissions",
+          "Object.assign.*req.body",
+          "spread.*req.body",
+          "...req.body"
+        ],
+        "nestjs": [
+          "@Body() dto",
+          "dto.role",
+          "dto.isAdmin",
+          "dto.is_admin",
+          "class-validator.*role"
+        ]
+      },
+      "default_privilege_patterns": [
+        "role:.*'admin'",
+        "isAdmin:.*true",
+        "defaultRole:.*'admin'",
+        "type:.*'admin'"
+      ],
+      "config_files": [
+        "app.js",
+        "server.js",
+        ".env",
+        "auth.module.ts",
+        "role.guard.ts",
+        "ability.factory.ts"
+      ]
+    },
+    "dotnet": {
+      "privilege_ops": [
+        "AddToRoleAsync",
+        "RemoveFromRoleAsync",
+        "IsInRoleAsync",
+        "AddClaimAsync",
+        "RemoveClaimAsync",
+        "RoleManager",
+        "UserManager",
+        "IdentityRole",
+        "IdentityUserRole",
+        "AuthorizeAttribute",
+        "ClaimsPrincipal",
+        "[Authorize(Roles"
+      ],
+      "tainted_params": [
+        "Role.*=.*model.Role",
+        "IsAdmin.*=.*model.IsAdmin",
+        "[FromBody] UserDTO",
+        "[FromBody] RoleDTO",
+        "UpdateModel.*Role",
+        "ModelState.IsValid"
+      ],
+      "default_privilege_patterns": [
+        "DefaultRole.*=.*Admin",
+        "IsAdmin.*=.*true",
+        "Role.*=.*\"Admin\"",
+        "new IdentityRole.*Admin"
+      ],
+      "config_files": [
+        "appsettings.json",
+        "appsettings.*.json",
+        "Startup.cs",
+        "Program.cs",
+        "IdentityConfig.cs",
+        "RoleSeeder.cs"
+      ]
+    },
+    "ruby": {
+      "privilege_ops": [
+        "add_role",
+        "remove_role",
+        "admin?",
+        "is_admin",
+        "has_role?",
+        "grant",
+        "revoke",
+        "rolify",
+        "cancan",
+        "CanCanCan",
+        "ability",
+        "can.*:manage",
+        "cannot.*:manage",
+        "devise",
+        "admin"
+      ],
+      "tainted_params": {
+        "rails": [
+          "params[:role]",
+          "params[:is_admin]",
+          "params.require(:user).permit!",
+          "update_attributes",
+          "update",
+          "assign_attributes",
+          "mass assignment",
+          "strong parameters"
+        ]
+      },
+      "default_privilege_patterns": [
+        "default_role.*admin",
+        "is_admin.*true",
+        "role.*admin",
+        "after_create.*:set_admin"
+      ],
+      "config_files": [
+        "config/initializers/devise.rb",
+        "config/initializers/rolify.rb",
+        "app/models/ability.rb",
+        "app/models/user.rb",
+        "app/controllers/users_controller.rb"
+      ]
+    },
+    "rust": {
+      "privilege_ops": [
+        "role",
+        "Role",
+        "Permission",
+        "is_admin",
+        "set_role",
+        "grant_permission",
+        "Admin",
+        "Moderator",
+        "UserRole",
+        "Casbin",
+        "rbac"
+      ],
+      "tainted_params": [
+        "serde::Deserialize.*role",
+        "struct.*UpdateUser.*role",
+        "Json<UserUpdate>",
+        "Path<.*role"
+      ],
+      "default_privilege_patterns": [
+        "Default.*Role",
+        "role:.*Role::Admin",
+        "is_admin:.*true"
+      ],
+      "config_files": [
+        "Cargo.toml",
+        "config.toml",
+        "config.yaml",
+        ".env",
+        "rbac.toml"
+      ]
+    },
+    "generic": {
+      "privilege_ops": [
+        "set_role",
+        "grant_admin",
+        "elevate",
+        "promote",
+        "change_permission",
+        "assign_role",
+        "add_role",
+        "is_admin",
+        "is_superuser",
+        "is_staff",
+        "user_type",
+        "access_level",
+        "make_admin",
+        "isAdmin"
+      ],
+      "tainted_params": [
+        "role",
+        "isAdmin",
+        "is_admin",
+        "privilege",
+        "permission",
+        "authority",
+        "user_type",
+        "access_level",
+        "is_superuser",
+        "is_staff",
+        "group",
+        "membership"
+      ],
+      "default_privilege_keywords": [
+        "default_role",
+        "default_permission",
+        "initial_role",
+        "base_role",
+        "auto_assign"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表权限管理中的高风险反模式",
+    "mass_assignment_privilege_fields": {
+      "description": "权限字段通过自动绑定机制被客户端污染",
+      "java": [
+        "@RequestBody.*User(?!DTO)",
+        "@ModelAttribute.*User",
+        "user\\.setRole\\(.*request",
+        "user\\.setIsAdmin\\(.*request",
+        "BeanUtils\\.copyProperties.*request.*user",
+        "modelMapper\\.map.*request.*user",
+        "without.*@JsonIgnore.*role",
+        "without.*@JsonProperty.*access.*READ_ONLY.*role"
+      ],
+      "python": [
+        "User\\(\\*\\*request\\.",
+        "is_superuser.*=.*request",
+        "is_staff.*=.*request",
+        "role.*=.*request\\.form",
+        "role.*=.*request\\.json",
+        "ModelForm.*User",
+        "save\\(\\).*commit.*True.*without.*exclude.*role"
+      ],
+      "php": [
+        "User::create\\(\\$request->all\\(\\)\\)",
+        "->update\\(\\$request->all\\(\\)\\)",
+        "\\$fillable.*role",
+        "\\$fillable.*is_admin",
+        "without.*\\$guarded.*role",
+        "\\$_POST.*role",
+        "\\$_POST.*is_admin"
+      ],
+      "go": [
+        "json\\.Decode.*&user.*role",
+        "ShouldBindJSON.*struct.*Role",
+        "c\\.BindJSON.*User.*Role"
+      ],
+      "javascript": [
+        "Object\\.assign.*user.*req\\.body",
+        "spread.*req\\.body.*user",
+        "\\.create\\(req\\.body\\)",
+        "\\.update\\(req\\.body\\)",
+        "User\\.findByIdAndUpdate.*req\\.body",
+        "without.*select.*omit.*role"
+      ],
+      "dotnet": [
+        "UpdateModel.*user",
+        "TryUpdateModelAsync.*user",
+        "_context\\.Update.*user.*without.*Role.*check"
+      ],
+      "ruby": [
+        "params\\.require\\(:user\\)\\.permit!",
+        "update_attributes.*params",
+        "User\\.create.*params",
+        "assign_attributes.*params.*without.*permit"
+      ],
+      "rust": [
+        "serde::Deserialize.*role.*without.*deny",
+        "Json<UserUpdate>.*role"
+      ]
+    },
+    "self_elevation": {
+      "description": "用户可通过接口提升自己的角色或权限",
+      "java": [
+        "setRole\\(.*request.*role",
+        "currentUserId.*==.*targetUserId.*setRole",
+        "principal.*setRole",
+        "SecurityContextHolder.*user.*setRole"
+      ],
+      "python": [
+        "current_user\\.id.*==.*user_id.*set_role",
+        "request\\.user.*update.*role",
+        "is_admin.*=.*True.*request"
+      ],
+      "php": [
+        "Auth::id\\(\\).*==.*\\$id.*setRole",
+        "\\$user->assignRole.*request"
+      ],
+      "generic": [
+        "currentUser.*setRole",
+        "self.*promote",
+        "me.*role.*admin"
+      ]
+    },
+    "residual_privilege": {
+      "description": "角色降级后权限未清理",
+      "java": [
+        "setRole.*without.*clearAuthorities",
+        "downgrade.*without.*removeRole",
+        "subscription.*FREE.*without.*clearPermissions"
+      ],
+      "python": [
+        "tier.*=.*FREE.*without.*clear_permissions",
+        "role.*=.*user.*without.*groups.clear",
+        "downgrade.*without.*remove"
+      ],
+      "php": [
+        "->syncRoles.*without.*syncPermissions",
+        "downgrade.*without.*removeRole",
+        "tier.*free.*without.*revoke"
+      ],
+      "generic": [
+        "downgrade.*without.*clear",
+        "demote.*without.*revoke",
+        "free_tier.*without.*remove_privilege"
+      ]
+    },
+    "default_excess_privilege": {
+      "description": "新用户被赋予超出预期的默认权限",
+      "java": [
+        "new User\\(.*ROLE_ADMIN",
+        "DEFAULT_ROLE.*ADMIN",
+        "createUser.*admin",
+        "register.*admin"
+      ],
+      "python": [
+        "create_user.*is_staff=True",
+        "create_user.*is_superuser=True",
+        "default_role.*=.*admin",
+        "is_admin.*=.*True.*default"
+      ],
+      "php": [
+        "'default_role'.*=>.*'admin'",
+        "INSERT.*role.*admin",
+        "is_admin.*1.*default"
+      ],
+      "go": [
+        "DefaultRole.*Admin",
+        "Role:.*\"admin\".*default"
+      ],
+      "javascript": [
+        "role:.*'admin'.*default",
+        "isAdmin:.*true.*default"
+      ],
+      "dotnet": [
+        "DefaultRole.*=.*\"Admin\"",
+        "IsAdmin.*=.*true.*default"
+      ],
+      "ruby": [
+        "default_role.*admin",
+        "after_create.*:set_admin"
+      ],
+      "rust": [
+        "Default.*Role::Admin"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "operator_authorization_check": {
+      "description": "执行权限变更的操作者是否经过了充分的授权校验",
+      "java_spring": [
+        "@PreAuthorize.*hasRole.*ADMIN",
+        "@PreAuthorize.*hasAuthority",
+        "@Secured.*ROLE_ADMIN",
+        "@RolesAllowed.*ADMIN",
+        "hasPermission.*ADMIN",
+        "@PreAuthorize.*hasRole.*SUPER_ADMIN",
+        "SecurityContextHolder.*getAuthentication.*ADMIN"
+      ],
+      "java_shiro": [
+        "@RequiresRoles.*ADMIN",
+        "@RequiresPermissions.*role:manage",
+        "subject\\.hasRole.*ADMIN",
+        "subject\\.isPermitted.*role:manage",
+        "checkPermission.*role:manage"
+      ],
+      "java_custom": [
+        "checkPrivilege.*role_manage",
+        "hasPrivilege.*role_assign",
+        "isAdmin.*check",
+        "accessControl.*role"
+      ],
+      "python_django": [
+        "@permission_required.*change_user",
+        "@permission_required.*add_role",
+        "PermissionRequiredMixin",
+        "has_perm.*change_user",
+        "has_perm.*add_role",
+        "user_passes_test.*is_admin",
+        "IsAdminUser"
+      ],
+      "python_flask": [
+        "@roles_required.*admin",
+        "@permission_required.*role_manage",
+        "has_role.*admin",
+        "flask_principal.*Permission",
+        "current_user\\.is_admin"
+      ],
+      "python_fastapi": [
+        "Depends.*admin_required",
+        "Depends.*role_checker.*admin",
+        "RoleChecker.*admin",
+        "check_permission.*role_manage"
+      ],
+      "php_laravel": [
+        "->middleware.*role:admin",
+        "Gate::allows.*manage-roles",
+        "authorize.*manage-roles",
+        "can.*manage-roles",
+        "PermissionMiddleware",
+        "Spatie.*hasRole.*admin",
+        "Spatie.*hasPermissionTo.*manage"
+      ],
+      "php_symfony": [
+        "isGranted.*ROLE_ADMIN",
+        "denyAccessUnlessGranted.*ROLE_ADMIN",
+        "@IsGranted.*ROLE_ADMIN",
+        "Voter.*ROLE_MANAGE"
+      ],
+      "php_native": [
+        "checkPriv.*role_manage",
+        "isAdmin.*session",
+        "hasPermission.*role_assign"
+      ],
+      "go": [
+        "rbac.*check",
+        "casbin.*Enforce.*admin",
+        "isAdmin.*true",
+        "RoleMiddleware",
+        "AdminOnly",
+        "checkPermission.*role_manage"
+      ],
+      "javascript_express": [
+        "requireAdmin",
+        "checkRole.*admin",
+        "hasPermission.*role_manage",
+        "accesscontrol.*can.*manage",
+        "rbac.*admin"
+      ],
+      "javascript_nestjs": [
+        "@Roles.*admin",
+        "RolesGuard",
+        "CASL.*can.*manage.*Role",
+        "@Permissions.*role:manage",
+        "PermissionsGuard"
+      ],
+      "dotnet": [
+        "\\[Authorize\\(Roles.*Admin\\)\\]",
+        "IsInRoleAsync.*Admin",
+        "Policy.*RequireRole.*Admin",
+        "AuthorizePolicy.*Admin"
+      ],
+      "ruby": [
+        "before_action.*admin_only",
+        "before_action.*check_admin",
+        "can\\?.*manage.*Role",
+        "rolify.*has_role.*admin",
+        "devise.*admin"
+      ],
+      "rust": [
+        "Role::Admin.*check",
+        "is_admin.*true",
+        "PermissionMiddleware",
+        "rbac.*admin"
+      ]
+    },
+    "privilege_field_isolation": {
+      "description": "权限字段是否与用户输入隔离（防 Mass Assignment）",
+      "java": [
+        "@JsonIgnore.*role",
+        "@JsonProperty.*access.*READ_ONLY.*role",
+        "UserDTO.*without.*role",
+        "RoleRequest.*DTO.*separate",
+        "without.*role.*field"
+      ],
+      "python": [
+        "exclude.*role",
+        "exclude.*is_admin",
+        "exclude.*is_superuser",
+        "DTO.*without.*role",
+        "UserSerializer.*read_only.*role",
+        "extra_kwargs.*role.*read_only"
+      ],
+      "php": [
+        "\\$guarded.*role",
+        "\\$guarded.*is_admin",
+        "UserDTO.*without.*role",
+        "only.*name.*email",
+        "request->only"
+      ],
+      "go": [
+        "struct.*UserUpdate.*without.*Role",
+        "struct.*without.*IsAdmin",
+        "separate.*DTO"
+      ],
+      "javascript": [
+        "omit.*role",
+        "select.*without.*role",
+        "pick.*name.*email",
+        "DTO.*without.*role",
+        "Zod.*omit.*role",
+        "class-validator.*without.*role"
+      ],
+      "dotnet": [
+        "UserDTO.*without.*Role",
+        "\\[JsonIgnore\\].*Role",
+        "CreateDTO.*without.*IsAdmin",
+        "Binding.Never.*Role"
+      ],
+      "ruby": [
+        "permit.*without.*role",
+        "permit.*without.*is_admin",
+        "strong_parameters.*without.*role",
+        "attr_readonly.*role"
+      ],
+      "rust": [
+        "struct.*UpdateUser.*without.*role",
+        "#\\[serde\\(deny_unknown_fields\\)\\]",
+        "deserialize.*without.*role"
+      ]
+    },
+    "role_value_whitelist": {
+      "description": "角色值是否通过枚举或白名单校验（拒绝任意客户端输入）",
+      "java": [
+        "Role\\..*valueOf",
+        "Enum.*Role",
+        "if.*ALLOWED_ROLES",
+        "role.*in.*\\{",
+        "isValidRole",
+        "RoleType.*enum"
+      ],
+      "python": [
+        "Role.*Enum",
+        "role.*in.*\\[",
+        "isValidRole",
+        "choices.*Role",
+        "validate_role"
+      ],
+      "php": [
+        "in_array.*role.*ALLOWED_ROLES",
+        "Role.*enum",
+        "RoleType.*class",
+        "isValidRole"
+      ],
+      "go": [
+        "Role.*const",
+        "IsValidRole",
+        "switch.*role.*case",
+        "AllowedRoles"
+      ],
+      "javascript": [
+        "allowedRoles",
+        "Object\\.values.*Role",
+        "role.*in.*\\[",
+        "enum.*Role",
+        "isValidRole"
+      ],
+      "dotnet": [
+        "Enum\\.IsDefined.*Role",
+        "Role.*enum",
+        "IsValidRole",
+        "AllowedRoles.*Contains"
+      ],
+      "ruby": [
+        "Role\\.values",
+        "allowed_roles.*include",
+        "enum.*role"
+      ],
+      "rust": [
+        "enum.*Role",
+        "match.*role",
+        "ALLOWED_ROLES.*contains"
+      ]
+    },
+    "self_elevation_prevention": {
+      "description": "是否存在自提升防御（用户不能修改自己的角色）",
+      "java": [
+        "currentUserId.*!=.*targetUserId",
+        "!currentUser.getId\\(\\).*equals",
+        "cannot_modify_self",
+        "self_modify.*deny"
+      ],
+      "python": [
+        "current_user\\.id.*!=.*user_id",
+        "request\\.user\\.id.*!=.*obj\\.id",
+        "cannot_modify_self"
+      ],
+      "php": [
+        "Auth::id\\(\\).*!=.*\\$id",
+        "cannot_modify_self",
+        "self_modify.*deny"
+      ],
+      "go": [
+        "currentUserID.*!=.*targetID",
+        "cannot_modify_self"
+      ],
+      "javascript": [
+        "req\\.user\\.id.*!==.*id",
+        "cannot_modify_self"
+      ],
+      "dotnet": [
+        "User\\.FindFirst.*sub.*!=.*id",
+        "cannot_modify_self"
+      ],
+      "ruby": [
+        "current_user\\.id.*!=.*params\\[:id\\]",
+        "cannot_modify_self"
+      ],
+      "rust": [
+        "current_user_id.*!=.*target_id",
+        "cannot_modify_self"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别权限变更操作】定位涉及角色分配、权限授予、管理员提升的端点或函数。同时识别用户注册/创建流程（默认权限检查）。",
+    "Step 1: 【追踪权限参数来源】检查角色(role)、权限(permission)、管理员标志(isAdmin/is_superuser/is_staff)等参数是直接从客户端请求获取，还是由服务端根据业务规则计算。命中 anti_patterns.mass_assignment_privilege_fields 则直接标记 High 候选。",
+    "Step 2: 【检查操作者权限验证】执行权限变更的操作者是否经过了充分的身份验证和权限校验（如仅超级管理员才能授予角色）。对照 control_detection_patterns.operator_authorization_check 验证。",
+    "Step 3: 【评估自提升风险】用户是否可以通过调用该接口将自己提升为管理员或获得更高权限（如 POST /api/role {role: 'admin'}）。对照 control_detection_patterns.self_elevation_prevention 验证。",
+    "Step 4: 【检查批量赋值路径】权限字段是否通过 @ModelAttribute / @RequestBody 等自动绑定机制被污染（与 CWE-915 交叉）。对照 control_detection_patterns.privilege_field_isolation 验证。若无隔离，同时命中 anti_patterns.mass_assignment_privilege_fields。",
+    "Step 5: 【评估默认权限设置】新用户注册时是否被赋予了超出预期的默认权限（如 is_staff=True、role=admin）。对照 anti_patterns.default_excess_privilege 验证。",
+    "Step 5.5: 【检查角色值白名单校验】角色/权限值是否通过服务端枚举或白名单校验，拒绝客户端传入的任意值。对照 control_detection_patterns.role_value_whitelist 验证。无白名单 = 任意角色可注入。",
+    "Step 5.6: 【检查权限残留】角色降级（如会员降级为免费用户）后，高权限角色/权限/功能是否被清理。对照 anti_patterns.residual_privilege 验证。",
+    "Step 5.7: 【检查多 Profile/环境差异】搜索 application-{profile}.yml、appsettings.{env}.json 等多环境配置，验证非生产环境是否覆盖了权限配置（如 dev 环境默认赋予 admin 角色），且生产环境配置未被意外覆盖。",
+    "Step 5.8: 【检查认证豁免路径的权限管理操作】对 permitAll/anonymous/isPublic 等白名单端点，验证其是否误放行了权限变更操作（如注册接口同时创建 admin 用户）。白名单路径 + 权限变更 = 未授权提权。",
+    "Step 6: 【九项确认标准】缺一不得 confirmed：(1)权限参数来源安全 (2)操作者授权充分 (3)自提升防御存在 (4)权限字段隔离 (5)角色值白名单校验 (6)默认权限最低 (7)权限残留已清理 (8)多环境配置无安全差异 (9)认证豁免路径无权限变更操作"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "@PutMapping(\"/api/users/{id}/role\")\npublic String updateRole(@PathVariable Long id, @RequestParam String role) {\n    User user = userRepo.findById(id);\n    user.setRole(role);\n    userRepo.save(user);\n    return \"ok\";\n}",
+        "vulnerability_analysis": "角色更新接口接受客户端传入的 role 参数并直接持久化。任何已登录用户均可将自己的角色改为 ADMIN 或 SUPERADMIN，实现垂直越权。缺少操作者身份校验（谁可以改别人的角色）、角色值白名单校验、自提升防御。",
+        "fix_pattern": "1. 限制仅 SUPER_ADMIN 可调用：@PreAuthorize(\"hasRole('SUPER_ADMIN')\")；2. 使用枚举/白名单校验 role 值；3. 禁止用户修改自己的角色：if (currentUserId.equals(id)) throw new AccessDeniedException()。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/api/users\")\npublic User createUser(@RequestBody UserDTO userDTO) {\n    User user = modelMapper.map(userDTO, User.class);\n    userRepo.save(user);\n    return user;\n}\n\npublic class UserDTO {\n    private String username;\n    private String email;\n    private String role;      // ← 可被客户端注入\n    private Boolean isAdmin;  // ← 可被客户端注入\n}",
+        "vulnerability_analysis": "UserDTO 包含 role 和 isAdmin 字段，客户端可通过 POST /api/users 传入 {\"username\":\"x\",\"email\":\"x@x.com\",\"role\":\"ADMIN\",\"isAdmin\":true} 直接创建管理员账户。ModelMapper 会自动映射所有字段，包括权限字段。",
+        "fix_pattern": "1. 从 UserDTO 中移除 role/isAdmin 字段，或标注 @JsonProperty(access = READ_ONLY)；2. 使用独立的 CreateUserDTO（不含权限字段）和 RoleAssignmentDTO（需管理员权限）；3. 服务端强制设置新用户默认角色。"
+      },
+      {
+        "language": "python",
+        "code_snippet": "# Django\n@login_required\ndef update_profile(request, user_id):\n    user = User.objects.get(id=user_id)\n    if request.method == 'POST':\n        user.is_staff = request.POST.get('is_staff', user.is_staff)\n        user.is_superuser = request.POST.get('is_superuser', user.is_superuser)\n        user.save()\n    return render(request, 'profile.html', {'user': user})",
+        "vulnerability_analysis": "is_staff 和 is_superuser 直接从 POST 参数读取，任何已登录用户均可通过 POST is_staff=true&is_superuser=true 将自己提升为超级管理员。缺少操作者权限校验和字段隔离。",
+        "fix_pattern": "1. 使用 Django PermissionRequiredMixin 限制仅管理员可访问；2. 使用 Form/Serializer 的 exclude 排除 is_staff/is_superuser；3. 服务端独立处理角色变更，不从请求直接赋值。"
+      },
+      {
+        "language": "python",
+        "code_snippet": "# Flask\n@app.route('/api/users', methods=['POST'])\ndef create_user():\n    data = request.get_json()\n    user = User(**data)  # Mass Assignment!\n    db.session.add(user)\n    db.session.commit()\n    return jsonify(user.to_dict())",
+        "vulnerability_analysis": "User(**data) 将客户端 JSON 的所有字段直接映射到 User 模型。客户端传入 {\"username\":\"x\",\"role\":\"admin\",\"is_admin\":true} 即可创建管理员。Flask 无 Django 的 ModelForm 保护。",
+        "fix_pattern": "1. 使用显式字段赋值：User(username=data['username'], email=data['email'])；2. 或使用 Marshmallow/Pydantic Schema 过滤敏感字段；3. 服务端强制设置 role='user'。"
+      },
+      {
+        "language": "php",
+        "code_snippet": "// Laravel\npublic function store(Request $request)\n{\n    $user = User::create($request->all());  // Mass Assignment!\n    return redirect()->route('users.index');\n}\n\n// User model\nprotected $fillable = ['name', 'email', 'role', 'is_admin'];",
+        "vulnerability_analysis": "$request->all() 将所有请求参数传入 create()，且 $fillable 包含 role 和 is_admin。攻击者通过 POST name=x&email=x@x.com&role=admin&is_admin=1 直接创建管理员账户。Laravel 的 Mass Assignment 保护失效。",
+        "fix_pattern": "1. 从 $fillable 中移除 role 和 is_admin；2. 或改用 $guarded = ['role', 'is_admin']；3. 使用独立的 FormRequest 或 DTO；4. 服务端单独处理角色赋值：$user->assignRole('user')。"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "// Express + Mongoose\napp.put('/api/users/:id', async (req, res) => {\n    const user = await User.findByIdAndUpdate(\n        req.params.id,\n        { $set: req.body },  // Mass Assignment!\n        { new: true }\n    );\n    res.json(user);\n});",
+        "vulnerability_analysis": "{ $set: req.body } 将请求体的所有字段写入数据库。客户端传入 {\"role\":\"admin\",\"isAdmin\":true} 即可提权。无字段白名单过滤。",
+        "fix_pattern": "1. 使用字段白名单：const { username, email } = req.body; await User.findByIdAndUpdate(id, { $set: { username, email } });2. 或使用 Zod/Joi schema 验证并过滤敏感字段；3. 添加管理员权限中间件。"
+      },
+      {
+        "language": "go",
+        "code_snippet": "// Gin\nfunc UpdateUser(c *gin.Context) {\n    var updateData struct {\n        Name     string `json:\"name\"`\n        Email    string `json:\"email\"`\n        Role     string `json:\"role\"`     // ← 可被客户端注入\n        IsAdmin  bool   `json:\"isAdmin\"`  // ← 可被客户端注入\n    }\n    if err := c.ShouldBindJSON(&updateData); err != nil {\n        c.JSON(400, gin.H{\"error\": err.Error()})\n        return\n    }\n    user.Role = updateData.Role\n    user.IsAdmin = updateData.IsAdmin\n    db.Save(&user)\n    c.JSON(200, user)\n}",
+        "vulnerability_analysis": "更新结构体包含 Role 和 IsAdmin 字段，客户端可直接注入。Go 没有框架级的 Mass Assignment 保护，完全依赖开发者手动过滤。",
+        "fix_pattern": "1. 从更新结构体中移除 Role/IsAdmin 字段；2. 使用独立的 UpdateUserDTO 和 RoleAssignmentDTO；3. 添加角色变更的权限中间件：r.PUT(\"/users/:id/role\", AdminRequired(), UpdateRole)。"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "// ASP.NET Core\n[HttpPut(\"/api/users/{id}\")]\npublic async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateModel model)\n{\n    var user = await _userManager.FindByIdAsync(id.ToString());\n    user.UserName = model.UserName;\n    user.Email = model.Email;\n    user.Role = model.Role;         // ← 可被客户端注入\n    user.IsAdmin = model.IsAdmin;   // ← 可被客户端注入\n    await _userManager.UpdateAsync(user);\n    return Ok(user);\n}",
+        "vulnerability_analysis": "UserUpdateModel 包含 Role 和 IsAdmin 属性，客户端可直接注入。虽有 UserManager 但未利用其角色管理 API（AddToRoleAsync/RemoveFromRoleAsync），而是直接修改实体字段。",
+        "fix_pattern": "1. 从 UserUpdateModel 移除 Role/IsAdmin；2. 角色变更通过 _userManager.AddToRoleAsync() 单独处理；3. 添加 [Authorize(Roles = \"Admin\")]; 4. 使用 [JsonIgnore] 或 [BindNever] 标注权限字段。"
+      },
+      {
+        "language": "ruby",
+        "code_snippet": "# Rails\ndef update\n    @user = User.find(params[:id])\n    @user.update(params.require(:user).permit!)  # permit! = allow all!\n    redirect_to @user\nend",
+        "vulnerability_analysis": "permit! 放行所有参数，等同于禁用 Strong Parameters。客户端传入 user[role]=admin 或 user[is_admin]=true 即可提权。",
+        "fix_pattern": "1. 使用显式 permit：params.require(:user).permit(:name, :email)；2. 角色变更使用独立 action 和 Strong Parameters；3. 添加 before_action :require_admin。"
+      }
+    ],
+    "mitigation_rules": [
+      "权限变更操作必须由具备足够权限的管理者执行，实施严格的 RBAC 控制。",
+      "禁止用户通过自助接口提升自己的角色或权限（自提升防御）。",
+      "角色/权限值必须通过服务端枚举或白名单校验，拒绝客户端传入的任意值。",
+      "新用户注册时的默认角色必须为最低权限（如 ROLE_USER / member / basic）。",
+      "权限字段（role/isAdmin/is_superuser/is_staff）必须与用户输入物理隔离，使用独立 DTO 或字段过滤。",
+      "角色降级后必须清理残留的高权限角色、权限和功能访问。",
+      "多环境部署时，确保所有环境的权限配置（默认角色、管理员列表）不低于生产环境的安全基线。"
+    ],
+    "refutation_checklist": [
+      "权限变更接口是否仅允许超级管理员调用（如 @PreAuthorize(\"hasRole('SUPER_ADMIN')\")）？",
+      "角色/权限值是否通过服务端枚举或白名单严格校验，拒绝任意客户端输入？",
+      "是否禁止用户修改自己的角色或权限（自提升防御）？",
+      "是否使用独立的 AdminDTO 接收参数，物理隔离了角色/权限等敏感字段？",
+      "角色管理是否由外部 IdP（如 Auth0, Okta）统一处理，应用层无直接角色写入？",
+      "降级操作是否同步清理了所有高权限角色和功能访问？",
+      "多环境配置中，是否有独立的 Profile 覆盖了默认角色？覆盖后的值是否仍然安全？",
+      "注册/创建用户的接口是否被认证豁免？如果是，是否误放行了含权限字段的创建请求？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_privilege_ops",
+      "desc": "识别涉及角色分配、权限授予和管理员提升的端点或函数。同时识别用户注册/创建流程。"
+    },
+    {
+      "name": "trace_role_params",
+      "desc": "追踪角色/权限参数的数据流来源（客户端请求 vs 服务端计算）。命中 anti_patterns.mass_assignment_privilege_fields 则标记。"
+    },
+    {
+      "name": "check_operator_auth",
+      "desc": "验证执行权限变更的操作者是否经过了充分的权限校验。对照 control_detection_patterns.operator_authorization_check。"
+    },
+    {
+      "name": "detect_self_elevation",
+      "desc": "检查用户是否可以通过该接口提升自己的权限。对照 control_detection_patterns.self_elevation_prevention。"
+    },
+    {
+      "name": "check_privilege_field_isolation",
+      "desc": "检查权限字段是否与用户输入物理隔离。对照 control_detection_patterns.privilege_field_isolation。"
+    },
+    {
+      "name": "check_role_whitelist",
+      "desc": "检查角色/权限值是否通过枚举或白名单校验。对照 control_detection_patterns.role_value_whitelist。"
+    },
+    {
+      "name": "check_default_privilege",
+      "desc": "检查新用户注册时的默认角色是否为最低权限。对照 anti_patterns.default_excess_privilege。"
+    },
+    {
+      "name": "check_residual_privilege",
+      "desc": "检查角色降级后高权限是否被清理。对照 anti_patterns.residual_privilege。"
+    },
+    {
+      "name": "check_multi_profile_differences",
+      "desc": "检查多环境配置，验证非生产环境是否覆盖了权限配置（如 dev 环境默认赋予 admin 角色）。"
+    },
+    {
+      "name": "check_auth_exemption_privilege_ops",
+      "desc": "检查认证豁免路径是否误放行了权限变更操作（如注册接口同时创建 admin 用户）。"
+    }
+  ],
+  "sanitizers": [
+    "权限变更接口仅允许超级管理员调用（如 @PreAuthorize(\"hasRole('SUPER_ADMIN')\")）",
+    "角色/权限值通过服务端枚举或白名单严格校验，拒绝任意客户端输入",
+    "禁止用户修改自己的角色或权限（自提升防御）",
+    "使用独立的 AdminDTO 接收参数，物理隔离了角色/权限等敏感字段",
+    "角色管理由外部 IdP（如 Auth0, Okta）统一处理，应用层无直接角色写入",
+    "角色降级操作同步清理了所有高权限角色和功能访问",
+    "多环境配置中各环境均保持了相同或更高安全级别的默认角色设置",
+    "认证豁免路径（如注册接口）仅创建最低权限用户，且不接受权限相关字段"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-269",
+    "privilege_change_type": "array — 权限管理缺陷类型 (如 ['role_escalation', 'self_elevation', 'mass_assignment', 'default_excess_privilege', 'residual_privilege'])",
+    "tainted_privilege_param": "string (指出具体哪个角色/权限参数来自客户端且未被校验)",
+    "missing_auth_check": "string (描述应添加但未添加的操作者权限校验逻辑)",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['mass_assignment_privilege_fields.java', 'self_elevation.java', 'default_excess_privilege.python'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['operator_authorization_check', 'privilege_field_isolation', 'role_value_whitelist', 'self_elevation_prevention'])",
+    "profile_difference_found": "boolean — 是否发现多环境配置安全差异",
+    "exemption_path_issue_found": "boolean — 是否发现认证豁免路径包含权限变更操作",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "CRITICAL",
+    "remediation": "string"
+  }
+}

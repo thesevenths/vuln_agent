@@ -1,0 +1,49 @@
+# CWE-352 检测模式
+
+ast_patterns:
+  - 'HTTPMethod[name=~/(POST|PUT|DELETE|PATCH)/i]'
+  - 'StateChange[no_csrf_token=true]'
+  - 'Form[csrf_protection=false]'
+
+semantic_keywords:
+  - csrf
+  - xsrf
+  - cross-site
+  - state-changing
+  - SameSite
+  - csrf_token
+  - anti-forgery
+  - _token
+  - X-CSRF-TOKEN
+
+file_context:
+  - controller
+  - form
+  - security_config
+  - filter
+
+logic_query_keywords_generic:
+  state_changing:
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - transfer
+    - delete
+    - update
+  csrf_guards:
+    - csrf
+    - xsrf
+    - anti-forgery
+    - csrf_token
+    - _token
+  cookie_flags:
+    - SameSite
+    - HttpOnly
+    - Secure
+
+sanitizers:
+  - 框架级 CSRF token 校验（Spring Security csrf、Django csrfmiddleware）
+  - SameSite=Strict/Lax 且敏感操作额外要求自定义头/token
+  - 双重 Cookie 或 Origin/Referer 白名单校验
+  - 状态变更接口要求不可跨站自动携带的 Authorization 头（非 Cookie）

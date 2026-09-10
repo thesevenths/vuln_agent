@@ -1,0 +1,102 @@
+# CWE-840 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【提取业务不变量】该接口保护什么业务规则？(例：订单总额=单价×数量、余额不可为负、优惠券单次使用、用户不可自授 admin、退款≤实付、库存不超卖、日累计限额)。'
+  - 'Step 2: 【识别信任边界】哪些决策值来自客户端 request/body/hidden field？服务端是否从权威源（数据库目录价、库存表、角色表）重新读取？对照 anti_patterns.client_computed_financial。'
+  - 'Step 3: 【重算 vs 透传】total/price/discount 是服务端计算还是直接采用客户端提交？若采用客户端值，是否有独立校验其与服务端状态一致？对照 control_detection_patterns.server_side_recompute。'
+  - 'Step 4: 【边界与组合】负数量/负价格、超大整数、多优惠券叠加、跳过最低消费、退款大于实付、并发下单超库存等组合攻击。对照 anti_patterns.discount_stacking、negative_value_abuse、refund_excess。'
+  - 'Step 5: 【限额切片攻击】仅有单笔限额而无日/月累计限额？攻击者可通过多次小额操作绕过限额。对照 anti_patterns.limit_slicing。'
+  - 'Step 6: 【不变量断言】代码中是否有显式的业务不变量断言（assert/validate/enforce）。对照 control_detection_patterns.invariant_assertions。'
+  - 'Step 7: 【与注入区分】若漏洞本质是「信任了不该信任的 business field」而非拼接 SQL/命令 → CWE-840；修复应是服务端重算与不变量断言，不仅是参数化查询。'
+  - 'Step 8: 【与 CWE-841 区分】840 是「规则算错/信任错字段」，841 是「跳过流程步骤」。若同时存在两种缺陷，分别报告。'
+  - 'Step 9: 【九项确认标准】缺一不得 confirmed：(1)金融值服务端重算 (2)不变量有断言 (3)无负值滥用 (4)优惠券单次使用 (5)退款≤实付 (6)累计限额存在 (7)折扣不可叠加 (8)与注入可区分 (9)并发安全'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: '@PostMapping("/checkout")
+public Order checkout(@RequestBody CheckoutRequest req) {
+    Order o = new Order();
+    o.setTotal(req.getTotal());
+    o.setPrice(req.getPrice());
+    repo.save(o);
+    return paymentService.charge(o.getTotal());
+}'
+      vulnerability_analysis: 订单金额完全由客户端提交（req.getTotal()、req.getPrice()），攻击者传 total=0.01 即可低价结账。无 SQL 注入，属于典型 CWE-840 业务逻辑错误。缺少服务端重算和不变量断言。
+      fix_pattern: 'Product p = catalog.getById(itemId); BigDecimal line = p.getPrice().multiply(qty); order.setTotal(lines.sum()); 拒绝客户端 total/price 字段。添加 assert order.getTotal().compareTo(BigDecimal.ZERO) > 0;'
+    - code_snippet: 'public BigDecimal applyDiscount(List<String> couponCodes, BigDecimal amount) {
+    BigDecimal discounted = amount;
+    for (String code : couponCodes) {
+        discounted = discounted.multiply(getDiscountRate(code));
+    }
+    return discounted;
+}'
+      vulnerability_analysis: '折扣循环叠加无互斥检查。攻击者可提交多个不兼容的折扣码（如 50%+30%+20%），导致最终价格远低于预期。缺少折扣类别互斥检查和最大折扣限制。'
+      fix_pattern: 'if (couponCodes.size() > 1) { check categories are same; } return couponCodes.stream().map(code -> calculateDiscount(code, amount)).min(Comparator.naturalOrder()).orElse(amount); // 取最优折扣'
+    - code_snippet: '@app.post("/refund")
+async def process_refund(order_id: int, amount: float):
+    await Refund.create(order_id=order_id, amount=amount)
+    await PaymentGateway.refund(order_id, amount)
+    return {"status": "refunded"}'
+      vulnerability_analysis: 退款处理未检查累计退款是否超过订单实付金额。攻击者可通过多次退款请求（或并发请求）获得超过原始支付的退款。缺少退款总额校验和幂等性控制。
+      fix_pattern: 'total_refunded = await Refund.filter(order_id=order_id).annotate(total=Sum(''amount'')); if total_refunded + amount > order.total_paid: raise HTTPException(400, ''Refund exceeds paid amount'')'
+    - code_snippet: 'app.post(''/api/transfer'', async (req, res) => {
+    const { from, to, amount } = req.body;
+    if (amount > PER_TRANSACTION_LIMIT) {
+        return res.status(400).json({error: ''Limit exceeded''});
+    }
+    await transfer(from, to, amount);
+    res.json({status: ''ok''});
+});'
+      vulnerability_analysis: '仅有单笔转账限额（PER_TRANSACTION_LIMIT），无日累计限额。攻击者可发送 100 次 $99 的转账来绕过 $100 的限额。这是典型的''限额切片''攻击。'
+      fix_pattern: 'const dailyTotal = await getDailyTransferTotal(from); if (dailyTotal + amount > DAILY_LIMIT) return res.status(400).json({error: ''Daily limit exceeded''}); // 同时保留单笔限额'
+    - code_snippet: 'if ("admin".equals(request.getParameter("role")))
+    user.setRole(ADMIN);'
+      vulnerability_analysis: '角色由请求参数决定，用户可自提管理员。非认证绕过（CWE-287）而是业务规则未强制执行（CWE-840/863）。业务不变量''用户不可自授角色''被违反。'
+      fix_pattern: 角色变更仅允许已授权管理员调用，且 role 来自服务端策略而非 request 参数。
+    - code_snippet: 'func PurchaseHandler(c *gin.Context) {
+    var req struct {
+        ItemID   int     `json:"item_id"`
+        Quantity int     `json:"quantity"`
+    }
+    c.ShouldBindJSON(&req)
+    total := getPrice(req.ItemID) * float64(req.Quantity)
+    charge(total)
+}'
+      vulnerability_analysis: Quantity 来自客户端且未验证正数约束。攻击者可传入 quantity=-100 导致 total 为负数，服务端向用户退款而非扣款。缺少数量正数校验和总额非负断言。
+      fix_pattern: 'if req.Quantity <= 0 { c.JSON(400, gin.H{"error": "invalid quantity"}); return }; total := getPrice(req.ItemID) * float64(req.Quantity); if total <= 0 { c.JSON(400, gin.H{"error": "invalid total"}); return }'
+  mitigation_rules:
+    - 所有金额/数量/状态变更由服务端根据权威数据源计算，客户端字段仅作展示或 id 引用。
+    - 对业务不变量编写显式断言（assertPricePositive、assertStockAvailable、assertValidTransition）。
+    - 敏感字段使用服务端签名 token 或加密状态 blob，防止客户端篡改 workflow 状态。
+    - 与 CWE-841 区分：840 是「规则算错/信任错字段」，841 是「跳过流程步骤」。
+    - 折扣/优惠券实施互斥检查和单次使用控制，防止叠加滥用。
+    - 金融操作实施累计限额（日/月），不仅依赖单笔限额。
+    - 退款必须校验累计退款 ≤ 实付金额，且所有退款路径共享统一账本。
+
+differentiation_from_sast:
+  - 传统 SAST 关注「危险函数+污点」，业务逻辑错误在于「代码按设计执行但业务规则被违背」。
+  - 本模板强制从领域不变量出发：价格≥0、库存不超卖、优惠券不可叠加、角色不可自提、状态机合法转移。
+  - 客户端提交的 price/quantity/status/discount 若被服务端直接信任，属于逻辑漏洞而非注入；须服务端独立重算与校验。
+
+anti_patterns:
+  - description
+  - client_computed_financial
+  - discount_stacking
+  - negative_value_abuse
+  - limit_slicing
+  - refund_excess
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-840
+  violated_invariant: 'string (被违背的业务不变量，如 ''订单总额=单价×数量'' 或 ''退款≤实付'')'
+  trusted_client_field: 'string (被错误信任的字段，如 ''req.body.total'' 或 ''req.body.quantity'')'
+  logic_error_type: 'array — 业务逻辑错误类型 (如 [''client_computed_financial'', ''discount_stacking'', ''negative_abuse'', ''limit_slicing'', ''refund_excess'', ''role_self_grant''])'
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''client_computed_financial.java'', ''discount_stacking.java''])'
+  control_missing: 'array — 缺失的安全控制 (如 [''server_side_recompute'', ''invariant_assertions'', ''coupon_single_use''])'
+  business_impact: string (0元购/透支/提权/超卖/限额绕过等)
+  logic_poc: string (篡改业务字段的 HTTP 步骤)
+  fix_code_hint: string (服务端重算/断言代码方向)
+  risk_level: HIGH
+  remediation: string

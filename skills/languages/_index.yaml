@@ -1,0 +1,46 @@
+# languages/ — 语言特化检测模式
+# 按语言拆分，运行时根据项目语言识别结果选择性加载
+
+# 语言识别信号（扫描项目依赖文件）
+language_detection:
+  java:
+    signals:
+      - pom.xml
+      - build.gradle
+      - build.gradle.kts
+    framework_signals:
+      spring_security: ["SpringSecurity", "spring-security-config", "spring-boot-starter-security"]
+      shiro: ["org.apache.shiro", "shiro-spring", "shiro-web"]
+      jaxrs: ["javax.ws.rs", "jakarta.ws.rs", "jersey", "resteasy"]
+  python:
+    signals:
+      - requirements.txt
+      - setup.py
+      - pyproject.toml
+      - Pipfile
+    framework_signals:
+      django: ["django", "djangorestframework"]
+      flask: ["flask", "flask-login", "flask-jwt", "flask-security"]
+      fastapi: ["fastapi"]
+
+# 加载规则
+load_rules:
+  always_load:
+    - "{lang}/cwe_patterns.yaml"      # CWE 检测模式（已存在）
+    - "{lang}/_meta.yaml"             # 语言元数据
+    - "{lang}/auth_controls.yaml"     # 安全控制检测
+    - "{lang}/source_patterns.yaml"   # Source 定义
+    - "{lang}/endpoint_discovery.yaml" # 端点枚举
+  conditional:
+    # Java 框架特化
+    spring_security:
+      - "{lang}/spring_security.yaml"
+    shiro:
+      - "{lang}/shiro_security.yaml"
+    # Python 框架特化
+    django:
+      - "{lang}/django_permissions.yaml"
+    flask:
+      - "{lang}/flask_auth.yaml"
+  checklists:
+    - "{lang}/checklists.yaml"

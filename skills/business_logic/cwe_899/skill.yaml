@@ -1,0 +1,13 @@
+# CWE-899 Skill 元数据
+# 从 templates/cwe/cwe_899.json 迁移
+
+skill_id: cwe_899_access_control_v2
+source_cwe: CWE-899
+priority: P1
+
+related_cwes:
+  - CWE-862
+  - CWE-285
+  - CWE-284
+  - CWE-639
+  - CWE-306

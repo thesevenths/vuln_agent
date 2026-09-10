@@ -1,0 +1,75 @@
+# Flask 认证模型
+# 框架特化检测模式（仅在识别到 Flask 依赖时加载）
+
+# Flask-Login
+flask_login:
+  setup:
+    - "LoginManager"
+    - "login_manager.init_app"
+    - "@login_manager.user_loader"
+  decorators:
+    - "@login_required"
+    - "@fresh_login_required"
+  user_object:
+    - "current_user"
+    - "is_authenticated"
+    - "is_active"
+    - "is_anonymous"
+  session_protection:
+    - "session_protection"
+    - "'basic'"
+    - "'strong'"
+  risk: "未使用 @login_required 保护的视图函数"
+
+# Flask-JWT-Extended
+jwt:
+  setup:
+    - "JWTManager"
+    - "jwt.init_app"
+    - "@jwt.token_in_header"
+  token_ops:
+    - "create_access_token"
+    - "create_refresh_token"
+    - "get_jwt_identity"
+    - "get_jwt"
+    - "decode_token"
+  config:
+    - "JWT_SECRET_KEY"
+    - "JWT_ACCESS_TOKEN_EXPIRES"
+    - "JWT_REFRESH_TOKEN_EXPIRES"
+    - "JWT_ALGORITHM"
+  risk_patterns:
+    - "JWT_SECRET_KEY 硬编码"
+    - "JWT_ALGORITHM = 'none'"
+    - "无过期时间设置"
+
+# Flask-Security
+flask_security:
+  features:
+    - "SECURITY_PASSWORD_HASH"
+    - "SECURITY_PASSWORD_SALT"
+    - "SECURITY_TOKEN_MAX_AGE"
+    - "SECURITY_TRACKABLE"
+  risk: "SECURITY_PASSWORD_SALT 未设置或使用弱值"
+
+# Session 管理
+session:
+  config:
+    - "SECRET_KEY"
+    - "SESSION_COOKIE_NAME"
+    - "SESSION_COOKIE_HTTPONLY"
+    - "SESSION_COOKIE_SECURE"
+    - "SESSION_COOKIE_SAMESITE"
+    - "PERMANENT_SESSION_LIFETIME"
+  risk_patterns:
+    - "SECRET_KEY 硬编码或默认值"
+    - "SESSION_COOKIE_HTTPONLY = False"
+    - "PERMANENT_SESSION_LIFETIME 过大"
+
+# Blueprint 安全
+blueprint_security:
+  patterns:
+    - "Blueprint"
+    - "register_blueprint"
+    - "url_prefix"
+  risk: "Blueprint 注册时未统一添加认证中间件"

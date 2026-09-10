@@ -1,0 +1,19 @@
+{
+  "skill_id": "version_identification",
+  "name": "版本识别（可选）",
+  "summary": "仅在用户明确要求版本识别时触发",
+  "trigger_keywords": ["decompiled", "_decompiled.c", "候选源码", "版本识别", "identify version"],
+  "completion_hints": [
+    "唯一匹配才进入针对性深扫",
+    "不可区分版本需如实输出范围结论"
+  ],
+  "min_score_to_activate": 0.28,
+  "start_node_id": "identify_version",
+  "nodes": [
+    {
+      "node_id": "identify_version",
+      "tool_name": "VersionTool.identify_component",
+      "arguments": {}
+    }
+  ]
+}

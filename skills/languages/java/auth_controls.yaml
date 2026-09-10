@@ -1,0 +1,87 @@
+# Java 安全控制检测模式
+# 识别框架级安全注解、过滤器、配置
+
+# Spring Security 安全控制
+spring_security:
+  method_level:
+    annotations:
+      - "@PreAuthorize"
+      - "@Secured"
+      - "@RolesAllowed"
+      - "@DenyAll"
+      - "@PermitAll"
+    risk: "方法级注解是最直接的安全控制信号"
+
+  filter_chain:
+    patterns:
+      - "SecurityFilterChain"
+      - "authorizeHttpRequests"
+      - "authorizeRequests"
+      - "antMatchers"
+      - "requestMatchers"
+      - "anyRequest"
+      - "permitAll"
+      - "authenticated"
+    risk: "FilterChain 配置决定 URL 级别的访问控制"
+
+  csrf_protection:
+    patterns:
+      - "CsrfFilter"
+      - "csrf()"
+      - "csrfToken"
+      - "CsrfTokenRepository"
+    risk: "CSRF 保护缺失导致跨站请求伪造"
+
+# Apache Shiro 安全控制
+shiro:
+  method_level:
+    annotations:
+      - "@RequiresAuthentication"
+      - "@RequiresPermissions"
+      - "@RequiresRoles"
+      - "@RequiresGuest"
+      - "@RequiresUser"
+    risk: "Shiro 注解级安全控制"
+
+  code_level:
+    patterns:
+      - "SecurityUtils.getSubject"
+      - "subject.isAuthenticated"
+      - "subject.hasRole"
+      - "subject.isPermitted"
+      - "subject.checkPermission"
+    risk: "Shiro 编程式安全校验"
+
+  config:
+    patterns:
+      - "filterChainDefinitions"
+      - "anon"
+      - "authc"
+      - "shiro.ini"
+    risk: "Shiro 过滤器链配置"
+
+# JAX-RS 安全控制
+jaxrs:
+  annotations:
+    - "@RolesAllowed"
+    - "@PermitAll"
+    - "@DenyAll"
+  filters:
+    - "ContainerRequestFilter"
+    - "ContainerResponseFilter"
+  risk: "JAX-RS 声明式安全 + 过滤器"
+
+# 通用编程式安全校验
+programmatic_checks:
+  authentication:
+    - "isAuthenticated"
+    - "getAuthentication"
+    - "getPrincipal"
+    - "SecurityContextHolder"
+    - "SecurityContext"
+  authorization:
+    - "hasRole"
+    - "hasPermission"
+    - "checkPermission"
+    - "authorize"
+    - "isAuthorized"

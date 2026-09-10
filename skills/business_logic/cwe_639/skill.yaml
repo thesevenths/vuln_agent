@@ -1,0 +1,22 @@
+# CWE-639 Skill 元数据
+# 从 templates/cwe/cwe_639.json 迁移
+
+skill_id: cwe_639_idor_detection
+source_cwe: CWE-639
+priority: P0
+
+related_cwes:
+  - cwe: CWE-863
+    reason: incorrect_authorization - IDOR 是授权不当的具体形式：使用可被猜测的资源标识符绕过授权
+  - cwe: CWE-200
+    reason: exposure_of_sensitive_information - IDOR 直接导致敏感信息泄露（他人订单/发票/档案）
+  - cwe: CWE-538
+    reason: insertion_of_sensitive_info_into_externally_accessible_file - IDOR 可导致文件路径遍历访问他人文件
+  - cwe: CWE-285
+    reason: improper_authorization_general - IDOR 是水平越权的具体实现方式
+  - cwe: CWE-862
+    reason: missing_authorization - IDOR 与完全缺少授权检查常共现：有查询但无所有权验证
+  - cwe: CWE-269
+    reason: improper_privilege_management - 水平越权与垂直越权常组合出现：IDOR 访问他人资源后利用权限管理缺陷提升角色
+
+description: 通过资源标识符访问数据的端点是 CWE-639 的核心攻击面，必须验证所有权绑定

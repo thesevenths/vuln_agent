@@ -1,0 +1,10 @@
+# CWE-79 Skill 元数据
+# 从 templates/cwe/cwe_79.json 迁移
+
+skill_id: cwe_79_cross_site_scripting
+source_cwe: CWE-79
+priority: P0
+
+related_cwes:
+  - CWE-80
+  - CWE-83

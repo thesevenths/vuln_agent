@@ -1,0 +1,11 @@
+# CWE-22 Skill 元数据
+# 从 templates/cwe/cwe_22.json 迁移
+
+skill_id: cwe_22_path_traversal
+source_cwe: CWE-22
+priority: P0
+
+related_cwes:
+  - CWE-23
+  - CWE-36
+  - CWE-73

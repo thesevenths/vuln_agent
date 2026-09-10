@@ -1,0 +1,22 @@
+# CWE-915 Skill 元数据
+# 从 templates/cwe/cwe_915.json 迁移
+
+skill_id: cwe_915_mass_assignment
+source_cwe: CWE-915
+priority: P1
+
+related_cwes:
+  - cwe: CWE-269
+    reason: improper_privilege_management - 攻击者通过批量赋值篡改角色/权限字段直接提权
+  - cwe: CWE-862
+    reason: missing_authorization - 未对敏感字段的写操作进行授权校验
+  - cwe: CWE-284
+    reason: improper_access_control - 缺少字段级访问控制使所有属性均可被外部修改
+  - cwe: CWE-472
+    reason: external_control_of_assumed_web_parameter - 攻击者控制了服务端不应信任的请求参数
+  - cwe: CWE-863
+    reason: incorrect_authorization - 批量赋值导致越权修改他人数据的字段
+  - cwe: CWE-913
+    reason: improper_control_of_dynamically_managed_code - 动态属性注入可被利用执行任意代码
+
+description: 数据绑定和对象更新操作是 CWE-915 的核心攻击面

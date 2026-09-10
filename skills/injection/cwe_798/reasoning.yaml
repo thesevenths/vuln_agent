@@ -1,0 +1,116 @@
+# CWE-798 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别凭证候选】扫描所有疑似密码/密钥/令牌/API凭据的字符串字面量、变量赋值和配置文件条目。'
+  - 'Step 1: 【上下文语义分析】该字符串是否出现在【认证/连接/加密/签名/云服务初始化】相关的函数调用或变量赋值中？（如 DriverManager.getConnection、AES.new、boto3.client）'
+  - 'Step 2: 【变体分类判断】'
+  - '   - Inbound（后门/默认凭据）：是否用于验证外部输入？（如 if password.equals(''Mew!'')）→ 后门/默认账户风险'
+  - '   - Outbound（连接凭据）：是否用于连接外部服务？（如 getConnection(url, ''scott'', ''tiger'')）→ 凭据泄露风险'
+  - '   - Crypto（加密密钥）：是否用于加密/签名操作？（如 SecretKeySpec(''key''.getBytes())）→ 加密形同虚设'
+  -    - Config（配置文件明文）：是否存储在配置文件/YAML/properties 中？→ 配置文件泄露风险
+  - 'Step 3: 【排除假阳性 — 外部来源检查】验证凭据是否实际来自环境变量（System.getenv/os.environ/process.env）、密钥管理服务（Vault/KMS/SecretsManager）或加密配置（jasypt/ENC()/sops）。'
+  - 'Step 4: 【排除假阳性 — 上下文检查】检查是否位于测试/Mock/示例/教程代码中（文件名含 test/spec/mock/fixture/example），或为占位符格式（${DB_PASSWORD}、CHANGE_ME、YOUR_KEY_HERE）。'
+  - 'Step 5: 【排除假阳性 — 值特征分析】检查值是否为已知公开哈希值（如 MD5/SHA 长度且用于完整性校验而非认证）、UUID、或明显无意义的占位字符串。'
+  - 'Step 6: 【评估暴露面与影响】若确认为真实硬编码：(a) 是否可通过反编译（javap -c）、源码仓库、配置文件读取获取？(b) 凭据权限范围（数据库管理员/API全权/加密主密钥）？(c) 是否所有部署实例共享同一凭据？'
+  - 'Step 7: 【评估第三方服务集成风险】若凭据用于第三方服务（短信/支付/邮件/OSS），评估泄露后攻击者可直接调用的服务范围和影响。'
+  - 'Step 8: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'DriverManager.getConnection(url, "scott", "tiger");'
+      vulnerability_analysis: 'Outbound 变体：数据库连接凭证 ''scott/tiger'' 直接硬编码在 Java 源码中。即使程序打包为 JAR，攻击者也可通过 javap -c 反编译字节码提取该字符串。此凭证对所有安装实例相同，无法通过配置修改，属于高危硬编码。'
+      fix_pattern: 'String pwd = System.getenv("DB_PASSWORD"); // 从环境变量或加密配置加载'
+    - code_snippet: 'if (strcmp(password, "Mew!")) { printf("Entering Diagnostic Mode..."); }'
+      vulnerability_analysis: 'Inbound 变体：诊断模式使用硬编码密码 ''Mew!'' 进行验证。这是一个隐藏的后门账户，任何知道该密码的人均可获得管理员权限。由于密码编译在二进制中，普通用户无法禁用或修改。'
+      fix_pattern: 移除硬编码诊断密码；改用独立的、可配置的、带审计日志的管理员认证机制。
+    - code_snippet: 'SECRET_KEY = ''super-secret-key-12345''
+app.config[''SECRET_KEY''] = SECRET_KEY
+
+@app.route(''/login'')
+def login():
+    token = jwt.encode({''user'': ''admin''}, SECRET_KEY, algorithm=''HS256'')'
+      vulnerability_analysis: 'Flask 应用将 SECRET_KEY 硬编码为 ''super-secret-key-12345''。该密钥用于 Session 签名和 JWT 签发，攻击者可利用已知密钥伪造任意用户的 Session 和 JWT Token，实现任意身份冒充和权限提升。'
+      fix_pattern: 'import os; app.config[''SECRET_KEY''] = os.environ.get(''SECRET_KEY'') # 从环境变量加载'
+    - code_snippet: 'const firebase = require(''firebase'');
+firebase.initializeApp({
+    apiKey: "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+    authDomain: "myapp.firebaseapp.com",
+    databaseURL: "https://myapp.firebaseio.com"
+});'
+      vulnerability_analysis: Firebase 配置中的 apiKey 硬编码在前端 JS 代码中。虽然 Firebase API Key 本身设计为公开（由 Security Rules 保护），但若配合 Firestore/RTDB 安全规则配置不当，攻击者可利用该 Key 直接访问数据库。此外，若其中包含 serviceAccountKey.json 的 private_key 则为高危。
+      fix_pattern: 前端 apiKey 可接受（配合严格 Security Rules）；但 serviceAccountKey.json（含 private_key）必须存储在服务端环境变量中，禁止提交到代码仓库。
+    - code_snippet: 'func NewDB() *sql.DB {
+    db, err := sql.Open("mysql", "root:P@ssw0rd123@tcp(127.0.0.1:3306)/mydb")
+    if err != nil {
+        log.Fatal(err)
+    }
+    return db
+}'
+      vulnerability_analysis: 'Go 服务将数据库 DSN（含用户名 root 和密码 P@ssw0rd123）硬编码在源码中。该密码会被编译到二进制文件中，通过 strings 命令即可提取。所有部署实例共享同一数据库管理员密码。'
+      fix_pattern: 'dsn := os.Getenv("DATABASE_DSN"); db, err := sql.Open("mysql", dsn) // 从环境变量加载'
+    - code_snippet: '$conn = new PDO(
+    ''mysql:host=localhost;dbname=production_db'',
+    ''root'',
+    ''r00tP@ss!''
+);
+
+$aws = new Aws\S3\S3Client([
+    ''key''    => ''AKIAIOSFODNN7EXAMPLE'',
+    ''secret'' => ''wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY''
+]);'
+      vulnerability_analysis: PHP 代码中同时存在数据库硬编码密码和 AWS 硬编码凭据。AWS Access Key (AKIA...) 和 Secret Key 直接写在源码中，攻击者可利用该凭据访问 S3 存储桶、EC2 实例等 AWS 资源。若代码仓库泄露（如 .git 目录暴露），所有凭据将一并暴露。
+      fix_pattern: 使用 .env 文件 + vlucas/phpdotenv 加载凭据；AWS 推荐使用 IAM Role（EC2 Instance Profile）而非 Access Key。
+    - code_snippet: '# docker-compose.yml
+services:
+  db:
+    environment:
+      MYSQL_ROOT_PASSWORD: SuperSecret123
+      POSTGRES_PASSWORD: postgres123
+  redis:
+    command: redis-server --requirepass RedisPass123
+  app:
+    environment:
+      - JWT_SECRET=my-jwt-secret-key-very-long-and-secure
+      - AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+      vulnerability_analysis: Docker Compose 配置文件中多处硬编码明文密码：MySQL root 密码、PostgreSQL 密码、Redis 密码、JWT Secret 和 AWS Secret Key。这些凭据通常会被提交到代码仓库，对所有开发和运维人员可见。
+      fix_pattern: 使用 Docker Secrets（docker secret create）或 .env 文件（加入 .gitignore）管理敏感凭据；生产环境使用 Kubernetes Secrets 或 Vault。
+    - code_snippet: 'var connectionString = "Server=prod-db.company.com;Database=ProductionDB;User Id=sa;Password=Str0ngP@ssw0rd!;";
+using var conn = new SqlConnection(connectionString);
+
+var signingKey = new SymmetricSecurityKey(
+    Encoding.UTF8.GetBytes("this-is-my-super-secret-jwt-key-12345"));'
+      vulnerability_analysis: .NET 应用中数据库连接字符串和 JWT 签名密钥均硬编码在源码中。sa 账户密码和 JWT 密钥编译到 DLL 后仍可通过反编译工具（如 ILSpy）提取。攻击者获取 JWT 密钥后可伪造任意身份的 Token。
+      fix_pattern: '使用 User Secrets（开发环境）或 Azure Key Vault（生产环境）：var connStr = config.GetConnectionString("Default"); var key = config["Jwt:SigningKey"];'
+  mitigation_rules:
+    - Outbound 凭证必须存储在加密配置文件或密钥管理服务中（如 HashiCorp Vault、AWS Secrets Manager、Azure Key Vault），禁止出现在源码/配置文件中。
+    - Inbound 默认凭证应改为首次登录强制修改模式，禁止硬编码通用密码。
+    - 加密密钥/IV 禁止硬编码，必须从安全的密钥管理服务或操作系统密钥库中动态加载。
+    - 若必须保留硬编码（如嵌入式设备），需限制访问途径（仅本地控制台）并加强物理安全。
+    - 使用加盐哈希存储密码，禁止明文或无盐哈希比较。
+    - 前端到后端连接应采用动态凭证、最小权限、时间敏感校验防重放。
+    - 所有 .env 文件、secrets.json、credentials 文件必须加入 .gitignore，禁止提交到代码仓库。
+    - CI/CD 管道中使用 Secret Scanning 工具（如 GitLeaks、TruffleHog、detect-secrets）拦截意外提交的凭据。
+
+anti_patterns:
+  - description
+  - hardcoded_password_literal
+  - hardcoded_api_key_or_token
+  - hardcoded_crypto_key
+  - plaintext_config_credentials
+  - default_or_common_credentials
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-798
+  variant_type: 'enum[''inbound_backdoor'', ''outbound_connection'', ''crypto_key_literal'', ''config_file_plaintext'', ''default_credentials'', ''api_key_literal'', ''jwt_secret_literal'']'
+  credential_type: 'enum[''database_password'', ''api_key'', ''encryption_key'', ''jwt_secret'', ''cloud_service_key'', ''smtp_password'', ''ssh_private_key'', ''session_secret'', ''oauth_secret'']'
+  credential_location: 'string (精确到文件:行号:变量名)'
+  exposure_vector: 'string (如 ''javap -c disassembly''、''config file read''、''source code review''、''strings binary''、''git history'')'
+  credential_scope: 'enum[''single_instance'', ''all_instances'', ''shared_across_services'']'
+  false_positive_reason: string (若未确认漏洞，说明排除原因)
+  third_party_service: string (若涉及第三方服务，标明服务类型和影响范围)
+  reasoning_trace: string
+  business_impact: string
+  risk_level: HIGH
+  remediation: string (结合变体类型生成修复方案，区分 Inbound/Outbound/Crypto/Config 修复路径)

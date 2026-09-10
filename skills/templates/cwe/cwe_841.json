@@ -1,0 +1,456 @@
+{
+  "skill_id": "cwe_841_workflow_bypass",
+  "source_cwe": ["CWE-841"],
+  "related_cwes": [
+    {"cwe": "CWE-863", "reason": "incorrect_authorization - 工作流绕过常与授权检查不完整共存：跳过的步骤本身可能含授权逻辑"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - 工作流步骤缺少鉴权使攻击者可独立调用任何步骤"},
+    {"cwe": "CWE-306", "reason": "missing_auth_for_critical_function - 终态操作（支付确认、发货）可能完全无认证保护"},
+    {"cwe": "CWE-639", "reason": "idor - 工作流中通过篡改 orderId/userId 可跳到他人订单的终态操作"},
+    {"cwe": "CWE-840", "reason": "business_logic_error - 工作流绕过是业务逻辑错误的子类型：违反流程不变量"},
+    {"cwe": "CWE-362", "reason": "race_condition - 并发请求可使工作流步骤竞态执行，跳过中间状态验证"},
+    {"cwe": "CWE-472", "reason": "external_control_of_state - 客户端可控的状态参数（step/status/hidden_field）使攻击者可操纵工作流"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(checkout|confirm|submit|approve|verify|complete|finalize|pay|transfer|process|activate|ship|cancel|refund|redeem|claim)/i]",
+      "StateTransition[from_step][to_step]",
+      "MultiStepHandler[skips_validation=true]",
+      "ClassDef[name=~/(CheckoutController|OrderController|PaymentController|WorkflowController|ApprovalController|CartController|BookingController)/i]",
+      "Call[name=~/(setStatus|setState|transition|moveTo|completeStep|skipTo|jumpTo|processStep)/i]",
+      "Annotation[name=~/(PostMapping|PutMapping).*(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate)/i]"
+    ],
+    "semantic_keywords": [
+      "step", "stage", "phase", "workflow", "checkout", "cart", "order_status",
+      "skip", "bypass", "direct", "force", "hidden_field", "status=",
+      "state_machine", "transition", "precondition", "postcondition",
+      "current_step", "next_step", "previous_step", "complete",
+      "payment_authorized", "shipping_complete", "order_confirmed",
+      "approval_pending", "review_stage", "finalized"
+    ],
+    "file_context": [
+      "checkout_controller", "order_service", "payment_service",
+      "workflow_manager", "approval_handler", "cart_service",
+      "booking_service", "shipping_handler", "refund_processor",
+      "state_machine", "order_controller", "step_handler"
+    ],
+    "operation_triggers": {
+      "description": "多步骤业务流程的端点是 CWE-841 的核心攻击面，必须验证每个步骤的前置条件",
+      "sensitive_operations": [
+        "checkout", "confirm_order", "process_payment", "authorize_payment",
+        "ship_order", "activate_account", "approve_request",
+        "cancel_order", "refund", "redeem_coupon", "claim_reward",
+        "submit_review", "publish_content", "transfer_ownership"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Post|Put|Patch)Mapping.*/(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate|redeem|claim)",
+          "@RequestMapping.*/(checkout|workflow|order|payment|approval)"
+        ],
+        "python": [
+          "@app\\.route.*/(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate)",
+          "@router\\.(post|put).*/(checkout|order|payment|approval)"
+        ],
+        "go": [
+          "\\.(POST|PUT|PATCH)\\(.*/(checkout|confirm|submit|approve|pay|ship|cancel|refund)",
+          "r\\.(POST|PUT)"
+        ],
+        "javascript": [
+          "router\\.(post|put|patch).*/(checkout|confirm|submit|approve|pay|ship|cancel|refund)",
+          "@(Post|Put|Patch)\\(.*/(checkout|order|payment)",
+          "app\\.(post|put)"
+        ],
+        "php": [
+          "Route::(post|put|patch).*/(checkout|confirm|submit|approve|pay|ship|cancel|refund)",
+          "@Route.*methods.*(?:POST|PUT).*/(checkout|order|payment)"
+        ],
+        "dotnet": [
+          "\\[Http(Post|Put|Patch)\\].*/(checkout|confirm|submit|approve|pay|ship|cancel|refund)",
+          "\\[Authorize\\].*/(checkout|order|payment)"
+        ],
+        "ruby": [
+          "(post|put|patch)\\s+\"/(checkout|confirm|submit|approve|pay|ship|cancel|refund)",
+          "resources\\s+:(orders|payments|bookings|approvals)"
+        ],
+        "rust": [
+          "\\.route.*/(checkout|confirm|submit|approve|pay|ship).*method.*(?:POST|PUT)",
+          "\\.post\\(.*/(checkout|order|payment)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "spring_workflow_ops": [
+        "checkout", "confirmOrder", "submitOrder", "processPayment",
+        "authorizePayment", "shipOrder", "activateAccount",
+        "approveRequest", "cancelOrder", "refundOrder",
+        "placeOrder", "completeOrder", "finalizeOrder"
+      ],
+      "state_fields": [
+        "status", "step", "stage", "phase", "orderState", "workflowState",
+        "paymentStatus", "shippingStatus", "approvalStatus",
+        "OrderStatus", "PaymentStatus", "ShippingStatus"
+      ],
+      "guards": [
+        "validateStep", "checkPreviousStep", "isStepComplete",
+        "requireStep", "assertState", "canTransition",
+        "validatePrecondition", "checkState", "isValidTransition"
+      ],
+      "state_machine": [
+        "StateMachine", "StateMachineFactory", "StateMachineBuilder",
+        "spring-statemachine", "StateContext", "TransitionAction",
+        "Guard", "Action"
+      ]
+    },
+    "python": {
+      "django_workflow_ops": [
+        "checkout", "confirm_order", "submit_order", "process_payment",
+        "ship_order", "activate_account", "approve_request",
+        "cancel_order", "refund_order", "redeem_coupon"
+      ],
+      "state_fields": [
+        "status", "step", "stage", "phase", "state",
+        "order_status", "payment_status", "shipping_status",
+        "approval_status", "workflow_state"
+      ],
+      "guards": [
+        "validate_step", "check_previous", "require_step",
+        "assert_state", "can_transition", "is_complete",
+        "validate_precondition"
+      ],
+      "state_machine": [
+        "django_fsm", "FSMField", "transition",
+        "django_state_machines", "can_proceed"
+      ]
+    },
+    "go": {
+      "workflow_ops": [
+        "Checkout", "ConfirmOrder", "SubmitOrder", "ProcessPayment",
+        "ShipOrder", "ActivateAccount", "ApproveRequest",
+        "CancelOrder", "RefundOrder"
+      ],
+      "state_fields": [
+        "Status", "Step", "Stage", "State", "OrderStatus",
+        "PaymentStatus", "ShippingStatus"
+      ],
+      "guards": [
+        "ValidateStep", "CheckPrevious", "RequireStep",
+        "AssertState", "CanTransition", "IsComplete"
+      ]
+    },
+    "javascript": {
+      "express_workflow_ops": [
+        "checkout", "confirmOrder", "submitOrder", "processPayment",
+        "shipOrder", "activateAccount", "approveRequest",
+        "cancelOrder", "refundOrder", "redeemCoupon"
+      ],
+      "state_fields": [
+        "status", "step", "stage", "state", "orderStatus",
+        "paymentStatus", "shippingStatus"
+      ],
+      "guards": [
+        "validateStep", "checkPreviousStep", "requireStep",
+        "assertState", "canTransition", "isComplete",
+        "xstate", "Machine", "createMachine"
+      ]
+    },
+    "generic": {
+      "workflow_ops": [
+        "checkout", "confirm", "submit", "approve", "complete",
+        "pay", "transfer", "finalize", "activate", "ship",
+        "cancel", "refund", "redeem", "claim"
+      ],
+      "state_fields": ["status", "step", "stage", "phase", "state"],
+      "guards": [
+        "validate_step", "check_previous", "require_step",
+        "assert_state", "can_transition", "is_complete"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表工作流执行中的高风险反模式",
+    "step_skipping": {
+      "description": "可直接调用终态 API 跳过中间步骤",
+      "java": [
+        "confirmOrder.*without.*isShippingComplete",
+        "processPayment.*without.*isCartValid",
+        "shipOrder.*without.*isPaymentAuthorized",
+        "finalizeOrder.*without.*validateAllSteps"
+      ],
+      "python": [
+        "confirm_order.*without.*shipping_complete",
+        "process_payment.*without.*cart_valid",
+        "ship_order.*without.*payment_authorized"
+      ],
+      "generic": [
+        "finalize.*without.*validate",
+        "complete.*without.*check.*previous",
+        "confirm.*without.*require.*step"
+      ]
+    },
+    "client_controlled_state": {
+      "description": "工作流状态（step/status/stage）由客户端参数控制",
+      "java": [
+        "order\\.setStatus.*request\\.getParameter",
+        "step.*=.*@RequestParam",
+        "status.*=.*@RequestBody",
+        "setState.*req\\.body"
+      ],
+      "python": [
+        "order\\.status\\s*=\\s*request",
+        "step\\s*=\\s*request\\.form",
+        "state\\s*=\\s*request\\.json"
+      ],
+      "javascript": [
+        "order\\.status\\s*=\\s*req\\.body",
+        "step\\s*=\\s*req\\.body\\.step",
+        "state\\s*=\\s*req\\.query"
+      ],
+      "generic": [
+        "status.*from.*request",
+        "step.*from.*param",
+        "state.*from.*body"
+      ]
+    },
+    "hidden_field_state": {
+      "description": "工作流状态存储在 hidden form field 或 cookie 中，可被客户端篡改",
+      "java": [
+        "hidden.*name.*step",
+        "hidden.*name.*status",
+        "request\\.getParameter.*currentStep"
+      ],
+      "generic": [
+        "hidden.*field.*step",
+        "hidden.*field.*status",
+        "cookie.*workflow.*state",
+        "client.*side.*step.*tracking"
+      ]
+    },
+    "idempotency_gap": {
+      "description": "应一次性执行的步骤（如支付、优惠券使用）可被重复调用",
+      "java": [
+        "processPayment.*without.*idempotencyKey",
+        "applyCoupon.*without.*isUsed",
+        "redeemReward.*without.*checkDuplicate"
+      ],
+      "python": [
+        "process_payment.*without.*idempotency",
+        "apply_coupon.*without.*used.*check",
+        "redeem.*without.*duplicate.*check"
+      ],
+      "generic": [
+        "payment.*without.*idempotent",
+        "coupon.*without.*single_use",
+        "reward.*without.*once.*check"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "state_machine_enforcement": {
+      "description": "是否存在服务端状态机校验（当前状态允许目标操作）",
+      "java": [
+        "StateMachine.*fireEvent",
+        "StateMachine.*canTransition",
+        "order\\.getStatus\\(\\)\\s*==\\s*OrderStatus\\.",
+        "if.*status.*!=.*PAID.*throw",
+        "isValidTransition",
+        "assertState.*PAID",
+        "spring-statemachine",
+        "spring_statemachine"
+      ],
+      "python": [
+        "django_fsm.*transition",
+        "can_proceed\\(",
+        "FSMField",
+        "order\\.status\\s*==\\s*OrderStatus\\.",
+        "if.*status.*!=.*PAID.*raise",
+        "validate_state_transition"
+      ],
+      "go": [
+        "Status\\s*==\\s*StatusPaid",
+        "if.*Status.*!=.*Paid.*return.*error",
+        "CanTransition",
+        "fsm\\.Event"
+      ],
+      "javascript": [
+        "xstate.*Machine",
+        "state\\.value\\s*===\\s*'paid'",
+        "if.*status.*!==.*PAID.*throw",
+        "canTransition",
+        "stateMachine\\.transition"
+      ],
+      "generic": [
+        "state.*machine",
+        "can.*transition",
+        "validate.*state",
+        "assert.*status"
+      ]
+    },
+    "precondition_validation": {
+      "description": "步骤执行前是否验证了所有前置条件",
+      "java": [
+        "isShippingComplete",
+        "isPaymentAuthorized",
+        "isCartValid",
+        "isAddressConfirmed",
+        "validatePreconditions",
+        "checkPreviousSteps"
+      ],
+      "python": [
+        "is_shipping_complete",
+        "is_payment_authorized",
+        "is_cart_valid",
+        "validate_preconditions",
+        "check_previous_steps"
+      ],
+      "generic": [
+        "validate.*precondition",
+        "check.*previous.*step",
+        "require.*complete",
+        "assert.*authorized"
+      ]
+    },
+    "server_side_state_storage": {
+      "description": "工作流状态是否在服务端持久化（而非客户端 hidden field/cookie）",
+      "java": [
+        "orderRepo\\.findById.*getStatus",
+        "orderRepo\\.save.*setStatus",
+        "session\\.getAttribute.*orderState",
+        "RedisTemplate.*orderState"
+      ],
+      "python": [
+        "Order\\.objects\\.get.*status",
+        "order\\.save\\(\\).*status",
+        "cache\\.get.*order_state",
+        "redis.*order_state"
+      ],
+      "generic": [
+        "database.*state.*storage",
+        "server.*side.*session",
+        "redis.*state.*persist",
+        "without.*hidden.*field.*state"
+      ]
+    },
+    "signed_workflow_token": {
+      "description": "工作流进度是否由服务端签名 token 保护（防客户端篡改）",
+      "java": [
+        "signedToken",
+        "HMAC.*workflow",
+        "workflow.*sign",
+        "tamper.*proof.*token"
+      ],
+      "generic": [
+        "signed.*token",
+        "hmac.*workflow",
+        "tamper.*proof",
+        "crypto.*sign.*state"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别多步业务流程】定位涉及多步骤的业务流程（注册、支付、审批、购物车结算、订单处理等），识别状态字段（step/status/stage/phase）和终态操作（支付确认、发货、激活等）。",
+    "Step 1: 【绘制状态机】列出到达敏感终态（付款成功、审批通过、账户激活）的合法前置步骤与状态机约束。枚举所有合法的状态转换路径。",
+    "Step 2: 【检查步骤跳过】是否存在直接调用终态 API 的入口：绕过 /checkout/shipping 和 /checkout/payment 直接调用 /checkout/confirm。对照 anti_patterns.step_skipping 和 control_detection_patterns.precondition_validation。",
+    "Step 3: 【检查客户端状态控制】工作流状态（step/status/stage）是否由客户端参数（URL param、form field、hidden field、cookie）控制。命中 anti_patterns.client_controlled_state 则直接标记 High。",
+    "Step 4: 【评估状态存储安全性】工作流状态是否在服务端持久化（数据库/服务端 session/Redis），而非存储在客户端 hidden field 或 cookie 中。对照 control_detection_patterns.server_side_state_storage。",
+    "Step 5: 【检查步骤重复利用】应一次性执行的步骤（支付、优惠券使用、奖励领取）是否可被重复调用。对照 anti_patterns.idempotency_gap。",
+    "Step 6: 【检查步骤重排序】是否可以乱序执行步骤（如先退款再支付、先发货再确认地址）。验证每个步骤是否检查了前序步骤的完成状态。",
+    "Step 7: 【评估竞态攻击】并发请求是否可使工作流步骤竞态执行（如同时提交两次支付），跳过中间状态验证。",
+    "Step 8: 【检查延迟篡改】验证与操作之间的 TOCTOU 窗口：在价格审批后、实际支付前，客户端是否可篡改订单内容。",
+    "Step 9: 【八项确认标准】缺一不得 confirmed：(1)状态机完整校验 (2)前置条件验证 (3)状态服务端存储 (4)步骤不可跳过 (5)步骤不可重复 (6)步骤不可乱序 (7)竞态攻击防护 (8)延迟篡改防护"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/checkout/confirm\")\npublic String confirmOrder(@RequestParam Long orderId) {\n    Order order = orderRepo.findById(orderId).orElseThrow();\n    order.setStatus(OrderStatus.CONFIRMED);\n    orderRepo.save(order);\n    paymentService.charge(order.getTotal());\n    return \"Order confirmed\";\n}",
+        "vulnerability_analysis": "确认订单接口仅校验 orderId 存在，未验证订单是否已完成地址填写（shipping）与支付授权（payment authorization）步骤。攻击者可跳过中间页面，直接调用 POST /checkout/confirm?orderId=1 完成订单，绕过所有中间验证步骤。",
+        "fix_pattern": "if (order.getStatus() != OrderStatus.PAYMENT_AUTHORIZED) throw new IllegalStateException(\"Order not ready for confirmation\"); if (!order.isShippingComplete()) throw new IllegalStateException(\"Shipping not complete\");"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/order/ship\")\npublic void shipOrder(@PathVariable Long orderId, @RequestParam String status) {\n    Order order = orderRepo.findById(orderId).get();\n    order.setStatus(OrderStatus.valueOf(status));  // 客户端控制状态!\n    orderRepo.save(order);\n}",
+        "vulnerability_analysis": "订单状态完全由客户端 status 参数控制。攻击者可传入 status=SHIPPED 直接将未支付订单标记为已发货，或传入 status=DELIVERED 标记为已送达以触发退款。客户端不应控制状态转换。",
+        "fix_pattern": "使用状态机：if (!stateMachine.canTransition(order.getStatus(), SHIPPED)) throw new ForbiddenException(); 且状态转换仅允许内部服务调用。"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.post(\"/checkout/step/{step_id}\")\nasync def process_step(step_id: int, order_id: int):\n    order = await Order.get(id=order_id)\n    order.current_step = step_id  # 客户端可跳步\n    await order.save()\n    return {\"next_step\": step_id + 1}",
+        "vulnerability_analysis": "工作流步骤完全由客户端 step_id 参数控制。攻击者可直接调用 POST /checkout/step/5 跳过步骤 1-4，或回退到已完成步骤重复执行。服务端未维护独立的步骤完成状态。",
+        "fix_pattern": "服务端维护步骤完成状态：completed_steps = order.get_completed_steps(); if step_id not in get_allowed_next_steps(completed_steps): raise HTTPException(403)"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.post(\"/payment/process\")\nasync def process_payment(order_id: int, amount: float):\n    order = await Order.get(id=order_id)\n    # 无幂等性控制，可重复扣款\n    await Payment.create(order_id=order_id, amount=amount)\n    order.status = 'paid'\n    await order.save()",
+        "vulnerability_analysis": "支付处理无幂等性控制。攻击者（或网络重试）可对同一订单发起多次支付请求，导致重复扣款。缺少 idempotency key 和支付状态检查。",
+        "fix_pattern": "if order.status == 'paid': return {'status': 'already_paid'}; 使用幂等键：idemp_key = f'payment:{order_id}:{user_id}'; if await redis.exists(idemp_key): raise DuplicateRequestException()"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.post('/checkout', async (req, res) => {\n    const { orderId, step, couponCode } = req.body;\n    const order = await Order.findByPk(orderId);\n    \n    if (step === 'payment') {\n        // 可被直接调用，跳过地址确认步骤\n        await processPayment(order, req.body.paymentInfo);\n        order.status = 'paid';\n    }\n    await order.save();\n    res.json(order);\n});",
+        "vulnerability_analysis": "单一端点通过客户端 step 参数控制工作流进度。攻击者可直接发送 step=payment 跳过前面的地址确认步骤。无服务端步骤完成状态追踪。",
+        "fix_pattern": "独立端点 + 服务端状态机：if (order.status !== 'address_confirmed') return res.status(403).json({error: 'Address not confirmed'}); await processPayment(order); order.status = 'paid';"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func ConfirmOrder(c *gin.Context) {\n    orderId := c.Param(\"orderId\")\n    order, _ := db.GetOrder(orderId)\n    // 无前置步骤验证\n    order.Status = \"confirmed\"\n    db.SaveOrder(order)\n    c.JSON(200, gin.H{\"status\": \"confirmed\"})\n}",
+        "vulnerability_analysis": "确认订单无前置步骤验证。Go 没有框架级工作流保护，完全依赖开发者手动实现状态机。攻击者可跳过所有中间步骤直接确认订单。",
+        "fix_pattern": "if order.Status != \"payment_authorized\" { c.JSON(403, gin.H{\"error\": \"order not ready\"}); return }; order.Status = \"confirmed\"; db.SaveOrder(order)"
+      }
+    ],
+    "mitigation_rules": [
+      "服务端维护完整的工作流状态机，每个步骤的前置条件必须显式验证。",
+      "工作流状态必须由服务端独立计算和存储（数据库/服务端 session），禁止客户端控制。",
+      "敏感终态操作（支付、发货、激活）需要不可伪造的服务端会话状态或签名 token。",
+      "每步完成后在服务端持久化状态，客户端无法单独声明已完成前置步骤。",
+      "一次性操作（支付、优惠券使用、奖励领取）必须实施幂等性控制（唯一约束/防重 token）。",
+      "工作流步骤的顺序必须由服务端强制，客户端不可指定当前步骤或跳步。",
+      "使用不可预测的 token 或签名绑定工作流进度，防止客户端伪造步骤完成状态。"
+    ],
+    "refutation_checklist": [
+      "是否存在服务端状态机（如 spring-statemachine / django-fsm / xstate）强制验证状态转换？",
+      "终态操作是否验证了所有前置步骤的完成状态（如 isShippingComplete && isPaymentAuthorized）？",
+      "工作流状态是否存储在服务端（数据库/Redis/服务端 session），而非客户端 hidden field/cookie？",
+      "一次性操作是否有幂等性控制（唯一约束 / idempotency key / 防重 token）？",
+      "客户端是否可以指定 step 参数来控制工作流进度？",
+      "并发请求是否可使同一工作流步骤竞态执行（如同时提交两次支付）？",
+      "工作流进度是否由服务端签名 token 保护（防客户端篡改）？",
+      "验证与操作之间是否存在 TOCTOU 窗口（如价格审批后、支付前可篡改订单内容）？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "identify_workflow_entry_points", "desc": "识别多步骤业务流程的端点（checkout/approve/pay/ship/activate 等），绘制完整的状态机。"},
+    {"name": "check_step_skipping", "desc": "验证是否存在直接调用终态 API 跳过中间步骤的入口。对照 anti_patterns.step_skipping 和 control_detection_patterns.precondition_validation。"},
+    {"name": "detect_client_controlled_state", "desc": "检查工作流状态（step/status/stage）是否由客户端参数控制。对照 anti_patterns.client_controlled_state。"},
+    {"name": "verify_server_side_state_storage", "desc": "验证工作流状态是否在服务端持久化。对照 control_detection_patterns.server_side_state_storage。"},
+    {"name": "check_idempotency", "desc": "检查一次性操作（支付、优惠券、奖励）是否有幂等性控制。对照 anti_patterns.idempotency_gap。"},
+    {"name": "check_step_reordering", "desc": "验证步骤是否可按乱序执行（如先退款后支付）。检查每个步骤的前置条件验证。"},
+    {"name": "evaluate_race_condition", "desc": "评估并发请求是否可使工作流步骤竞态执行，跳过中间状态验证。"},
+    {"name": "check_late_mutation", "desc": "检查验证与操作之间是否存在 TOCTOU 窗口，攻击者可在验证后篡改输入。"}
+  ],
+  "sanitizers": [
+    "服务端状态机（spring-statemachine / django-fsm / xstate）显式校验当前步骤/状态允许的目标操作",
+    "敏感终态操作需要不可伪造的服务端会话状态或签名 token",
+    "每步完成后在服务端持久化状态，客户端无法单独声明已完成前置步骤",
+    "一次性操作有幂等性控制（唯一约束 / idempotency key / 防重 token / 数据库唯一索引）",
+    "工作流进度由服务端签名 token 或加密状态 blob 保护，防客户端篡改",
+    "并发操作由数据库事务/分布式锁保护，防止竞态跳步",
+    "验证与操作在同一事务/请求中完成，无 TOCTOU 窗口"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-841",
+    "workflow_bypass_type": "array — 工作流绕过类型 (如 ['step_skipping', 'client_controlled_state', 'step_repetition', 'step_reordering', 'race_condition_bypass', 'late_mutation'])",
+    "bypass_path": "string (具体绕过路径，如 'POST /checkout/confirm 跳过 shipping 和 payment 步骤')",
+    "missing_state_check": "string (缺失的状态验证，如 '未验证 order.status == PAYMENT_AUTHORIZED')",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['step_skipping.java', 'client_controlled_state.python'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['state_machine_enforcement', 'precondition_validation', 'server_side_state_storage'])",
+    "reasoning_trace": "string",
+    "business_impact": "string (如 '0元购、未付款发货、重复退款')",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

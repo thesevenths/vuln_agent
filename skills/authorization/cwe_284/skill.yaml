@@ -1,0 +1,13 @@
+# CWE-284 Skill 元数据
+# 从 templates/cwe/cwe_284.json 迁移
+
+skill_id: cwe_284_improper_access_control_fallback
+source_cwe: CWE-284
+priority: P2
+
+related_cwes:
+  - CWE-306
+  - CWE-862
+  - CWE-863
+  - CWE-639
+  - CWE-942

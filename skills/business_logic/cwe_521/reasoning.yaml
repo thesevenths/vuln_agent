@@ -1,0 +1,36 @@
+# CWE-521 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别密码生命周期端点】定位处理用户注册、密码修改、密码重置的控制器或服务方法。'
+  - 'Step 1: 【检查服务端校验存在性】确认密码在落库（Hash）前，是否在服务端经过了显式的复杂度校验逻辑，排除仅依赖前端 JS 校验的情况。'
+  - 'Step 2: 【评估基础复杂度规则】检查是否强制要求了合理的最小长度（如 >=8 或 12），以及是否包含大小写、数字、特殊字符的组合要求。'
+  - 'Step 3: 【检查字典与上下文防御】验证是否集成了弱口令字典（如 Top 10000 常见弱密码）拦截，以及是否禁止密码与用户名、邮箱等上下文信息高度相似。'
+  - 'Step 4: 【评估成熟库的使用】检查是否使用了 zxcvbn、Passay 等专业密码强度评估库，而非脆弱且易被绕过的自定义正则表达式。'
+  - 'Step 5: 【检查历史重用策略】（若适用）检查改密时是否校验了新密码与最近 N 次历史密码的重复性，防止密码循环使用。'
+  - 'Step 6: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public void register(String username, String password) { if (password.length() < 6) throw new IllegalArgumentException("Too short"); userRepository.save(new User(username, hash(password))); }'
+      vulnerability_analysis: '仅检查了密码最小长度（且阈值过低），缺乏对字符种类（大小写/数字/特殊字符）的要求，且未防御常见弱口令字典（如 ''123456''）。攻击者可轻易使用弱密码注册，增加撞库和爆破风险。'
+      fix_pattern: '引入 Passay 或 zxcvbn 库，配置 LengthRule(8, 64)、CharacterRule(EnglishCharacterData.UpperCase, 1) 等规则，并加载常见弱口令黑名单进行比对。'
+    - code_snippet: '@PostMapping("/reset") public String reset(@RequestBody ResetReq req) { userService.updatePassword(req.getUserId(), req.getNewPassword()); return "success"; }'
+      vulnerability_analysis: 后端接口直接接收新密码并更新，未在服务端执行任何复杂度校验。即使前端页面有 JavaScript 校验，攻击者也可直接构造 HTTP 请求绕过前端，设置任意弱密码。
+      fix_pattern: 在 userService.updatePassword 内部或 Controller 层增加服务端密码强度校验拦截器，确保无论请求来源如何，弱密码均被拒绝。
+  mitigation_rules:
+    - 强制实施服务端密码复杂度校验，绝不可仅依赖前端校验。
+    - 设置合理的最小长度（推荐 NIST 标准的 8 字符以上，最高支持 64 字符），不强制要求复杂的字符组合以免导致用户记录密码。
+    - '必须拒绝常见弱口令字典（如 RockYou, Top 10k）以及与用户上下文（用户名/邮箱）高度相似的密码。'
+    - '推荐使用成熟的密码强度评估库（如 zxcvbn）并设置合理的阈值（如 score >= 3）。'
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-521
+  password_lifecycle_stage: 'enum[''registration'', ''password_change'', ''password_reset'']'
+  weakness_type: 'array — 缺失的防御维度 (如 [''short_length'', ''no_dictionary_check'', ''context_match'', ''client_side_only''])'
+  validation_mechanism: 'string (描述当前的校验方式，如''自定义正则''或''无校验'')'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: MEDIUM
+  remediation: string

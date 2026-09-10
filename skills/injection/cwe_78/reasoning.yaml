@@ -1,0 +1,40 @@
+# CWE-78 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别系统命令执行】是否存在执行操作系统命令的操作？'
+  - 'Step 2: 【检查命令构造方式】命令字符串是否包含用户可控输入？'
+  - '   - ❌ Runtime.exec("ping " + userInput)'
+  - '   - ❌ new ProcessBuilder("sh", "-c", "cmd " + userInput)'
+  -    - ✅ ProcessBuilder 使用参数数组 + 严格白名单校验
+  - 'Step 3: 【追踪用户输入来源】动态部分来自哪里？'
+  - '   - @RequestParam / @PathVariable / HTTP Header → 高风险'
+  -    - 数据库存储值 → 中风险（可能为二次注入）
+  - 'Step 4: 【检查输入校验】是否进行了以下防护？'
+  - '   - 白名单正则校验（如仅允许 IP 格式: ^\d{1,3}(\.\d{1,3}){3}$）'
+  -    - 参数数组传递（避免 shell 解析）
+  - '   - 命令/参数分离（ProcessBuilder 的 List<String>）'
+  - 'Step 5: 【评估影响】命令注入可能导致什么？（远程代码执行RCE、信息泄露、系统破坏）'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'Runtime.getRuntime().exec("ping -c 3 " + target);'
+      vulnerability_analysis: target 来自用户输入，直接拼接到 exec 命令中。攻击者输入 127.0.0.1; cat /etc/passwd 即可执行任意命令。Runtime.exec 通过 shell 解析时存在注入风险。
+      fix_pattern: '// 方案1: 参数数组 + 白名单
+if (!target.matches("^[a-zA-Z0-9.-]+$")) throw new IllegalArgumentException();
+ProcessBuilder pb = new ProcessBuilder("ping", "-c", "3", target);
+// 方案2: 避免直接执行系统命令，使用 Java API 替代'
+  mitigation_rules:
+    - 避免执行操作系统命令，优先使用Java API替代（如InetAddress代替ping）
+    - '如必须执行命令，使用 ProcessBuilder + 参数数组（List<String>），禁止字符串拼接'
+    - 用户输入必须通过白名单正则校验（严格限定合法字符集）
+    - 使用 ProcessBuilder.redirectErrorStream(true) 并限制进程超时
+    - 以最小权限运行应用进程（非root）
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-78
+  command_type: string (ping/traceroute/nslookup/custom)
+  input_validation: 'enum[''none'', ''blacklist'', ''whitelist'']'
+  risk_level: CRITICAL
+  remediation: string

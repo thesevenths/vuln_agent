@@ -1,0 +1,70 @@
+# sensitive_ops.yaml — 敏感操作分类
+# 从 code-audit sensitive_operations_matrix.md 迁移
+# 用于 sensitive_operations scanner 分类高价值操作
+
+operations:
+  # ── 数据修改 ──────────────────────────────────────────────────────────────
+  data_modification:
+    risk: high
+    description: "CREATE/UPDATE/DELETE 操作"
+    endpoint_patterns:
+      http_methods: ["POST", "PUT", "DELETE", "PATCH"]
+    java:
+      - "save\\b"
+      - "saveAll"
+      - "saveAndFlush"
+      - "update\\b"
+      - "delete\\b"
+      - "deleteAll"
+      - "remove\\b"
+      - "insert\\b"
+
+  # ── 权限变更 ──────────────────────────────────────────────────────────────
+  privilege_change:
+    risk: critical
+    description: "角色/权限分配、用户管理"
+    java:
+      - "grantRole|revokeRole"
+      - "assignPermission|removePermission"
+      - "createUser|deleteUser|updateUser"
+      - "resetPassword|changePassword"
+      - "setAdmin|promoteUser"
+
+  # ── 资金操作 ──────────────────────────────────────────────────────────────
+  financial:
+    risk: critical
+    description: "转账/支付/退款/余额变更"
+    java:
+      - "transfer|withdraw|deposit"
+      - "pay|refund|charge"
+      - "updateBalance|adjustBalance"
+      - "createOrder|cancelOrder"
+
+  # ── 批量操作 ──────────────────────────────────────────────────────────────
+  batch_operation:
+    risk: high
+    description: "导出/批量删除/批量更新"
+    java:
+      - "export|download"
+      - "batchDelete|batchUpdate"
+      - "import|upload"
+
+  # ── 外部通信 ──────────────────────────────────────────────────────────────
+  external_communication:
+    risk: high
+    description: "HTTP 外发请求/邮件/短信"
+    java:
+      - "RestTemplate|WebClient|FeignClient"
+      - "sendMail|sendEmail|sendSms"
+      - "publish|notify"
+
+  # ── 认证操作 ──────────────────────────────────────────────────────────────
+  auth_operation:
+    risk: critical
+    description: "登录/注册/密码重置/Token 管理"
+    java:
+      - "authenticate|login|logout"
+      - "register|signup"
+      - "generateToken|refreshToken"
+      - "resetPassword|forgotPassword"
+      - "verifyOtp|sendOtp"

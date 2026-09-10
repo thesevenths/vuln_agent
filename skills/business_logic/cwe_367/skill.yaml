@@ -1,0 +1,12 @@
+# CWE-367 Skill 元数据
+# 从 templates/cwe/cwe_367.json 迁移
+
+skill_id: cwe_367_toctou_race_window
+source_cwe: CWE-367
+priority: P0
+
+related_cwes:
+  - CWE-362
+  - CWE-366
+  - CWE-421
+  - CWE-841

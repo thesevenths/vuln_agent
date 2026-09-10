@@ -1,0 +1,63 @@
+# CWE-276 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(chmod|chown|mkdir|open|create_bucket|set_acl|setPosixFilePermissions)/i]'
+  - 'FunctionDef[name=~/(init_storage|setup_dirs|install|create_file|provision)/i]'
+  - 'Assignment[target=~/(umask|permissions|acl|mode)/i]'
+
+semantic_keywords:
+  - chmod
+  - '777'
+  - '666'
+  - world-writable
+  - public-read
+  - public-read-write
+  - umask
+  - everyone
+  - guest
+  - acl
+  - posix
+  - permissions
+  - mode
+
+file_context:
+  - install_script
+  - setup
+  - init
+  - dockerfile
+  - terraform
+  - cloudformation
+  - storage_service
+  - file_manager
+  - docker_compose
+  - kubernetes_yaml
+  - ansible_playbook
+
+sensitive_operations:
+  - create_file
+  - create_directory
+  - set_permissions
+  - create_bucket
+  - init_database
+  - setup_admin
+  - deploy_container
+  - provision_infrastructure
+
+logic_query_keywords_generic:
+  file_ops:
+    - permissions
+    - mode
+    - access_control
+    - grant_access
+  cloud_ops:
+    - public
+    - anonymous
+    - global_access
+    - internet_facing
+
+sanitizers:
+  - '文件/目录权限严格遵循最小特权原则（如 0o600, 0o700, 0o640），明确拒绝 Others 组的访问'
+  - 云存储资源配置为 Private，且账号级别开启了 Block Public Access (阻止公共访问)
+  - '基础设施由受控的 CI/CD 管道部署，且 IaC 扫描工具（如 Checkov, tfsec）强制拦截了宽松权限配置'
+  - 使用了 SELinux/AppArmor 等强制访问控制（MAC）机制，在系统层面限制了进程对文件的越权访问
+  - 该资源为公开的静态资源目录（如 Web 服务器的 /images），且经过安全评审确认不包含敏感数据或执行权限

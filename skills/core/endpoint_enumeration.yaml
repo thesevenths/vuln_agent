@@ -1,0 +1,81 @@
+# 端点枚举方法论
+# 穷尽所有 HTTP/RPC 可达入口，建立完整的攻击面清单
+
+endpoint_enumeration:
+  philosophy: >
+    端点枚举是控制驱动审计的第一步。
+    只有完整知道"有哪些操作"，才能判断"哪些操作缺少保护"。
+    枚举必须覆盖所有入口类型，不能遗漏非标准路由。
+
+  java_frameworks:
+    spring_mvc:
+      annotations:
+        - "@GetMapping"
+        - "@PostMapping"
+        - "@PutMapping"
+        - "@DeleteMapping"
+        - "@PatchMapping"
+        - "@RequestMapping"
+      scan_targets: "Controller 类"
+    jaxrs:
+      annotations:
+        - "@Path"
+        - "@GET"
+        - "@POST"
+        - "@PUT"
+        - "@DELETE"
+      scan_targets: "Resource 类"
+    servlet:
+      methods:
+        - "doGet"
+        - "doPost"
+        - "doPut"
+        - "doDelete"
+        - "service"
+        - "handleRequest"
+      scan_targets: "HttpServlet 子类"
+    webflux:
+      patterns:
+        - "RouterFunction"
+        - "@Bean route()"
+      scan_targets: "函数式路由配置"
+
+  python_frameworks:
+    django:
+      patterns: ["path()", "re_path()", "url()", "DefaultRouter"]
+      config_files: ["**/urls.py"]
+    flask:
+      decorators: ["@app.route", "@blueprint.route"]
+      config_files: ["**/app.py", "**/routes.py", "**/views.py"]
+    fastapi:
+      decorators: ["@app.get/post/put/delete", "@router.*"]
+      config_files: ["**/main.py", "**/routers/*.py"]
+
+  generic_fallback:
+    description: "框架无法识别时的通用回退策略"
+    method_names: ["doGet", "doPost", "handle", "invoke", "process"]
+    parameter_types: ["HttpServletRequest", "Response", "Context", "Exchange"]
+    annotation_keywords: ["Mapping", "Path", "route"]
+
+  endpoint_attributes:
+    - handler: "方法全限定名"
+    - http_method: "GET/POST/PUT/DELETE/PATCH"
+    - path: "URL 路径"
+    - file: "源文件"
+    - line: "行号"
+    - annotations: "注解列表"
+    - parameters: "函数参数签名"
+    - auth_status: "guarded | public | identity_bound"
+
+  public_endpoint_detection:
+    description: "public_endpoints 查询执行三重排除"
+    exclusions:
+      - id: 1
+        rule: "方法级安全注解排除"
+        examples: ["@PreAuthorize", "@Secured", "@RolesAllowed", "@RequiresAuthentication"]
+      - id: 2
+        rule: "类级安全注解排除"
+        description: "整个 Controller 类有安全注解时，其下所有方法视为受保护"
+      - id: 3
+        rule: "Identity-bound 参数排除"
+        description: "方法参数含 @CurrentUser/@AuthenticationPrincipal/@Principal 时排除"

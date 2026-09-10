@@ -1,0 +1,465 @@
+{
+  "skill_id": "cwe_639_idor_detection",
+  "source_cwe": ["CWE-639"],
+  "related_cwes": [
+    {"cwe": "CWE-863", "reason": "incorrect_authorization - IDOR 是授权不当的具体形式：使用可被猜测的资源标识符绕过授权"},
+    {"cwe": "CWE-200", "reason": "exposure_of_sensitive_information - IDOR 直接导致敏感信息泄露（他人订单/发票/档案）"},
+    {"cwe": "CWE-538", "reason": "insertion_of_sensitive_info_into_externally_accessible_file - IDOR 可导致文件路径遍历访问他人文件"},
+    {"cwe": "CWE-285", "reason": "improper_authorization_general - IDOR 是水平越权的具体实现方式"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - IDOR 与完全缺少授权检查常共现：有查询但无所有权验证"},
+    {"cwe": "CWE-269", "reason": "improper_privilege_management - 水平越权与垂直越权常组合出现：IDOR 访问他人资源后利用权限管理缺陷提升角色"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i][params.count >= 1]",
+      "FileRead[path.source~=/param|request|input/i]",
+      "APIHandler[method=~/(GET|PUT|DELETE)/i][path_params.count > 0]",
+      "FunctionDef[name=~/(getById|findById|findOne|deleteById|updateById|getRecord|fetchRecord|downloadFile)/i]",
+      "Call[name=~/(findById|getById|findOne|getReferenceById|findBySlug|deleteById|updateById)/i]",
+      "Annotation[name=~/(GetMapping|PostMapping|PutMapping|DeleteMapping|PathVariable|PathParam)/i]"
+    ],
+    "semantic_keywords": [
+      "user_id", "account_id", "order_id", "invoice_id", "profile_id",
+      "document_id", "record_id", "owner_id", "tenant_id",
+      "findById", "getById", "findOne", "deleteById",
+      "resource_key", "object_id", "entity_id",
+      "horizontal", "idor", "insecure_direct_object_reference"
+    ],
+    "file_context": [
+      "controller", "api_endpoint", "service_method",
+      "repository", "resource_handler", "file_controller",
+      "document_service", "invoice_controller", "profile_handler"
+    ],
+    "operation_triggers": {
+      "description": "通过资源标识符访问数据的端点是 CWE-639 的核心攻击面，必须验证所有权绑定",
+      "sensitive_operations": [
+        "get_order", "get_invoice", "get_profile", "get_document",
+        "update_record", "delete_record", "download_file",
+        "get_account", "get_user", "get_message", "get_transaction"
+      ],
+      "route_patterns": {
+        "java": [
+          "@GetMapping.*/(orders|invoices|profiles|documents|accounts|messages|files)/\\{.*Id\\}",
+          "@(Get|Put|Delete)Mapping.*/(user|account|order|invoice|document)/",
+          "@PathVariable.*Long.*id", "@PathParam.*id"
+        ],
+        "python": [
+          "@app\\.route.*/(orders|invoices|profiles|documents|accounts)/<.*:.*id>",
+          "@router\\.(get|put|delete).*/(user|account|order|invoice)/\\{.*id\\}"
+        ],
+        "go": [
+          "\\.(GET|PUT|DELETE)\\(.*/(orders|invoices|profiles|documents)/:id",
+          "c\\.Param\\(\"id\"\\)"
+        ],
+        "javascript": [
+          "router\\.(get|put|delete).*/(orders|invoices|profiles|documents)/:id",
+          "req\\.params\\.id", "req\\.params\\..*Id"
+        ],
+        "php": [
+          "Route::(get|put|delete).*/(orders|invoices|profiles|documents)/\\{id\\}",
+          "\\$request->route\\('id'\\)"
+        ],
+        "dotnet": [
+          "\\[Http(Get|Put|Delete)\\].*/(orders|invoices|profiles|documents)/\\{id\\}",
+          "\\[FromRoute\\].*id"
+        ],
+        "ruby": [
+          "(get|put|delete)\\s+\"/(orders|invoices|profiles|documents)/:id\"",
+          "params\\[:id\\]"
+        ],
+        "rust": [
+          "\\.route.*/(orders|invoices|profiles|documents)/\\{id\\}.*method.*(?:GET|PUT|DELETE)",
+          "Path::<.*id"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "resource_keys": [
+        "findById", "getById", "findOne", "deleteById",
+        "getReferenceById", "findBySlug", "findByIdAndUserId",
+        "findByOwnerId", "findByTenantId"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "tenant_id", "account_id",
+        "customer_id", "author_id", "created_by", "user"
+      ],
+      "jaxrs_path_ids": [
+        "@PathVariable", "@PathParam", "@Path",
+        "userId", "orderId", "invoiceId", "documentId"
+      ],
+      "safe_patterns": [
+        "findByIdAndUserId", "findByOwnerId",
+        "WHERE.*AND.*user_id.*=", "WHERE.*AND.*owner_id.*="
+      ]
+    },
+    "python": {
+      "resource_keys": [
+        "query.get", "query.filter_by", "filter_by(id=",
+        "get_or_404", "get_object_or_404", "filter(id="
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "author_id", "tenant_id",
+        "created_by"
+      ],
+      "safe_patterns": [
+        "filter_by(user_id=current_user.id)",
+        "filter(user_id=request.user.id)",
+        "get_object_or_404.*user=request.user"
+      ]
+    },
+    "php": {
+      "resource_keys": [
+        "find", "findOrFail", "where.*first",
+        "firstOrFail", "findOrFail"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "tenant_id", "author_id"
+      ],
+      "safe_patterns": [
+        "where('user_id', auth()->id())",
+        "where('owner_id', Auth::id())"
+      ]
+    },
+    "go": {
+      "resource_keys": [
+        "First", "Find", "Where.*First", "Take",
+        "db.Where", "db.First"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "tenant_id", "UserID"
+      ],
+      "safe_patterns": [
+        "Where.*user_id.*=.*userID",
+        "Where.*owner_id.*=.*currentUserID"
+      ]
+    },
+    "javascript": {
+      "resource_keys": [
+        "findByPk", "findOne", "findById", "findAll",
+        "Model.findOne", "Model.findByPk"
+      ],
+      "ownership_fields": [
+        "userId", "ownerId", "tenantId", "authorId",
+        "user_id", "owner_id"
+      ],
+      "safe_patterns": [
+        "where.*userId.*req\\.user\\.id",
+        "where.*ownerId.*req\\.user\\.id",
+        "findOne.*where.*userId.*user"
+      ]
+    },
+    "dotnet": {
+      "resource_keys": [
+        "FindAsync", "FirstOrDefaultAsync", "SingleOrDefaultAsync",
+        "Where.*FirstOrDefault"
+      ],
+      "ownership_fields": [
+        "UserId", "OwnerId", "TenantId", "CreatedBy"
+      ],
+      "safe_patterns": [
+        "Where.*UserId.*==.*currentUserId",
+        "Where.*OwnerId.*==.*userId"
+      ]
+    },
+    "ruby": {
+      "resource_keys": [
+        "find", "find_by", "where.*first", "find_by!"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "author_id"
+      ],
+      "safe_patterns": [
+        "current_user.*\\.find",
+        "where(user_id: current_user.id)"
+      ]
+    },
+    "rust": {
+      "resource_keys": [
+        "find_by_id", "first", "filter.*first", "get_result"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "tenant_id"
+      ],
+      "safe_patterns": [
+        "filter.*user_id.*eq.*current_user",
+        "filter.*owner_id.*eq.*user_id"
+      ]
+    },
+    "generic": {
+      "resource_keys": [
+        "findById", "getById", "findOne", "get(",
+        "filter", "WHERE id", "SELECT.*WHERE"
+      ],
+      "ownership_fields": [
+        "user_id", "owner_id", "tenant_id", "account_id",
+        "customer_id", "author_id", "created_by"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表 IDOR 的高风险反模式",
+    "direct_id_query": {
+      "description": "资源 ID 直接从请求参数传入数据库查询，无所有权过滤",
+      "java": [
+        "findById\\(.*PathVariable",
+        "getById\\(.*RequestParam",
+        "findOne\\(.*request.*id",
+        "WHERE.*id\\s*=\\s*:id.*without.*AND.*user_id"
+      ],
+      "python": [
+        "query\\.get\\(.*request",
+        "filter_by\\(id=.*\\).*without.*user_id",
+        "get_or_404\\(.*\\).*without.*current_user"
+      ],
+      "javascript": [
+        "findByPk\\(req\\.params",
+        "findOne.*where.*id.*req\\.params.*without.*userId",
+        "findById.*req\\.params.*without.*user"
+      ],
+      "go": [
+        "db\\.First.*c\\.Param\\(\"id\"\\).*without.*user_id",
+        "Find.*Param.*without.*userID"
+      ],
+      "php": [
+        "find\\(\\$request->route\\('id'\\)\\).*without.*user_id",
+        "findOrFail.*without.*auth\\(\\)->id\\(\\)"
+      ],
+      "generic": [
+        "findById.*param.*without.*ownership",
+        "query.*id.*without.*user_filter",
+        "SELECT.*WHERE.*id.*without.*AND.*owner"
+      ]
+    },
+    "predictable_ids": {
+      "description": "资源使用可预测的连续整数 ID 而非 UUID",
+      "java": [
+        "@Id.*Long",
+        "@GeneratedValue.*strategy.*IDENTITY",
+        "@GeneratedValue.*strategy.*AUTO",
+        "auto_increment"
+      ],
+      "python": [
+        "models\\.IntegerField.*primary_key",
+        "models\\.AutoField",
+        "SERIAL.*PRIMARY KEY"
+      ],
+      "generic": [
+        "auto_increment",
+        "serial.*primary",
+        "integer.*primary.*key",
+        "sequential.*id"
+      ]
+    },
+    "front_end_only_restriction": {
+      "description": "仅通过前端下拉框/列表限制可见资源，服务端未独立验证",
+      "java": [
+        "findAll.*return.*to.*client",
+        "listAll.*without.*user.*filter"
+      ],
+      "generic": [
+        "frontend.*only.*restriction",
+        "dropdown.*limited.*without.*server.*validation",
+        "ui.*only.*filter"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "ownership_binding_in_query": {
+      "description": "查询条件是否包含当前用户 ID/租户 ID 的等值绑定",
+      "java": [
+        "findByIdAndUserId",
+        "findByOwnerId",
+        "WHERE.*id.*AND.*user_id.*=",
+        "WHERE.*id.*AND.*owner_id.*=",
+        "AND.*created_by.*=.*principal",
+        "@PreAuthorize.*#.*\\.userId.*==.*authentication"
+      ],
+      "python": [
+        "filter_by.*user_id.*=.*current_user",
+        "filter.*user_id.*=.*request\\.user",
+        "get_object_or_404.*user.*=.*request\\.user"
+      ],
+      "php": [
+        "where.*user_id.*auth\\(\\)->id\\(\\)",
+        "where.*owner_id.*Auth::id\\(\\)",
+        "auth\\(\\)->user\\(\\)->orders"
+      ],
+      "go": [
+        "Where.*user_id.*=.*currentUserID",
+        "Where.*owner_id.*=.*userID",
+        "db\\.Where.*userID"
+      ],
+      "javascript": [
+        "where.*userId.*req\\.user\\.id",
+        "where.*ownerId.*req\\.user\\.id",
+        "findOne.*userId.*user"
+      ],
+      "dotnet": [
+        "Where.*UserId.*==.*currentUserId",
+        "Where.*OwnerId.*==.*userId",
+        "Include.*Where.*UserId"
+      ],
+      "ruby": [
+        "current_user\\..*\\.find",
+        "where.*user_id.*current_user\\.id"
+      ],
+      "rust": [
+        "filter.*user_id.*eq.*current_user",
+        "filter.*owner_id.*eq.*user_id"
+      ]
+    },
+    "framework_data_isolation": {
+      "description": "是否使用了框架级数据隔离机制",
+      "java": [
+        "@Filter.*tenant", "@Where.*user_id",
+        "Hibernate.*Filter", "MultiTenancy",
+        "TenantFilter", "DataScope"
+      ],
+      "python": [
+        "get_queryset.*filter.*user",
+        "Manager.*filter.*tenant",
+        "django-multitenant"
+      ],
+      "dotnet": [
+        "Global.*Query.*Filter",
+        "HasQueryFilter",
+        "IMultiTenant"
+      ],
+      "generic": [
+        "tenant.*filter",
+        "global.*query.*filter",
+        "data.*isolation.*framework",
+        "multi.*tenancy"
+      ]
+    },
+    "unguessable_ids": {
+      "description": "资源 ID 是否为不可猜测的 UUID 且服务端验证了其签发合法性",
+      "java": [
+        "@Id.*UUID", "@GenericGenerator.*uuid",
+        "UUID\\.randomUUID", "IdGenerator.*uuid"
+      ],
+      "python": [
+        "models\\.UUIDField.*default.*uuid",
+        "uuid\\.uuid4", "default.*uuid"
+      ],
+      "go": [
+        "uuid\\.New", "uuid\\.Must",
+        "google/uuid", "gofrs/uuid"
+      ],
+      "javascript": [
+        "uuid\\.v4", "uuidv4", "crypto\\.randomUUID",
+        "nanoid"
+      ],
+      "generic": [
+        "UUID", "GUID", "nanoid",
+        "random.*id", "unguessable"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别资源访问操作】当前代码是否执行了针对特定用户/实体资源的读写操作？（如查询发票、读取档案、修改订单、下载文件）。同时识别通过资源 ID 访问的所有端点。",
+    "Step 1: 【追溯资源标识符来源】用于定位资源的 key/id 参数是否直接或间接来自外部输入？（URL param, body field, cookie, header）。记录所有外部可控的资源标识符。",
+    "Step 2: 【检查所有权绑定逻辑】在执行资源访问前，是否存在将当前会话用户身份与目标资源标识符进行关联校验的逻辑？对照 anti_patterns.direct_id_query 和 control_detection_patterns.ownership_binding_in_query。安全模式：WHERE id = @id AND owner_id = @current_user_id；漏洞模式：WHERE id = @id（仅依赖外部传入的 id）。",
+    "Step 3: 【评估前端限制的可靠性】即使前端有下拉框/列表限制，服务端是否独立验证了资源归属？（前端限制 ≠ 安全控制）。对照 anti_patterns.front_end_only_restriction。",
+    "Step 4: 【评估 ID 可预测性】资源 ID 是否为可预测的连续整数（auto_increment），攻击者可枚举 ID 访问他人资源。对照 anti_patterns.predictable_ids 和 control_detection_patterns.unguessable_ids。",
+    "Step 5: 【检查框架级隔离】是否使用了框架级的数据隔离机制（Hibernate @Filter、EF Core Global Query Filter、Django Manager 过滤）。对照 control_detection_patterns.framework_data_isolation。",
+    "Step 6: 【评估多租户隔离】在多租户系统中，查询是否同时包含租户 ID 过滤，防止跨租户访问。",
+    "Step 7: 【确认绕过路径】攻击者能否通过修改 key 值访问其他用户的同类资源？若可 → 确认为 CWE-639。",
+    "Step 8: 【八项确认标准】缺一不得 confirmed：(1)资源 ID 来自外部输入 (2)查询无所有权绑定 (3)无前端唯一限制 (4)ID 可预测或枚举 (5)无框架级数据隔离 (6)多租户有隔离 (7)无签名 ID 验证 (8)服务端可被绕过"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "@GetMapping(\"/api/invoices/{id}\")\npublic Invoice getInvoice(@PathVariable Long id) {\n    return invoiceRepo.findById(id).orElseThrow();\n}",
+        "vulnerability_analysis": "发票查询仅依赖客户端传入的 id，未绑定当前用户身份。攻击者可遍历 /api/invoices/1, /api/invoices/2, ... 访问所有用户的发票。即使使用了参数化查询防 SQL 注入，仍为 IDOR 水平越权。",
+        "fix_pattern": "@GetMapping(\"/api/invoices/{id}\") public Invoice getInvoice(@PathVariable Long id, @AuthenticationPrincipal User user) { Invoice inv = invoiceRepo.findById(id).orElseThrow(); if (!inv.getUserId().equals(user.getId())) throw new AccessDeniedException(); return inv; }"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.get(\"/api/documents/{doc_id}\")\nasync def get_document(doc_id: int, current_user: User = Depends(get_current_user)):\n    doc = await Document.filter(id=doc_id).first()\n    if not doc:\n        raise HTTPException(404)\n    return doc.dict()",
+        "vulnerability_analysis": "文档查询仅按 doc_id 过滤，未绑定 current_user.id。任何已认证用户可通过修改 doc_id 访问他人文档。缺少所有权校验。",
+        "fix_pattern": "doc = await Document.filter(id=doc_id, user_id=current_user.id).first(); if not doc: raise HTTPException(404)"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.get('/api/orders/:orderId', authMiddleware, async (req, res) => {\n    const order = await Order.findByPk(req.params.orderId);\n    if (!order) return res.status(404).json({error: 'Not found'});\n    res.json(order);\n});",
+        "vulnerability_analysis": "虽然有 authMiddleware 验证了用户身份，但 Order.findByPk 仅按 orderId 查询，未绑定 req.user.id。已认证用户可遍历 orderId 访问他人订单（水平越权）。",
+        "fix_pattern": "const order = await Order.findOne({ where: { id: req.params.orderId, userId: req.user.id } }); if (!order) return res.status(404).json({error: 'Not found'});"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func GetProfile(c *gin.Context) {\n    id := c.Param(\"id\")\n    var profile Profile\n    db.First(&profile, id)\n    c.JSON(200, profile)\n}",
+        "vulnerability_analysis": "Profile 查询仅按 id 过滤，未绑定当前用户。攻击者可遍历 id 获取所有用户 Profile。Go 无框架级数据隔离，完全依赖开发者手动添加所有权检查。",
+        "fix_pattern": "userID := c.GetUint(\"userID\"); db.Where(\"id = ? AND user_id = ?\", id, userID).First(&profile); if profile.ID == 0 { c.JSON(404, gin.H{\"error\": \"not found\"}); return }"
+      },
+      {
+        "language": "php",
+        "code_snippet": "public function show($id)\n{\n    $invoice = Invoice::findOrFail($id);\n    return response()->json($invoice);\n}",
+        "vulnerability_analysis": "Invoice::findOrFail($id) 仅按 id 查询，未绑定当前认证用户。任何已登录用户可通过修改 $id 访问他人发票。Laravel 的 Eloquent 默认不执行所有权校验。",
+        "fix_pattern": "$invoice = Invoice::where('id', $id)->where('user_id', auth()->id())->firstOrFail(); return response()->json($invoice);"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "[HttpGet(\"{id}\")]\npublic async Task<IActionResult> GetOrder(int id)\n{\n    var order = await _context.Orders.FindAsync(id);\n    if (order == null) return NotFound();\n    return Ok(order);\n}",
+        "vulnerability_analysis": "FindAsync(id) 仅按 id 查询，未绑定当前用户。任何已认证用户可通过修改 id 访问他人订单。EF Core 默认不执行所有权校验。",
+        "fix_pattern": "var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value; var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId); if (order == null) return NotFound();"
+      }
+    ],
+    "mitigation_rules": [
+      "每次数据访问都必须验证当前用户对该记录拥有足够权限（所有权绑定查询）。",
+      "资源查找 key 不应由用户直接控制；若必须使用，需配合数字签名或加密防篡改。",
+      "实施 Default Deny：未明确验证所有权的资源访问一律拒绝。",
+      "避免使用顺序/可预测的 ID 作为资源标识符；改用 UUID 或 HMAC 签名 ID。",
+      "在多租户系统中，所有查询必须包含租户 ID 过滤条件。",
+      "使用框架级数据隔离机制（如 Hibernate @Filter、EF Core Global Query Filter）减少遗漏。"
+    ],
+    "refutation_checklist": [
+      "查询条件是否显式包含当前用户 ID/租户 ID 的等值绑定（如 AND user_id = ?）？",
+      "是否使用了框架级数据隔离机制（如 Hibernate @Filter, EF Core Global Query Filter）？",
+      "资源 ID 是否为不可猜测的 UUID 且服务端验证了其签发合法性？",
+      "该资源是否在设计文档中明确定义为公开共享且经安全评审确认？",
+      "多租户场景下查询是否同时包含租户 ID 过滤？",
+      "是否存在批量导出/列表接口也需要所有权过滤？",
+      "文件下载接口是否也验证了文件归属（防路径遍历）？",
+      "GraphQL/API 的关联查询是否也需要所有权绑定？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "trace_resource_key_origin", "desc": "回溯资源 ID 参数的完整数据流，标记是否为外部可控输入。"},
+    {"name": "analyze_query_where_clause", "desc": "解析 SQL/ORM 查询的 WHERE 条件，检查是否包含 owner/user/tenant 等归属字段绑定。对照 control_detection_patterns.ownership_binding_in_query。"},
+    {"name": "check_session_user_binding", "desc": "验证当前 authenticated session 的用户标识是否参与资源访问决策。"},
+    {"name": "detect_predictable_ids", "desc": "检查资源 ID 是否为可预测的连续整数（auto_increment）。对照 anti_patterns.predictable_ids。"},
+    {"name": "check_framework_isolation", "desc": "检查是否使用了框架级数据隔离机制。对照 control_detection_patterns.framework_data_isolation。"},
+    {"name": "check_multi_tenant_isolation", "desc": "在多租户系统中验证查询是否包含租户 ID 过滤。"},
+    {"name": "check_bulk_endpoints", "desc": "检查批量导出/列表接口是否也需要所有权过滤。"}
+  ],
+  "sanitizers": [
+    "查询条件显式包含当前用户 ID/租户 ID 的等值绑定（如 AND user_id = ?）",
+    "使用了框架级数据隔离机制（如 Hibernate @Filter, EF Core Global Query Filter）",
+    "资源 ID 为不可猜测的 UUID 且服务端验证了其签发合法性",
+    "该资源在设计文档中明确定义为公开共享且经安全评审确认",
+    "多租户场景下查询同时包含租户 ID 过滤",
+    "文件下载接口验证了文件归属且防止路径遍历",
+    "GraphQL/API 的关联查询也实施了所有权绑定",
+    "批量导出/列表接口也包含所有权过滤"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-639",
+    "idor_type": "array — IDOR 类型 (如 ['horizontal', 'vertical_via_flag', 'session_hijack_via_predictable_id', 'cross_tenant'])",
+    "uncontrolled_key_source": "string (指出具体哪个参数来自外部且未被所有权校验，如 'req.params.orderId' 或 '@PathVariable Long id')",
+    "missing_ownership_check": "string (描述应添加但未添加的所有权校验逻辑)",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['direct_id_query.java', 'predictable_ids.java'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['ownership_binding_in_query', 'framework_data_isolation', 'unguessable_ids'])",
+    "reasoning_trace": "string (必须引用查询条件分析作为推理依据)",
+    "business_impact": "string (从 common_consequences 映射: 水平越权/数据泄露/跨租户访问)",
+    "risk_level": "HIGH",
+    "remediation": "string (结合 potential_mitigations 生成，强调'服务端所有权绑定')"
+  }
+}

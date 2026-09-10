@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "skill_id": "source_0day_pipeline",
+      "file": "templates/source_0day_pipeline.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "binary_0day_direct",
+      "file": "templates/binary_0day_direct.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "reachability_exploitability",
+      "file": "templates/reachability_exploitability.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "version_identification",
+      "file": "templates/version_identification.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "poc_generation_validation",
+      "file": "templates/poc_generation_validation.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "java_attack_surface",
+      "file": "templates/java_attack_surface.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "java_web_audit_pipeline",
+      "file": "templates/java_web_audit_pipeline.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "logic_vuln_audit_pipeline",
+      "file": "templates/logic_vuln_audit_pipeline.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "web_pentest_whitebox_pipeline",
+      "file": "templates/web_pentest_whitebox_pipeline.json",
+      "enabled": false,
+      "comment": "借鉴 Shannon 五阶段；启用前需 base_url + 授权。见 docs/Shannon借鉴与整合路线图.md"
+    },
+    {
+      "skill_id": "expert_cpp_buffer_overflow",
+      "file": "templates/expert/expert_cpp_buffer_overflow.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_cpp_uaf_double_free",
+      "file": "templates/expert/expert_cpp_uaf_double_free.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_cpp_integer_overflow",
+      "file": "templates/expert/expert_cpp_integer_overflow.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_cpp_memory_leak",
+      "file": "templates/expert/expert_cpp_memory_leak.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_java_sql_injection",
+      "file": "templates/expert/expert_java_sql_injection.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_java_injection_suite",
+      "file": "templates/expert/expert_java_injection_suite.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_java_deserialization",
+      "file": "templates/expert/expert_java_deserialization.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "expert_java_auth_bypass",
+      "file": "templates/expert/expert_java_auth_bypass.json",
+      "enabled": true
+    },
+    {
+      "skill_id": "cve_pattern_scan",
+      "file": "templates/cve_pattern_scan.json",
+      "enabled": false,
+      "comment": "CVE 知识库 DB 就绪后启用"
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "skill_id": "cwe_384_session_fixation",
+  "source_cwe": [
+    "CWE-384"
+  ],
+  "related_cwes": [
+    "CWE-613",
+    "CWE-287",
+    "CWE-319",
+    "CWE-522",
+    "CWE-614"
+  ],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(login|signin|authenticate|auth|sso_callback|oauth)/i]",
+      "ClassDef[name=~/(Auth|Login|Security|Session|Token)/i]",
+      "Annotation[name=~/(PostMapping|RequestMapping).*(login|auth|signin)/i]"
+    ],
+    "semantic_keywords": [
+      "login",
+      "session",
+      "session_id",
+      "jsessionid",
+      "phpsessid",
+      "regenerate",
+      "invalidate",
+      "authenticate",
+      "session fixation"
+    ],
+    "file_context": [
+      "auth_controller",
+      "login_service",
+      "session_manager",
+      "security_config",
+      "middleware"
+    ]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "auth_endpoints": [
+        "login",
+        "authenticate",
+        "doFilter",
+        "UsernamePasswordAuthenticationFilter",
+        "handleLogin"
+      ],
+      "session_ops": [
+        "getSession()",
+        "setAttribute",
+        "invalidate()",
+        "changeSessionId()",
+        "JSESSIONID",
+        "HttpSession"
+      ],
+      "security_config": [
+        "SessionAuthenticationStrategy",
+        "SessionFixationProtectionStrategy",
+        "sessionManagement()",
+        "sessionFixation()",
+        "migrateSession",
+        "changeSessionId",
+        "none()"
+      ]
+    },
+    "flask": {
+      "auth_endpoints": [
+        "login",
+        "authenticate",
+        "login_user"
+      ],
+      "session_ops": [
+        "session",
+        "session.modified",
+        "session.regenerate()",
+        "session.clear()",
+        "flask.session"
+      ]
+    },
+    "php": {
+      "auth_endpoints": [
+        "login",
+        "authenticate",
+        "check_password"
+      ],
+      "session_ops": [
+        "session_start",
+        "session_regenerate_id",
+        "session_id",
+        "session_destroy",
+        "PHPSESSID"
+      ]
+    },
+    "generic": {
+      "auth_endpoints": [
+        "login",
+        "signin",
+        "auth",
+        "verify"
+      ],
+      "session_ops": [
+        "session_id",
+        "regenerate",
+        "invalidate",
+        "renew",
+        "rotate",
+        "destroy"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别认证入口】定位处理用户登录、身份验证成功、SSO回调的函数或路由。",
+    "Step 1: 【追踪会话生命周期】检查在身份验证*之前*，系统是否已经为匿名用户分配了 Session ID（如浏览商品时）。",
+    "Step 2: 【检查登录后会话轮换】在密码校验成功、用户身份确立的*瞬间及之后*，代码是否调用了会话销毁（invalidate）或会话 ID 重新生成（regenerate/renew）的机制。",
+    "Step 3: 【评估框架默认行为】检查使用的 Web 框架或安全组件（如 Spring Security, Shiro）的会话管理配置，确认是否被开发者错误地禁用了防固定策略（如配置为 none）。",
+    "Step 4: 【检查跨域与Token场景】在单点登录（SSO）或 OAuth2 回调中，是否在建立本地会话时重新生成了 Session ID；若使用 JWT，检查是否颁发了新 Token 并废弃临时状态。",
+    "Step 5: 【评估攻击面】检查 Session ID 是否可以通过 URL 参数、Cookie 设置或 XSS 轻易被攻击者预设并传递给受害者。",
+    "Step 6: 【六项确认标准】缺一不得 confirmed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "public String login(String user, String pwd, HttpServletRequest req) { if (check(user, pwd)) { req.getSession().setAttribute(\"user\", user); return \"home\"; } return \"login\"; }",
+        "vulnerability_analysis": "登录成功后直接将用户信息绑定到现有的 Session 中，未调用 req.changeSessionId() 或 session.invalidate()。若攻击者提前将已知的 JSESSIONID 发送给受害者，受害者登录后攻击者即可使用该 ID 接管账户。",
+        "fix_pattern": "if (check(user, pwd)) { HttpSession session = req.getSession(false); if (session != null) session.invalidate(); HttpSession newSession = req.getSession(true); newSession.setAttribute(\"user\", user); }"
+      },
+      {
+        "code_snippet": "http.sessionManagement().sessionFixation().none();",
+        "vulnerability_analysis": "在 Spring Security 配置中显式调用了 .none()，禁用了框架默认的会话固定保护策略（migrateSession 或 changeSessionId），导致应用层直接暴露于会话固定攻击之下。",
+        "fix_pattern": "移除 .none() 配置，使用 Spring Security 默认的 sessionFixation().migrateSession() (Servlet 3.0 以下) 或 changeSessionId() (Servlet 3.1+)。"
+      }
+    ],
+    "mitigation_rules": [
+      "身份验证成功后，必须立即使旧 Session 失效并生成新的 Session ID (Session Regeneration)。",
+      "依赖成熟安全框架的默认会话固定保护机制，切勿随意关闭或覆盖。",
+      "禁止通过 URL 参数传递 Session ID，强制使用 Secure/HttpOnly Cookie。",
+      "对于无状态 Token (JWT)，确保登录成功后签发新的 Token，不与认证前的临时状态混用。"
+    ],
+    "refutation_checklist": [
+      "Spring Security 是否使用了默认的 migrateSession 或 changeSessionId 策略？",
+      "PHP 是否在登录成功后显式调用了 session_regenerate_id(true)？",
+      "Django / Flask-Login 等框架是否在 login_user 时自动处理了 Session 轮换？",
+      "系统是否为纯无状态 API（每次请求均使用独立的 JWT，不依赖服务端 Session 状态）？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_login_endpoints",
+      "desc": "识别处理凭证校验、SSO回调和登录状态建立的函数或路由。"
+    },
+    {
+      "name": "trace_session_lifecycle",
+      "desc": "追踪 Session ID 的创建、传递、绑定和销毁的生命周期，确认认证前后的 Session 标识是否发生变化。"
+    },
+    {
+      "name": "check_session_regeneration",
+      "desc": "检查认证成功后是否调用了 Session ID 重新生成、轮换或旧 Session 销毁的底层 API。"
+    },
+    {
+      "name": "analyze_framework_config",
+      "desc": "分析安全框架（如 Spring Security, Shiro）的会话管理配置，确认是否禁用了防固定策略。"
+    },
+    {
+      "name": "detect_token_rotation",
+      "desc": "对于基于 Token 的认证，检查登录成功后是否轮换（Rotate）了 Token 或废弃了临时凭证。"
+    }
+  ],
+  "sanitizers": [
+    "框架默认开启了 Session Fixation Protection（如 Spring Security 默认配置，未使用 .none()）",
+    "登录成功后显式调用了 session.invalidate() 并创建新 Session，或调用了 request.changeSessionId() / session_regenerate_id()",
+    "纯无状态 API（每次请求均使用独立的 JWT/Bearer Token，不依赖服务端 Session 状态），且不存在认证前后的状态混淆",
+    "使用了安全的 SSO 网关或 IdP 统一处理会话，应用层仅作为 RP 且正确处理了回调会话轮换",
+    "Flask-Login / Django 等框架的内置 login 函数已自动接管并处理了 Session 轮换"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-384",
+    "session_management_type": "enum['cookie_based_session', 'jwt_token', 'custom_token', 'server_side_session']",
+    "missing_regeneration_point": "string (指出应在何处添加会话轮换/重新生成逻辑)",
+    "framework_config_flaw": "string (若存在框架配置缺陷，如'Spring Security 禁用了 sessionFixation 保护')",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

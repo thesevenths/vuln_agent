@@ -1,0 +1,17 @@
+# CWE-836 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 定位认证入口函数，识别参与比对的【密码字段】来源。'
+  - 'Step 2: 追踪该字段的赋值链：它是在【服务端】从请求体获取后哈希的，还是直接接收了客户端传来的【已哈希值】？'
+  - 'Step 3: 检查前端代码/接口文档：是否存在 JS 端 hash() 调用后再发送的请求？'
+  - 'Step 4: 判断服务端是否对接收到的值进行了【二次哈希】或直接做了【字符串等值比较】。'
+  - 'Step 5: 若服务端直接比较客户端哈希 → 确认为 CWE-836；若服务端重新哈希后再比较 → 安全。'
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-836
+  attack_scenario: string (描述攻击者如何重放哈希绕过认证)
+  evidence: '{''client_side_hash_source'': ''string (前端哈希代码位置或接口特征)'', ''server_comparison_type'': ''string (direct_string_compare / re_hash_then_compare)''}'
+  remediation: string (明确指示：移除前端哈希，改为传输明文密码+HTTPS，服务端使用 bcrypt/argon2 哈希后比较)
+  risk_level: HIGH (等效于明文密码传输)

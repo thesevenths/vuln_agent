@@ -1,0 +1,104 @@
+# CWE-840 检测模式
+
+ast_patterns:
+  - 'Assignment[target=~/(price|amount|total|quantity|discount|balance|status|role)/i][source=~/(request|param|body|json)/i]'
+  - 'BinaryExpr[op=+|-|*][operand_from_user=true][no_server_recompute=true]'
+  - 'StateUpdate[field=status][value_from_client=true]'
+  - 'FunctionDef[name=~/(checkout|applyDiscount|processRefund|transfer|withdraw|calculateTotal|processOrder|redeemCoupon|updateBalance)/i]'
+
+semantic_keywords:
+  - price
+  - amount
+  - quantity
+  - total
+  - discount
+  - coupon
+  - balance
+  - negative
+  - overflow
+  - free
+  - zero
+  - hidden
+  - status
+  - role
+  - isAdmin
+  - premium
+  - trial
+  - credit
+  - refund
+  - transfer limit
+  - stacking
+  - quota
+  - rate_limit
+  - daily_limit
+  - per_transaction
+  - inventory
+  - stock
+  - conservation
+  - idempotent
+  - subscription
+  - tier
+  - downgrade
+  - upgrade
+
+file_context:
+  - controller
+  - service
+  - checkout
+  - order
+  - payment
+  - cart
+  - billing
+  - pricing_engine
+  - discount_service
+  - refund_handler
+  - transfer_service
+  - coupon_service
+  - quota_manager
+  - subscription_service
+
+sensitive_operations:
+  - calculate_total
+  - apply_discount
+  - process_refund
+  - transfer_funds
+  - withdraw
+  - redeem_coupon
+  - update_balance
+  - process_order
+  - checkout
+  - update_subscription
+  - upgrade_tier
+  - downgrade_tier
+
+logic_query_keywords_generic:
+  client_controlled_fields:
+    - price
+    - amount
+    - quantity
+    - total
+    - discount
+    - status
+    - role
+    - balance
+    - credit
+    - tier
+  invariants:
+    - non_negative
+    - inventory_limit
+    - role_not_self_granted
+    - state_machine
+    - single_use_coupon
+    - conservation_of_value
+    - daily_limit
+    - per_transaction_limit
+
+sanitizers:
+  - 金额/数量由服务端根据产品目录与库存重新计算，客户端 total/price 被忽略或仅作校验参考
+  - 状态/角色变更仅通过受控管理接口且经服务端策略引擎判定
+  - 存在完整的领域层校验（Validator/Policy）且在 Controller 之前强制执行
+  - 使用了经审计的支付网关回调验签，不以客户端回调参数作为唯一结算依据
+  - 折扣/优惠券有互斥检查和单次使用控制
+  - 退款有累计退款 ≤ 实付金额的守恒校验
+  - 有累计限额（日/月）防止限额切片攻击
+  - 数量/金额有正数校验防止负值滥用

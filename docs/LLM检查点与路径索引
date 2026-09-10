@@ -1,0 +1,51 @@
+# 逻辑 LLM 检查点与路径索引
+
+## LLM 检查点 `cpg_logic_llm.json`
+
+```mermaid
+flowchart TB
+    LOAD[加载 llm_by_key] --> MERGE{增量且 cached_findings?}
+    MERGE -->|是| M1["setdefault 非 affected_types 的会话结论"]
+    MERGE -->|否| LOOP
+    M1 --> LOOP[遍历 top-N candidates]
+
+    LOOP --> CKEY["ckey = type|file|line|caller"]
+    CKEY --> INC{incremental_query_names?}
+
+    INC -->|否| FP["命中 ⇔ ckey 存在且 input_fingerprint 一致"]
+    INC -->|是| AFF{"type ∈ affected_types?"}
+
+    AFF -->|是| RUN[必跑 LLM]
+    AFF -->|否| CK["命中 ⇔ ckey 在 llm_by_key 且有结论<br/>不比 fingerprint"]
+
+    FP -->|命中| SKIP[跳过 LLM]
+    CK -->|命中| SKIP
+    FP -->|未命中| RUN
+    CK -->|未命中| RUN
+
+    RUN --> ANA[_analyze_logic_candidate]
+    ANA --> SAVE[写回 cpg_logic_llm.json + input_fingerprint]
+```
+
+| 场景 | Joern checkpoint | LLM checkpoint |
+|------|------------------|----------------|
+| 全量 `run_logic_scan` | 跳过已完成 query | ckey + fingerprint |
+| 增量补失败 query | 只跑 `incremental_query_names` | 非 affected → 仅 ckey；affected → 重跑 |
+| Planner 中间读了 L2 | 不变 | 全量会因 fingerprint 漂移失效；**增量非 affected 不受影响** |
+
+## 项目文件索引 `project_file_index.py`
+
+```mermaid
+flowchart LR
+    BUILD[build_project_file_index] --> LIVE["_live_file_index<br/>all_paths 完整相对路径"]
+    LIVE --> RESOLVE[resolve_l2_path]
+    RESOLVE --> EXACT[exact 在 all_paths]
+    RESOLVE --> BASE[basename 唯一匹配]
+    RESOLVE --> GLOB[glob 模式]
+
+  RESOLVE --> READ[FileTool / pending_l2_reads]
+    META["metadata.project_file_index<br/>to_dict 仅 ~120 条 sample"] -.->|审计摘要| LIVE
+```
+
+- **禁止** `direct_fs` / `sanitize` 绕过索引直接读盘（非 glob）。
+- 日志区分：`索引拒绝 path_not_in_index` vs `索引已解析但磁盘不存在`。

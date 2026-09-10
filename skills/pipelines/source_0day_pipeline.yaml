@@ -1,0 +1,53 @@
+# Pipeline: source_0day_pipeline
+# 源码0-day挖掘
+
+skill_id: source_0day_pipeline
+name: 源码0-day挖掘
+summary: '上下文准备 -> 源码深扫 -> L2补证 -> 收口报告'
+min_score_to_activate: 0.25
+start_node_id: set_context
+trigger_keywords:
+  - 源码
+  - 0day
+  - 0-day
+  - 漏洞挖掘
+  - source scan
+  - 静态分析
+  - sast
+completion_hints:
+  - L1 需有有效 flow 或明确无命中说明
+  - L2 至少完成一轮配置/依赖补证
+  - 终态必须可解释（避免待确认收尾）
+  - C/C++：默认两阶段污点扫描+检查点续扫；熔断后重启 Joern 再跑，见 docs/CppJoern扫描稳定性.md
+  - 报告须含「扫描覆盖说明」；出现「熔断中止」不得当作扫全
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: source_scan
+
+  - node_id: source_scan
+    tool_name: JoernTool.run_source_scan
+    success_next: glob_l2
+
+  - node_id: glob_l2
+    tool_name: null
+    success_next: read_l2
+    failure_next: read_l2
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/application*.yml'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/pom.xml'
+          limit: 20
+
+  - node_id: read_l2
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/pom.xml'
+      limit: 20
+    completion_signal: l2_attempted
+

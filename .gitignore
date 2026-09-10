@@ -1,0 +1,8 @@
+# 忽略配置文件
+.env
+
+# 忽略临时与缓存文件夹
+.qoder/
+.workbuddy/
+.pytest_cache/
+__pycache__/

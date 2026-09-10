@@ -1,0 +1,63 @@
+# Java 语言元数据 + 框架信号
+
+language: java
+version: "17+"
+
+# 框架识别信号（依赖名 → 框架标签）
+framework_signals:
+  spring_security:
+    dependency_patterns:
+      - "spring-security-config"
+      - "spring-boot-starter-security"
+      - "SpringSecurity"
+    config_files:
+      - "**/*Security*Config*.java"
+      - "**/*WebSecurity*.java"
+      - "**/application*.yml"
+      - "**/application*.properties"
+      - "**/security*.xml"
+
+  shiro:
+    dependency_patterns:
+      - "org.apache.shiro"
+      - "shiro-spring"
+      - "shiro-web"
+    config_files:
+      - "**/shiro.ini"
+      - "**/ShiroConfig.java"
+      - "**/application*.yml"
+
+  jaxrs:
+    dependency_patterns:
+      - "javax.ws.rs"
+      - "jakarta.ws.rs"
+      - "jersey"
+      - "resteasy"
+    config_files:
+      - "**/web.xml"
+      - "**/*Application.java"
+
+# 通用 Java 安全注解（所有框架共用）
+common_annotations:
+  auth_annotations:
+    - "@PreAuthorize"
+    - "@Secured"
+    - "@RolesAllowed"
+    - "@DenyAll"
+    - "@PermitAll"
+    - "@RequiresAuthentication"
+    - "@RequiresPermissions"
+    - "@RequiresRoles"
+
+# 数据访问层信号
+data_layer:
+  orm_patterns:
+    - JpaRepository
+    - JdbcTemplate
+    - MyBatis
+    - Hibernate
+    - SpringData
+  transaction_patterns:
+    - "@Transactional"
+    - "PlatformTransactionManager"
+    - "TransactionTemplate"

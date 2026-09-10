@@ -1,0 +1,36 @@
+# CWE-89 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别SQL操作】是否涉及数据库查询/更新？'
+  - 'Step 2: 【检查查询构造方式】'
+  - '   - ❌ 字符串拼接: "SELECT * FROM users WHERE id=" + userId'
+  - '   - ❌ String.format: String.format("SELECT * FROM users WHERE id=%s", userId)'
+  - '   - ✅ 参数化查询: PreparedStatement + setString/setInt'
+  - '   - ✅ ORM: JPA Repository / Hibernate HQL with setParameter'
+  - 'Step 3: 【追踪用户输入】查询中的动态部分是否来自用户可控输入？'
+  - 'Step 4: 【检查转义/过滤】是否使用了防注入措施？'
+  -    - PreparedStatement 参数绑定
+  -    - ORM 框架自动参数化
+  -    - 手动转义（不推荐但有效）
+  - 'Step 5: 【评估影响】SQL注入可能导致什么后果？（数据泄露、数据篡改、权限提升、RCE）'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'String query = "SELECT * FROM challenge_users WHERE userid=''" + username + "'' AND password=''" + password + "''";'
+      vulnerability_analysis: '直接将用户输入拼接到SQL查询中。攻击者输入 username='' OR ''1''=''1 可绕过认证，或使用 UNION SELECT 提取全表数据。这是CWE-89的经典案例。'
+      fix_pattern: 'PreparedStatement ps = conn.prepareStatement("SELECT * FROM challenge_users WHERE userid=? AND password=?");
+ps.setString(1, username); ps.setString(2, password);'
+  mitigation_rules:
+    - 永远使用参数化查询（PreparedStatement / ORM），禁止字符串拼接SQL
+    - 动态排序/表名等无法参数化的部分必须通过白名单校验
+    - 使用存储过程时也必须参数化，不要在过程体内拼接
+    - 启用数据库最小权限原则，限制应用账户的数据库权限
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-89
+  injection_point: string (WHERE clause / ORDER BY / table name)
+  query_type: 'enum[''SELECT'', ''INSERT'', ''UPDATE'', ''DELETE'', ''UNION'']'
+  risk_level: CRITICAL
+  remediation: string

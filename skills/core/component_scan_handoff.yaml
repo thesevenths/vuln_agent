@@ -1,0 +1,23 @@
+# 组件扫描联动流程
+
+component_scan_handoff:
+  trigger: >
+    当工作区存在组件/依赖漏洞扫描结果时（如 component_scan 输出、
+    java-vulnerability.yaml 规则扫描、SCA 报告、vendor audit-skills 脚本产物）
+  workflow:
+    - >
+      读取命中项的 component_name、detected_version、rule_name/CVE、severity、
+      vulnerability_class（由规则 YAML 定义，非模板硬编码）
+    - >
+      按 vulnerability_class 分流：auth_bypass / missing_auth / acl_bypass /
+      default_exposure → 优先查该组件已知绕过路径与配置项，再查业务代码逻辑
+    - >
+      deserialization / rce / ssrf 等类别 → 转交对应 CWE 模板，
+      不与 862/306 混报
+    - >
+      仅版本命中而无配置/代码证据 → 记为「组件风险线索」，不得单独 confirmed；
+      须在 reasoning 中引用扫描条目并与 L2 配置交叉验证
+  extensibility: >
+    新组件与新 CVE 通过 java-vulnerability.yaml（或同类规则库）扩展；
+    CWE 模板不写死 Shiro/Spring 版本号，只描述与扫描结果联动的分析顺序
+  output_field: "component_scan_context: {matched_rules[], relevance_to_candidate, follow_up_reads[]}"

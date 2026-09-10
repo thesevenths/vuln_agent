@@ -1,0 +1,180 @@
+{
+  "skill_id": "cwe_521_weak_password_requirements",
+  "source_cwe": [
+    "CWE-521"
+  ],
+  "related_cwes": [
+    "CWE-262",
+    "CWE-307",
+    "CWE-522",
+    "CWE-916",
+    "CWE-263"
+  ],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(register|signup|createUser|changePassword|updatePassword|resetPassword|setPassword)/i]",
+      "ClassDef[name=~/(User|Account|Auth|Registration|Profile)/i]",
+      "Annotation[name=~/(PostMapping|RequestMapping).*(register|password|reset)/i]"
+    ],
+    "semantic_keywords": [
+      "password",
+      "passwd",
+      "pwd",
+      "strength",
+      "complexity",
+      "register",
+      "signup",
+      "reset",
+      "min_length",
+      "special_char"
+    ],
+    "file_context": [
+      "user_service",
+      "auth_controller",
+      "registration",
+      "profile_manager",
+      "security_config"
+    ]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "password_ops": [
+        "register",
+        "changePassword",
+        "resetPassword",
+        "updatePassword",
+        "signup",
+        "createUser"
+      ],
+      "validation_rules": [
+        "length()",
+        "matches()",
+        "Pattern",
+        "Passay",
+        "PasswordValidator",
+        "zxcvbn",
+        "CharacterRule",
+        "LengthRule"
+      ],
+      "weak_patterns": [
+        "123456",
+        "password",
+        "qwerty",
+        "admin",
+        "abc123"
+      ]
+    },
+    "flask": {
+      "password_ops": [
+        "register",
+        "change_password",
+        "reset_password",
+        "update_profile"
+      ],
+      "validation_rules": [
+        "len()",
+        "re.match",
+        "password_validator",
+        "zxcvbn",
+        "min_length",
+        "islower",
+        "isupper",
+        "isdigit"
+      ]
+    },
+    "generic": {
+      "password_ops": [
+        "set_password",
+        "create_user",
+        "update_pwd",
+        "forgot_password"
+      ],
+      "validation_rules": [
+        "min_length",
+        "uppercase",
+        "lowercase",
+        "digit",
+        "special_char",
+        "regex",
+        "blacklist",
+        "dictionary"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别密码生命周期端点】定位处理用户注册、密码修改、密码重置的控制器或服务方法。",
+    "Step 1: 【检查服务端校验存在性】确认密码在落库（Hash）前，是否在服务端经过了显式的复杂度校验逻辑，排除仅依赖前端 JS 校验的情况。",
+    "Step 2: 【评估基础复杂度规则】检查是否强制要求了合理的最小长度（如 >=8 或 12），以及是否包含大小写、数字、特殊字符的组合要求。",
+    "Step 3: 【检查字典与上下文防御】验证是否集成了弱口令字典（如 Top 10000 常见弱密码）拦截，以及是否禁止密码与用户名、邮箱等上下文信息高度相似。",
+    "Step 4: 【评估成熟库的使用】检查是否使用了 zxcvbn、Passay 等专业密码强度评估库，而非脆弱且易被绕过的自定义正则表达式。",
+    "Step 5: 【检查历史重用策略】（若适用）检查改密时是否校验了新密码与最近 N 次历史密码的重复性，防止密码循环使用。",
+    "Step 6: 【六项确认标准】缺一不得 confirmed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "public void register(String username, String password) { if (password.length() < 6) throw new IllegalArgumentException(\"Too short\"); userRepository.save(new User(username, hash(password))); }",
+        "vulnerability_analysis": "仅检查了密码最小长度（且阈值过低），缺乏对字符种类（大小写/数字/特殊字符）的要求，且未防御常见弱口令字典（如 '123456'）。攻击者可轻易使用弱密码注册，增加撞库和爆破风险。",
+        "fix_pattern": "引入 Passay 或 zxcvbn 库，配置 LengthRule(8, 64)、CharacterRule(EnglishCharacterData.UpperCase, 1) 等规则，并加载常见弱口令黑名单进行比对。"
+      },
+      {
+        "code_snippet": "@PostMapping(\"/reset\") public String reset(@RequestBody ResetReq req) { userService.updatePassword(req.getUserId(), req.getNewPassword()); return \"success\"; }",
+        "vulnerability_analysis": "后端接口直接接收新密码并更新，未在服务端执行任何复杂度校验。即使前端页面有 JavaScript 校验，攻击者也可直接构造 HTTP 请求绕过前端，设置任意弱密码。",
+        "fix_pattern": "在 userService.updatePassword 内部或 Controller 层增加服务端密码强度校验拦截器，确保无论请求来源如何，弱密码均被拒绝。"
+      }
+    ],
+    "mitigation_rules": [
+      "强制实施服务端密码复杂度校验，绝不可仅依赖前端校验。",
+      "设置合理的最小长度（推荐 NIST 标准的 8 字符以上，最高支持 64 字符），不强制要求复杂的字符组合以免导致用户记录密码。",
+      "必须拒绝常见弱口令字典（如 RockYou, Top 10k）以及与用户上下文（用户名/邮箱）高度相似的密码。",
+      "推荐使用成熟的密码强度评估库（如 zxcvbn）并设置合理的阈值（如 score >= 3）。"
+    ],
+    "refutation_checklist": [
+      "认证是否由外部 IdP (如 Auth0, Okta, Azure AD) 处理，且 IdP 层面已配置了强密码策略与防暴破机制？",
+      "是否使用了无密码认证机制 (如 Passkey, WebAuthn, FIDO2, Magic Link)，从而彻底消除了密码强度问题？",
+      "框架是否自带全局密码验证器并已启用严格策略 (如 Django 的 AUTH_PASSWORD_VALIDATORS)？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_password_endpoints",
+      "desc": "识别处理密码创建、修改和重置的路由或函数入口。"
+    },
+    {
+      "name": "trace_validation_logic",
+      "desc": "追踪密码在存入数据库（或进行 Hash 计算）前经过的校验函数或中间件。"
+    },
+    {
+      "name": "analyze_regex_complexity",
+      "desc": "分析用于密码校验的正则表达式或规则集，评估其是否覆盖了必要的字符集和长度要求。"
+    },
+    {
+      "name": "check_dictionary_defense",
+      "desc": "检查代码中是否引入了弱口令字典比对逻辑或第三方强度评估库（如 zxcvbn）。"
+    },
+    {
+      "name": "verify_server_side_enforcement",
+      "desc": "确认校验逻辑是否在服务端强制执行，排除仅在前端进行拦截的脆弱实现。"
+    }
+  ],
+  "sanitizers": [
+    "认证由外部 IdP (OAuth2/OIDC/SAML) 处理，且 IdP 具备完善的密码策略与黑名单拦截",
+    "使用了无密码认证机制 (Passkey, WebAuthn, Magic Link, 硬件 Token)",
+    "服务端集成了 zxcvbn 或类似成熟库，且阈值设置合理（如拒绝 score < 3 的密码）",
+    "框架自带的全局密码验证器已启用并配置了严格策略 (如 Django AUTH_PASSWORD_VALIDATORS, Spring Security Passay)",
+    "系统为内部测试环境或无需高安全级别的临时系统（需结合业务上下文确认）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-521",
+    "password_lifecycle_stage": "enum['registration', 'password_change', 'password_reset']",
+    "weakness_type": "array — 缺失的防御维度 (如 ['short_length', 'no_dictionary_check', 'context_match', 'client_side_only'])",
+    "validation_mechanism": "string (描述当前的校验方式，如'自定义正则'或'无校验')",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "MEDIUM",
+    "remediation": "string"
+  }
+}

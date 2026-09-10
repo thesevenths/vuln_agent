@@ -1,0 +1,16 @@
+flowchart LR
+    M[main]
+
+    M --> J["JoernTool(joern_url, project_name)"]
+    M --> D[DBTool]
+    M --> G["GraphBuilder(joern, db)"]
+    M --> P["AgentPlannerExecutor(graph, max_steps)"]
+    M --> S["AgentState(project_path, language, ...)"]
+
+    P --> CB["graph.joern.set_audit_callback<br/>scanner 内部事件 → planner JSONL"]
+
+    M --> R{mode}
+    R --> repl
+    R --> agent
+    R --> source_scan
+    R --> reachability

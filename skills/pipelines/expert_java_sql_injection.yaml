@@ -1,0 +1,129 @@
+# Pipeline: expert_java_sql_injection
+# Java SQL 注入专家分析
+
+skill_id: expert_java_sql_injection
+name: Java SQL 注入专家分析
+summary: 定向扫描 SQLi → 读取 DAO 层 → ORM 用法检查(并行) → 参数化检查 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - sql_injection
+  - SQL注入
+  - CWE-89
+  - SQLi
+  - MyBatis
+  - JPA
+  - Hibernate
+  - PreparedStatement
+completion_hints:
+  - '必须区分 ${} 拼接 vs #{} 参数化（MyBatis）'
+  - 必须检查 PreparedStatement 是否真正参数化（非字符串拼接后 prepare）
+  - orderBy/groupBy/表名/列名拼接是常见盲区
+  - 报告须标注参数可控性：完全可控/条件可控/不可控
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: targeted_scan
+    expert_guidance:
+      analysis_focus: 准备 Java SQL 注入分析上下文
+      expert_rules:
+        - SQL 注入核心：用户输入经字符串拼接进入 SQL 语句
+        - 'ORM 不等于安全：MyBatis ${} 和 JPA native query 仍可注入'
+
+  - node_id: targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: [sql_injection]
+      language: java
+    success_next: read_dao_layer
+    failure_next: read_dao_layer
+    expert_guidance:
+      analysis_focus: 扫描 SQL 注入相关 flow
+      expert_rules:
+        - 重点关注 executeQuery/executeUpdate/execute/addBatch 等 JDBC 方法
+        - 注意 prepareStatement 后仍可能拼接 SQL
+
+  - node_id: read_dao_layer
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*Mapper*.xml'
+      limit: 20
+    success_next: check_orm_usage
+    failure_next: check_orm_usage
+    expert_guidance:
+      analysis_focus: 读取 DAO/Repository/Mapper 层代码
+      required_evidence:
+        - SQL 拼接点所在方法完整代码
+        - 'MyBatis Mapper XML 中的 SQL 语句（${} vs #{}）'
+        - 'JPA Repository 中的 @Query 或 native query'
+      expert_rules:
+        - '读取 Mapper XML 文件，搜索 ${} 模式（拼接注入风险）'
+        - 读取 DAO 类，检查是否用 Statement 而非 PreparedStatement
+
+  - node_id: check_orm_usage
+    tool_name: null
+    success_next: check_parameterization
+    failure_next: check_parameterization
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/pom.xml'
+          limit: 10
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Mapper*.xml'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Security*.java'
+          limit: 15
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/application*.yml'
+          limit: 10
+    expert_guidance:
+      analysis_focus: 检查 ORM 框架使用方式和配置
+      required_evidence:
+        - pom.xml 中的 MyBatis/JPA/Hibernate 依赖版本
+        - 'Mapper XML 中所有 ${} 用法'
+        - 是否有全局 SQL 拦截器或白名单
+      refutation_checklist:
+        - 'MyBatis 是否全部使用 #{} 而非 ${}'
+        - JPA 是否使用 Criteria API 而非原生 SQL 拼接
+        - PreparedStatement 是否先 prepare 再 setXxx
+        - 是否有 SQL 防火墙（如 ModSecurity、WallFilter）
+      false_positive_patterns:
+        - 'MyBatis 全部使用 #{} 参数化'
+        - 使用 JPA Criteria API 构建查询
+        - PreparedStatement 正确使用 setXxx 绑定参数
+        - orderBy/groupBy 使用白名单映射（非直接拼接）
+        - 有 Druid WallFilter 或等价 SQL 防火墙
+
+  - node_id: check_parameterization
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*Repository*.java'
+      limit: 15
+    success_next: verify
+    failure_next: verify
+    expert_guidance:
+      analysis_focus: 深入检查参数化是否正确
+      expert_rules:
+        - '检查 orderBy/groupBy/表名/列名是否直接拼接（这些位置 #{} 不能用）'
+        - 检查 LIKE 查询是否在 % 拼接中有注入风险
+        - 检查 IN 子句是否用字符串拼接而非数组参数
+        - 动态 SQL 中 if/choose/foreach 是否安全
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定 SQL 注入是否成立
+      expert_rules:
+        - 判定为真实漏洞须满足：(1) 有 SQL 拼接点 (2) 拼接内容来自用户输入 (3) 无有效防护
+        - 若仅 orderBy 等位置拼接但值来自枚举白名单，标注为「低风险」
+        - '报告中须给出可注入的 SQL 示例（如 '' OR 1=1 --）'
+

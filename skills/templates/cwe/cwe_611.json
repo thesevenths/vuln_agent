@@ -1,0 +1,75 @@
+{
+  "skill_id": "cwe_611_xml_external_entity",
+  "source_cwe": ["CWE-611"],
+  "related_cwes": ["CWE-827", "CWE-200"],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "Call[name=~/(SAXParser|DocumentBuilder|XMLReader|TransformerFactory|XMLInputFactory|Unmarshaller|SAXReader|XMLHelper)/i]",
+      "Call[name=~/(parse|unmarshal|readValue|newDocumentBuilder|newSAXParser|newInstance)/i]"
+    ],
+    "semantic_keywords": [
+      "XML", "parse", "SAX", "DOM", "unmarshal", "entity",
+      "DTD", "external entity", "Xerces", "XercesDOM", "Document"
+    ],
+    "file_context": ["xml_handler", "parser", "import_export", "api_endpoint"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "xml_parsers": ["SAXParserFactory", "DocumentBuilderFactory", "XMLInputFactory", "TransformerFactory", "SchemaFactory", "XMLReader", "SAXReader", "Unmarshaller"],
+      "dangerous_features": ["FEATURE_EXTERNAL_GENERAL_ENTITIES", "FEATURE_EXTERNAL_PARAMETER_ENTITIES", "DISALLOW_DOCTYPE_DECL", "http://apache.org/xml/features", "ACCESS_EXTERNAL_DTD", "ACCESS_EXTERNAL_SCHEMA"],
+      "safe_features": ["setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true)"]
+    },
+    "generic": {
+      "xml_parsers": ["etree.parse", "ElementTree", "lxml", "xml.dom.minidom", "xml.sax"],
+      "dangerous_features": ["resolve_entities", "load_dtd", "no_network"],
+      "safe_features": ["defusedxml", "resolve_entities=False"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别XML解析】是否涉及XML解析/反序列化操作？",
+    "Step 2: 【检查解析器配置】XML解析器是否禁用了外部实体？",
+    "   - ❌ 默认配置（未禁用任何特性）",
+    "   - ❌ 仅禁用部分特性（如仅禁用外部DTD但保留外部实体）",
+    "   - ✅ 完全安全配置（见下方 sanitizers）",
+    "Step 3: 【检查输入来源】XML数据是否来自不可信源？",
+    "   - HTTP请求体 / 文件上传 / API调用 → 高风险",
+    "   - 内部系统间通信 → 中风险",
+    "Step 4: 【评估影响】XXE可能导致什么后果？",
+    "   - 读取服务器文件（file:///etc/passwd）",
+    "   - SSRF（http://internal-service/...）",
+    "   - 拒绝服务（Billion Laughs Attack）",
+    "Step 5: 【检查DTD处理】是否完全禁用了DTD或外部实体声明？"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();\nDocument doc = factory.newDocumentBuilder().parse(request.getInputStream());",
+        "vulnerability_analysis": "DocumentBuilderFactory 默认允许外部实体和DTD。攻击者提交包含 <!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><foo>&xxe;</foo> 的XML即可读取服务器任意文件。",
+        "fix_pattern": "factory.setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true);\nfactory.setFeature(\"http://xml.org/sax/features/external-general-entities\", false);\nfactory.setFeature(\"http://xml.org/sax/features/external-parameter-entities\", false);\nfactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, \"\");\nfactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, \"\");"
+      }
+    ],
+    "mitigation_rules": [
+      "XML解析器必须禁用外部实体和DTD（使用 OWASP 推荐配置）",
+      "优先使用 JSON 等不支持实体引用的数据格式",
+      "如需解析不受信XML，使用 defusedxml (Python) 或配置安全的 DocumentBuilderFactory",
+      "S3/云存储的XML配置也需要同步禁用外部实体"
+    ]
+  },
+  "sanitizers": [
+    "禁用DOCTYPE: setFeature(\"http://apache.org/xml/features/disallow-doctype-decl\", true)",
+    "禁用外部通用实体: setFeature(\"http://xml.org/sax/features/external-general-entities\", false)",
+    "禁用外部参数实体: setFeature(\"http://xml.org/sax/features/external-parameter-entities\", false)",
+    "禁用外部DTD/Schema: setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, \"\")",
+    "使用 defusedxml / 不支持实体引用的解析器"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-611",
+    "parser_type": "string (DOM/SAX/StAX/Unmarshaller)",
+    "disabled_features": "array[string] (已禁用的安全特性列表)",
+    "risk_level": "CRITICAL",
+    "remediation": "string"
+  }
+}

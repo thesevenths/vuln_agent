@@ -1,0 +1,12 @@
+# CWE-341 Skill 元数据
+# 从 templates/cwe/cwe_341.json 迁移
+
+skill_id: cwe_341_cryptographic_weakness
+source_cwe: CWE-341
+priority: P1
+
+related_cwes:
+  - CWE-327
+  - CWE-328
+  - CWE-330
+  - CWE-798

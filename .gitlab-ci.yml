@@ -1,0 +1,61 @@
+# GitLab CI：push / Merge Request 时自动跑单元测试
+#
+# 行为说明：
+# - allow_failure: true → 测试失败会在 MR/流水线里标红，但不把整个流水线判失败，一般不拦合并
+# - 不启动 Joern、不调真实 LLM，只在 Runner 里用 Python unittest
+#
+# 前置条件（GitLab 网页）：
+# Settings → CI/CD → Runners → 启用 Shared Runner，或注册自建 Runner
+
+stages:
+  - test
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+# 全量单测：覆盖 planner 模拟 + flow_reconcile + report_merge 等（约十几秒）
+unit-tests:
+  stage: test
+  image: python:3.11-slim
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python -m unittest discover -s tests -v
+
+# 仅 planner 相关改动时额外跑一遍（与上重叠，但日志更清晰；同样不拦合并）
+planner-regression:
+  stage: test
+  image: python:3.11-slim
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - planner.py
+        - flow_reconcile.py
+        - report_merge.py
+        - skill_engine.py
+        - state.py
+        - tests/test_planner*.py
+        - tests/test_report_merge.py
+        - prompts.py
+        - tool_capabilities.py
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - planner.py
+        - flow_reconcile.py
+        - report_merge.py
+        - skill_engine.py
+        - state.py
+        - tests/test_planner*.py
+        - tests/test_report_merge.py
+        - prompts.py
+        - tool_capabilities.py
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python -m unittest discover -s tests -p "test_planner*.py" -v
+    - python -m unittest discover -s tests -p "test_report_merge.py" -v

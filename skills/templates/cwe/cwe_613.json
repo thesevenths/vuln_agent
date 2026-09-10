@@ -1,0 +1,904 @@
+{
+  "skill_id": "cwe_613_insufficient_session_expiration",
+  "source_cwe": [
+    "CWE-613"
+  ],
+  "related_cwes": [
+    {
+      "cwe": "CWE-384",
+      "reason": "session_fixation - 同属 session_management 控制项，会话固定后永不过期加剧危害"
+    },
+    {
+      "cwe": "CWE-287",
+      "reason": "authentication_bypass - 会话不过期等价于认证可被无限重用"
+    },
+    {
+      "cwe": "CWE-306",
+      "reason": "missing_auth - 永不过期的会话等于关键功能缺少时效性认证"
+    },
+    {
+      "cwe": "CWE-307",
+      "reason": "excessive_attempts - 永不过期会话 + 无限重试 = 组合攻击放大"
+    },
+    {
+      "cwe": "CWE-614",
+      "reason": "cookie_without_secure - 会话Cookie缺失Secure标志，会话ID可被中间人截获后长期利用"
+    },
+    {
+      "cwe": "CWE-522",
+      "reason": "insufficient_credential_protection - 明文传输会话标识，截获后因不过期而长期有效"
+    },
+    {
+      "cwe": "CWE-488",
+      "reason": "data_exposure - 已过期会话仍可访问未授权的敏感数据"
+    }
+  ],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(login|session|token|auth|expire|timeout|logout|invalidate|destroy_session)/i]",
+      "ClassDef[name=~/(SecurityConfig|SessionConfig|WebConfig|AuthConfig|TokenProvider|SessionManager|SessionMiddleware)/i]",
+      "Annotation[name=~/(SessionScope|EnableRedisHttpSession|SessionConfig|Bean|Configuration)/i]"
+    ],
+    "semantic_keywords": [
+      "session",
+      "timeout",
+      "expiration",
+      "ttl",
+      "max_age",
+      "cookie",
+      "jwt",
+      "expire",
+      "invalidate",
+      "idle_timeout",
+      "absolute_timeout",
+      "refresh_token",
+      "session_destroy",
+      "regenerate",
+      "maxInactiveInterval",
+      "gc_maxlifetime",
+      "cookie_lifetime"
+    ],
+    "file_context": [
+      "security_config",
+      "session_manager",
+      "auth_middleware",
+      "application_properties",
+      "application_yml",
+      "web_xml",
+      "token_service",
+      "settings_py",
+      "config_php",
+      "env",
+      "docker_compose"
+    ],
+    "operation_triggers": {
+      "description": "执行敏感操作时应验证会话仍然有效，以下端点类型需额外检查会话时效",
+      "sensitive_operations": [
+        "delete",
+        "update",
+        "create",
+        "export",
+        "batch",
+        "bulk",
+        "admin",
+        "config",
+        "payment",
+        "transfer",
+        "refund",
+        "password_change",
+        "role_change",
+        "permission_change"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Delete|Put|Post|Patch)Mapping",
+          "@RequestMapping"
+        ],
+        "python": [
+          "@app\\.route.*methods",
+          "@router\\.(delete|put|post|patch)",
+          "@api_view.*\\[.*(?:DELETE|PUT|POST|PATCH)"
+        ],
+        "go": [
+          "\\.(DELETE|PUT|POST|PATCH)\\(",
+          "\\.Handle\\("
+        ],
+        "javascript": [
+          "router\\.(delete|put|post|patch)",
+          "@(Delete|Put|Post|Patch)\\(",
+          "app\\.(delete|put|post|patch)"
+        ],
+        "php": [
+          "Route::(delete|put|post|patch)",
+          "@Route.*methods"
+        ],
+        "dotnet": [
+          "\\[Http(Delete|Put|Post|Patch)\\]",
+          "\\[Authorize\\]"
+        ],
+        "ruby": [
+          "delete\\s+\"/",
+          "put\\s+\"/",
+          "post\\s+\"/"
+        ],
+        "rust": [
+          "\\.route.*method.*(?:DELETE|PUT|POST|PATCH)",
+          "\\.delete\\(",
+          "\\.post\\("
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "spring_session_ops": [
+        "sessionManagement()",
+        "maximumSessions(",
+        "sessionFixation()",
+        "invalidateSession",
+        "session.invalidate()",
+        "sessionCreationPolicy",
+        "HttpSession",
+        "setMaxInactiveInterval",
+        "server.servlet.session.timeout",
+        "spring.session.timeout",
+        "server.servlet.session.cookie.max-age",
+        "spring.session.servlet.cookie.max-age",
+        "spring.session.redis.namespace",
+        "ConfigureRedisAction"
+      ],
+      "shiro_session_ops": [
+        "sessionManager",
+        "globalSessionTimeout",
+        "sessionValidationInterval",
+        "sessionValidationScheduler",
+        "SessionDAO",
+        "EnterpriseCacheSessionDAO",
+        "sessionDAO"
+      ],
+      "jwt_ops": [
+        "setExpiration",
+        "setIssuedAt",
+        "exp",
+        "Jwts.builder",
+        "Jwts.parserBuilder",
+        "jwt.expiration",
+        "jwt.refresh-expiration",
+        "jwt.access-token-expiration",
+        "redisTemplate.expire",
+        "token-blacklist",
+        "JwtBuilder"
+      ],
+      "config_files": [
+        "application.properties",
+        "application.yml",
+        "application.yaml",
+        "application-*.yml",
+        "application-*.properties",
+        "web.xml"
+      ]
+    },
+    "python": {
+      "django_session_ops": [
+        "SESSION_COOKIE_AGE",
+        "SESSION_EXPIRE_AT_BROWSER_CLOSE",
+        "SESSION_COOKIE_HTTPONLY",
+        "SESSION_COOKIE_SECURE",
+        "SESSION_SAVE_EVERY_REQUEST",
+        "session.clear()",
+        "cycle_key()",
+        "flush()",
+        "django.contrib.sessions.middleware",
+        "SessionMiddleware"
+      ],
+      "flask_session_ops": [
+        "PERMANENT_SESSION_LIFETIME",
+        "session.permanent",
+        "SESSION_COOKIE_MAX_AGE",
+        "SESSION_COOKIE_HTTPONLY",
+        "SESSION_COOKIE_SECURE",
+        "SESSION_COOKIE_DOMAIN",
+        "redis.setex",
+        "app.config",
+        "session.clear()",
+        "session.pop"
+      ],
+      "fastapi_session_ops": [
+        "SessionMiddleware",
+        "session_cookie_max_age",
+        "redis.setex",
+        "token_expires_delta",
+        "timedelta",
+        "create_access_token",
+        "ALGORITHM",
+        "auth_jwt"
+      ],
+      "config_files": [
+        "settings.py",
+        "config.py",
+        "app.py",
+        ".env",
+        "env.py"
+      ]
+    },
+    "php": {
+      "laravel_session_ops": [
+        "config/session.php",
+        "'lifetime'",
+        "'expire_on_close'",
+        "Session::flush",
+        "Session::invalidate",
+        "Auth::logout",
+        "Auth::logoutOtherDevices",
+        "session:array",
+        "'driver'\\s*=>"
+      ],
+      "symfony_session_ops": [
+        "framework.session.cookie_lifetime",
+        "framework.session.gc_maxlifetime",
+        "framework.session.handler_id",
+        "framework.session.cookie_secure",
+        "session.invalidate()",
+        "session.migrate()",
+        "security.yaml"
+      ],
+      "thinkphp_session_ops": [
+        "session_start",
+        "Session::get",
+        "Session::set",
+        "Session::delete",
+        "Session::clear",
+        "session.php"
+      ],
+      "wordpress_session_ops": [
+        "wp_logout",
+        "wp_destroy_current_session",
+        "wp_get_all_sessions",
+        "SESSION_EXPIRE_TIME",
+        "wp_set_auth_cookie"
+      ],
+      "native_session_ops": [
+        "session.gc_maxlifetime",
+        "session.cookie_lifetime",
+        "session.gc_probability",
+        "session.gc_divisor",
+        "ini_set",
+        "session_destroy",
+        "session_regenerate_id",
+        "session_unset"
+      ],
+      "config_files": [
+        "config/session.php",
+        "config/packages/framework.yaml",
+        "php.ini",
+        ".htaccess",
+        "wp-config.php",
+        "config/app.php"
+      ]
+    },
+    "go": {
+      "session_ops": [
+        "gorilla/sessions",
+        "scs.SessionManager",
+        "session.Options",
+        "session.MaxAge",
+        "session.Save",
+        "session.Clear",
+        "session.Delete",
+        "DestroySession",
+        "session.Lifetime",
+        "session.IdleTimeout",
+        "session.Cookie.MaxAge",
+        "session.Cookie.Expires"
+      ],
+      "jwt_ops": [
+        "jwt.Parse",
+        "jwt.ParseWithClaims",
+        "Claims.ExpiresAt",
+        "token.ExpiresAt",
+        "jwt.NewWithClaims",
+        "RegisteredClaims",
+        "MapClaims",
+        "ExpiresAt"
+      ],
+      "config_files": [
+        "config.yaml",
+        "config.json",
+        ".env",
+        "main.go"
+      ]
+    },
+    "javascript": {
+      "express_session_ops": [
+        "express-session",
+        "cookie-session",
+        "maxAge",
+        "rolling.*true",
+        "req.session.destroy",
+        "session.regenerate",
+        "res.clearCookie",
+        "cookie.maxAge",
+        "cookie.expires",
+        "store.*ttl",
+        "connect-redis",
+        "connect-mongo"
+      ],
+      "nestjs_ops": [
+        "@UseGuards.*Auth",
+        "JwtModule.register",
+        "expiresIn",
+        "JwtService",
+        "passport-jwt",
+        "passport.strategy",
+        "RefreshToken",
+        "TokenExpiredError"
+      ],
+      "fastify_ops": [
+        "fastify-session",
+        "fastify-jwt",
+        "fastify-cookie",
+        "session.cookie.maxAge",
+        "sign.expiresIn"
+      ],
+      "koa_ops": [
+        "koa-session",
+        "koa-jwt",
+        "maxAge",
+        "rolling",
+        "renew",
+        "ctx.session"
+      ],
+      "config_files": [
+        "app.js",
+        "server.js",
+        "index.js",
+        "app.ts",
+        "main.ts",
+        ".env",
+        "auth.module.ts",
+        "auth.strategy.ts"
+      ]
+    },
+    "dotnet": {
+      "session_ops": [
+        "SessionTimeout",
+        "IdleTimeout",
+        "ExpireTimeSpan",
+        "Cookie.Expiration",
+        "Cookie.MaxAge",
+        "ITicketStore",
+        "SecurityStampValidator",
+        "SlidingExpiration",
+        "Cookie.SameSite",
+        "Cookie.HttpOnly",
+        "Cookie.SecurePolicy",
+        "AddDistributedMemoryCache",
+        "AddSession"
+      ],
+      "jwt_ops": [
+        "TokenValidationParameters",
+        "ClockSkew",
+        "ValidateLifetime",
+        "ValidateIssuer",
+        "ValidateAudience",
+        "IssuerSigningKey",
+        "TokenExpiry",
+        "JwtBearerOptions",
+        "RefreshToken"
+      ],
+      "config_files": [
+        "appsettings.json",
+        "appsettings.*.json",
+        "Startup.cs",
+        "Program.cs",
+        "web.config"
+      ]
+    },
+    "ruby": {
+      "session_ops": [
+        "expire_after",
+        "session[:user_id]",
+        "reset_session",
+        "devise",
+        "timeoutable",
+        "Devise.timeout_in",
+        "Warden::Manager",
+        "ActionDispatch::Session",
+        "cookie_only",
+        "secure",
+        "httponly"
+      ],
+      "jwt_ops": [
+        "jwt.encode",
+        "jwt.decode",
+        "exp",
+        "expires_in",
+        "refresh_token",
+        "Warden::JWTAuth"
+      ],
+      "config_files": [
+        "config/initializers/devise.rb",
+        "config/initializers/session_store.rb",
+        "config/application.rb",
+        "config/environments/production.rb",
+        "config/secrets.yml"
+      ]
+    },
+    "rust": {
+      "session_ops": [
+        "actix_session",
+        "Session::set",
+        "Session::purge",
+        "SessionMiddleware",
+        "ttl",
+        "max_age",
+        "Session::renew",
+        "Session::clear",
+        "actix_identity",
+        "IdentityPolicy",
+        "login_timestamp",
+        "visit_timestamp",
+        "axum-extra.*cookie"
+      ],
+      "jwt_ops": [
+        "jsonwebtoken",
+        "encode",
+        "decode",
+        "Validation",
+        "leeway",
+        "exp",
+        "Algorithm",
+        "Header"
+      ],
+      "config_files": [
+        "Cargo.toml",
+        "config.toml",
+        "config.yaml",
+        ".env",
+        "main.rs"
+      ]
+    },
+    "generic": {
+      "session_ops": [
+        "timeout",
+        "expire",
+        "max_age",
+        "ttl",
+        "invalidate",
+        "lifetime",
+        "blacklist",
+        "revoke",
+        "destroy",
+        "regenerate",
+        "flush",
+        "clear",
+        "idle",
+        "absolute",
+        "sliding"
+      ],
+      "jwt_ops": [
+        "exp",
+        "expiresIn",
+        "expires_in",
+        "expires_at",
+        "ExpirationTime",
+        "lifetime",
+        "refresh",
+        "access_token",
+        "id_token"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们看起来像'配置了'，但实际效果是永不过期或禁用了会话安全",
+    "java": [
+      "session-timeout=0",
+      "session-timeout>-1",
+      "setMaxInactiveInterval\\(-1\\)",
+      "setMaxInactiveInterval\\(0\\)",
+      "spring.session.timeout=0",
+      "server.servlet.session.timeout=0",
+      "sessionCreationPolicy.*STATELESS",
+      "csrf\\(\\)\\.disable\\(\\)",
+      "sessionManagement\\(\\).*disable",
+      "globalSessionTimeout=-1"
+    ],
+    "python": [
+      "PERMANENT_SESSION_LIFETIME.*=.*None",
+      "SESSION_COOKIE_AGE.*=.*None",
+      "SESSION_COOKIE_AGE.*=.*0",
+      "SESSION_EXPIRE_AT_BROWSER_CLOSE.*=.*False",
+      "SESSION_SAVE_EVERY_REQUEST.*=.*False",
+      "expires_delta.*=.*None",
+      "timedelta\\(days.*=.*[3-9][0-9]",
+      "timedelta\\(days.*=.*[0-9]{3,}"
+    ],
+    "php": [
+      "session.gc_maxlifetime.*=.*0",
+      "session.cookie_lifetime.*=.*0",
+      "ini_set.*session.gc_maxlifetime.*0",
+      "ini_set.*session.cookie_lifetime.*0",
+      "'lifetime'\\s*=>\\s*0",
+      "'lifetime'\\s*=>\\s*['\"]*∞",
+      "'expire_on_close'\\s*=>\\s*false"
+    ],
+    "go": [
+      "MaxAge.*-1",
+      "MaxAge.*0",
+      "session\\.Options\\{.*MaxAge:\\s*0",
+      "session\\.Options\\{.*MaxAge:\\s*-1",
+      "Lifetime:\\s*0"
+    ],
+    "javascript": [
+      "maxAge.*null",
+      "maxAge.*Infinity",
+      "cookie\\.maxAge.*0",
+      "cookie\\.maxAge.*-1",
+      "expires.*never",
+      "expiresIn.*['\"]\\d+[yYmM]['\"]",
+      "expiresIn.*365.*d",
+      "expiresIn.*30.*d"
+    ],
+    "dotnet": [
+      "IdleTimeout.*=.*TimeSpan\\.Zero",
+      "ExpireTimeSpan.*=.*TimeSpan\\.Zero",
+      "SlidingExpiration.*=.*false",
+      "ValidateLifetime.*=.*false",
+      "ClockSkew.*=.*TimeSpan\\.FromDays"
+    ],
+    "ruby": [
+      "expire_after.*=.*nil",
+      "expire_after.*=.*0",
+      "Devise\\.timeout_in.*=.*nil"
+    ],
+    "rust": [
+      "ttl.*0",
+      "max_age.*0",
+      "Ttl.*Duration::ZERO",
+      "leeway.*Duration.*days"
+    ]
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "session_management_properly_configured": {
+      "java_spring": [
+        "sessionManagement\\(.*sessionFixation",
+        "maximumSessions\\(",
+        "server\\.servlet\\.session\\.timeout=[1-9]",
+        "spring\\.session\\.timeout=[1-9]",
+        "sessionCreationPolicy.*IF_REQUIRED",
+        "sessionCreationPolicy.*NEVER",
+        "invalidateSession"
+      ],
+      "java_shiro": [
+        "globalSessionTimeout=[1-9]",
+        "sessionValidationScheduler",
+        "sessionValidationInterval=[1-9]",
+        "SessionDAO"
+      ],
+      "python_django": [
+        "SESSION_COOKIE_AGE\\s*=\\s*[1-9]\\d*",
+        "SESSION_EXPIRE_AT_BROWSER_CLOSE\\s*=\\s*True",
+        "SESSION_SAVE_EVERY_REQUEST\\s*=\\s*True",
+        "SESSION_COOKIE_SECURE\\s*=\\s*True",
+        "SESSION_COOKIE_HTTPONLY\\s*=\\s*True"
+      ],
+      "python_flask": [
+        "PERMANENT_SESSION_LIFETIME\\s*=\\s*timedelta",
+        "SESSION_COOKIE_MAX_AGE\\s*=\\s*[1-9]",
+        "SESSION_COOKIE_SECURE.*True",
+        "SESSION_COOKIE_HTTPONLY.*True"
+      ],
+      "python_fastapi": [
+        "timedelta\\(minutes.*=.*[1-9][0-9]{0,3}\\)",
+        "timedelta\\(hours.*=.*[1-9]",
+        "expires_delta.*timedelta",
+        "SESSION_COOKIE_MAX_AGE"
+      ],
+      "php_laravel": [
+        "'lifetime'\\s*=>\\s*[1-9]\\d*",
+        "'expire_on_close'\\s*=>\\s*true",
+        "Session::invalidate",
+        "Auth::logoutOtherDevices",
+        "SESSION_DRIVER.*redis"
+      ],
+      "php_symfony": [
+        "framework\\.session\\.gc_maxlifetime.*[1-9]",
+        "framework\\.session\\.cookie_lifetime.*[1-9]",
+        "session\\.invalidate\\(\\)",
+        "session\\.migrate\\(\\)"
+      ],
+      "php_native": [
+        "ini_set.*session\\.gc_maxlifetime.*[1-9]",
+        "ini_set.*session\\.cookie_lifetime.*[1-9]",
+        "session_regenerate_id\\(true\\)",
+        "session_destroy"
+      ],
+      "go": [
+        "MaxAge.*[1-9]\\d*",
+        "session\\.Options.*MaxAge.*[1-9]",
+        "session\\.Lifetime",
+        "session\\.IdleTimeout"
+      ],
+      "javascript_express": [
+        "maxAge.*\\d{4,}",
+        "rolling.*true",
+        "res\\.clearCookie",
+        "req\\.session\\.destroy",
+        "store.*ttl.*\\d+"
+      ],
+      "javascript_nestjs": [
+        "JwtModule\\.register.*expiresIn.*[1-9]",
+        "expiresIn.*\\d+[smh]",
+        "TokenExpiredError",
+        "RefreshToken"
+      ],
+      "dotnet": [
+        "IdleTimeout.*=.*TimeSpan\\.FromMinutes",
+        "ExpireTimeSpan.*=.*TimeSpan\\.FromMinutes",
+        "SlidingExpiration.*=.*true",
+        "SecurityStampValidator",
+        "ValidateLifetime.*=.*true"
+      ],
+      "ruby": [
+        "expire_after.*\\d+",
+        "Devise\\.timeout_in",
+        "reset_session",
+        "expire_after.*\\.minutes"
+      ],
+      "rust": [
+        "ttl.*Duration.*from_secs.*[1-9]",
+        "max_age.*Duration.*from_secs.*[1-9]",
+        "SessionMiddleware",
+        "Session::purge"
+      ]
+    },
+    "jwt_properly_configured": {
+      "java": [
+        "setExpiration.*Date\\(System\\.currentTimeMillis.*\\+.*\\d{3,6}\\)",
+        "\\.setExpiration.*\\+\\s*1000\\s*\\*\\s*60\\s*\\*\\s*[1-9]",
+        "jwt\\.expiration=[1-9]",
+        "jwt\\.refresh-expiration=[1-9]",
+        "redisTemplate\\.expire",
+        "token-blacklist",
+        "Jwts\\.parserBuilder"
+      ],
+      "python": [
+        "expires_delta.*timedelta\\(minutes.*=.*[1-9][0-9]{0,3}\\)",
+        "expires_delta.*timedelta\\(hours.*=.*[1-9]",
+        "ALGORITHM.*HS256",
+        "create_refresh_token"
+      ],
+      "php": [
+        "exp.*time\\(\\).*\\+.*[1-9]",
+        "jwt.*ttl.*[1-9]",
+        "jwt.*leeway",
+        "invalidate.*token",
+        "blacklist"
+      ],
+      "go": [
+        "ExpiresAt.*time\\.Now.*Add.*[1-9]",
+        "RegisteredClaims.*ExpiresAt",
+        "Expiration.*time\\.Duration"
+      ],
+      "javascript": [
+        "expiresIn.*['\"]?[1-9]\\d{0,4}['\"]?",
+        "expiresIn.*[1-9]\\d*\\s*\\*\\s*60",
+        "verify.*exp",
+        "refresh.*token"
+      ],
+      "dotnet": [
+        "TokenValidationParameters.*ValidateLifetime.*true",
+        "ClockSkew.*=.*TimeSpan\\.FromMinutes",
+        "Expires.*DateTime\\.UtcNow\\.AddMinutes",
+        "RefreshToken"
+      ],
+      "ruby": [
+        "exp.*Time\\.now.*\\+.*[1-9]",
+        "expires_in.*[1-9].*\\.minutes",
+        "Warden::JWTAuth.*exp"
+      ],
+      "rust": [
+        "exp.*SystemTime.*\\+.*Duration.*from_secs.*[1-9]",
+        "Validation.*new.*HS256",
+        "leeway.*Duration.*from_secs"
+      ],
+      "generic": [
+        "expiresIn.*[1-9][0-9]{0,4}",
+        "exp.*Date\\.now.*\\+.*[1-9]",
+        "\\.setExpiration",
+        "refresh_token",
+        "refresh.*token",
+        "token.*blacklist",
+        "token.*revoke",
+        "token.*invalidate"
+      ]
+    },
+    "logout_properly_implemented": {
+      "java": [
+        "session\\.invalidate\\(\\)",
+        "SecurityContextHolder\\.clearContext",
+        "HttpServletRequest\\.logout",
+        "rememberMe.*invalidate",
+        "token.*blacklist.*add",
+        "redisTemplate\\.delete.*token"
+      ],
+      "python": [
+        "session\\.clear\\(\\)",
+        "session\\.flush\\(\\)",
+        "request\\.session\\.flush\\(\\)",
+        "logout\\(",
+        "cycle_key\\(\\)",
+        "redis.*delete.*token",
+        "token.*revoke"
+      ],
+      "php": [
+        "session_destroy",
+        "session_unset",
+        "Session::flush",
+        "Session::invalidate",
+        "Auth::logout",
+        "session_regenerate_id\\(true\\)",
+        "Cache::forget.*token"
+      ],
+      "go": [
+        "session\\.Clear",
+        "session\\.Delete",
+        "DestroySession",
+        "redis\\.Del",
+        "token.*revoke"
+      ],
+      "javascript": [
+        "req\\.session\\.destroy",
+        "session\\.regenerate",
+        "res\\.clearCookie",
+        "redis\\.del",
+        "token.*revoke",
+        "token.*blacklist.*add"
+      ],
+      "dotnet": [
+        "HttpContext\\.SignOutAsync",
+        "HttpContext\\.Session\\.Clear",
+        "AuthenticationHttpContextExtensions\\.SignOut",
+        "await.*SignOutAsync"
+      ],
+      "ruby": [
+        "reset_session",
+        "session\\.destroy",
+        "sign_out",
+        "warden\\.logout"
+      ],
+      "rust": [
+        "Session::purge",
+        "Session::clear",
+        "Session::remove",
+        "redis.*del"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别会话管理机制】定位系统使用的会话存储与维持方式（服务端 Session、Redis、JWT、Cookie）及其配置入口。优先检查 config_files 中的配置。",
+    "Step 1: 【检查空闲超时 (Idle Timeout)】验证用户在一段时间无操作后，会话是否会自动失效（如 Spring 的 setMaxInactiveInterval 或 Redis TTL）。比对 anti_patterns 中永不过期的配置。",
+    "Step 2: 【检查绝对超时 (Absolute Timeout)】验证无论用户是否活跃，会话在达到最大生命周期后是否强制失效，以防止长连接被劫持或重用。注意：很多框架默认无绝对超时。",
+    "Step 3: 【检查客户端 Cookie 属性】验证 Session ID Cookie 是否设置了合理的 Max-Age 或 Expires，且与服务端超时时间一致或更短，避免客户端残留有效 Cookie。同时检查 Secure/HttpOnly/SameSite 标志。",
+    "Step 4: 【评估 JWT 过期策略】若使用 JWT，检查 Token 的 exp 声明是否设置合理（如 15-30 分钟），并配合 Refresh Token 机制，而非颁发长期有效的单 Token。检查 Refresh Token 是否有轮换和撤销机制。",
+    "Step 5: 【检查登出与状态清理】用户主动登出或密码修改时，服务端是否真正销毁了 Session 或将 JWT 加入黑名单（Blocklist/Revocation List）。无状态 JWT 不等于无法撤销。",
+    "Step 5.5: 【检查多 Profile/环境差异】搜索 application-{profile}.yml、appsettings.{env}.json 等多环境配置，验证非生产环境是否覆盖了会话超时配置（如 dev/staging 环境的 timeout=0），且生产环境配置未被意外覆盖。同一应用的不同部署模式可能有不同的会话安全策略。",
+    "Step 5.6: 【检查认证豁免路径的会话有效性】对 permitAll/anonymous/isPublic/@AllowAnonymous 等白名单端点，验证其是否误放行了需要有效会话才能安全执行的操作。白名单路径 + 敏感操作 = 无需有效会话即可执行。特别注意：数据导出、批量操作、管理配置端点可能被误设为豁免。",
+    "Step 6: 【七项确认标准】缺一不得 confirmed：(1)空闲超时存在且合理 (2)绝对超时存在 (3)Cookie属性完整 (4)JWT过期策略安全 (5)登出真正失效 (6)多环境配置无安全差异 (7)认证豁免路径无不安全操作"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "Jwts.builder().setSubject(userId).setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24 * 30)).signWith(key).compact();",
+        "vulnerability_analysis": "JWT 被设置为 30 天有效期，且系统未实现 Refresh Token 轮换与 Token 撤销机制。一旦 Token 泄露（如通过 XSS 或日志），攻击者可在长达一个月的时间内无限制接管账户。",
+        "fix_pattern": "将 Access Token 有效期缩短至 15-30 分钟；引入 Refresh Token 机制并存储在 HttpOnly Cookie 中；在 Redis 中维护 Token 黑名单以支持主动登出和撤销。"
+      },
+      {
+        "code_snippet": "server.servlet.session.timeout=0\n# 或在 web.xml 中配置 <session-timeout>0</session-timeout>",
+        "vulnerability_analysis": "将 Session 超时时间配置为 0，在多数容器（如 Tomcat）中意味着会话永不过期。若用户离开但未主动登出，其会话将永久保持有效，极易被会话劫持。",
+        "fix_pattern": "设置合理的空闲超时时间（如 server.servlet.session.timeout=30m），并结合业务需求配置绝对超时时间。"
+      },
+      {
+        "code_snippet": "# Flask\napp.config['PERMANENT_SESSION_LIFETIME'] = None\napp.config['SESSION_COOKIE_MAX_AGE'] = None",
+        "vulnerability_analysis": "Flask 中将 PERMANENT_SESSION_LIFETIME 设为 None 导致会话永不过期，SESSION_COOKIE_MAX_AGE 为 None 使 Cookie 在浏览器关闭后仍保留。攻击者获取 Cookie 后可无限期使用。",
+        "fix_pattern": "设置 PERMANENT_SESSION_LIFETIME = timedelta(hours=8)，SESSION_COOKIE_MAX_AGE = 28800，并启用 SESSION_COOKIE_SECURE=True。"
+      },
+      {
+        "code_snippet": "// Go\nsession.Options(sessions.Options{\n    MaxAge: -1,\n})",
+        "vulnerability_analysis": "gorilla/sessions 中 MaxAge 设为 -1 表示会话不过期。虽然代码看似设置了 Options，但 -1 使会话永久有效，等价于无超时保护。",
+        "fix_pattern": "设置 MaxAge: 1800（30分钟），配合 Secure:true, HttpOnly:true, SameSite:http.SameSiteLaxMode。"
+      },
+      {
+        "code_snippet": "// Node.js / Express\napp.use(session({\n  secret: 'keyboard cat',\n  cookie: { maxAge: null },\n  resave: false,\n  saveUninitialized: true\n}));",
+        "vulnerability_analysis": "Express-session 中 cookie.maxAge 为 null 导致会话为浏览器会话 Cookie（浏览器关闭即失效），但服务端会话永不过期。若浏览器保持打开（常见于桌面应用），会话无限有效。",
+        "fix_pattern": "设置 cookie.maxAge: 30 * 60 * 1000（30分钟），store 配合 connect-redis 并设置 TTL，启用 rolling: true 使每次请求重置超时。"
+      },
+      {
+        "code_snippet": "// .NET\nservices.AddAuthentication().AddCookie(options => {\n    options.ExpireTimeSpan = TimeSpan.Zero;\n    options.SlidingExpiration = false;\n});",
+        "vulnerability_analysis": "ExpireTimeSpan 为 TimeSpan.Zero 且 SlidingExpiration 为 false，意味着认证 Cookie 一旦颁发就不会过期也不会滑动延长，但在某些 ASP.NET Core 版本中 Zero 行为等价于 Session Cookie（无 Max-Age），服务端 Claims 仍有效。",
+        "fix_pattern": "设置 ExpireTimeSpan = TimeSpan.FromMinutes(30)，SlidingExpiration = true，配合 SecurityStampValidatorOptions.ValidationInterval 实现绝对超时。"
+      },
+      {
+        "code_snippet": "# Ruby / Devise\nDevise.setup do |config|\n  config.timeout_in = nil\nend",
+        "vulnerability_analysis": "Devise timeout_in 设为 nil 禁用了超时模块。即使引入了 :timeoutable，nil 配置也会使其不生效，用户会话永不过期。",
+        "fix_pattern": "设置 config.timeout_in = 30.minutes，确保 User model 中包含 :timeoutable，并在 production 环境中配置 session_store 的 expire_after。"
+      }
+    ],
+    "mitigation_rules": [
+      "实施双重超时机制：空闲超时（Idle Timeout，如 15-30 分钟）和绝对超时（Absolute Timeout，如 8-12 小时）。",
+      "确保服务端会话销毁与客户端 Cookie 过期时间同步，避免客户端残留有效 Cookie。",
+      "JWT 应保持短生命周期（Access Token 15-30 分钟），配合 Refresh Token 轮换机制，并实现服务端撤销能力。",
+      "用户主动登出、密码修改或权限变更时，必须立即使现有会话/Token 失效。",
+      "多环境部署时，确保所有环境（含 dev/staging）的会话超时配置不低于生产环境的安全基线。",
+      "认证豁免路径仅允许真正的公开操作（登录、注册、健康检查），敏感操作端点不得被豁免。"
+    ],
+    "refutation_checklist": [
+      "系统是否使用了无状态短效 JWT 配合严格的 Refresh Token 撤销机制（如 Redis 家族轮换）？",
+      "全局 API 网关或 IAM（身份访问管理）是否已统一接管并强制执行了会话生命周期策略？",
+      "系统是否为内部短生命周期工具，且网络环境受严格物理/零信任控制？",
+      "高敏感系统是否已实施基于行为的动态会话终止或操作级步数认证（Step-up Auth）？",
+      "多环境配置中，是否有独立的 Profile 覆盖了会话超时？覆盖后的值是否仍然安全？",
+      "被认证豁免的端点是否全部为无副作用操作（GET 登录页、健康检查等）？有无误放行的写操作？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_session_management",
+      "desc": "识别系统使用的会话维持技术（Session, JWT, Cookie）及配置入口。"
+    },
+    {
+      "name": "check_idle_timeout_config",
+      "desc": "检查服务端配置中是否设置了合理的空闲超时时间（Inactive Interval）。"
+    },
+    {
+      "name": "check_absolute_timeout_config",
+      "desc": "检查是否存在强制的最大生命周期（Absolute Timeout）限制。"
+    },
+    {
+      "name": "check_cookie_attributes",
+      "desc": "检查 Session Cookie 的 Max-Age、Expires、Secure、HttpOnly、SameSite 属性。"
+    },
+    {
+      "name": "analyze_jwt_expiration",
+      "desc": "分析 JWT 生成逻辑，提取 exp 字段计算有效时长，检查是否存在长期 Token。"
+    },
+    {
+      "name": "verify_logout_invalidation",
+      "desc": "追踪登出逻辑，确认服务端是否清理了会话状态或将 Token 加入黑名单。"
+    },
+    {
+      "name": "check_multi_profile_differences",
+      "desc": "检查多环境配置（application-{profile}.yml、appsettings.{env}.json 等），验证非生产环境是否覆盖了会话超时配置。"
+    },
+    {
+      "name": "check_auth_exemption_paths",
+      "desc": "检查认证豁免路径（permitAll/anonymous/isPublic 等），验证豁免端点是否误放行了需要有效会话的敏感操作。"
+    }
+  ],
+  "sanitizers": [
+    "框架或网关（如 Nginx, APISIX, IAM）已全局配置了严格的 Session/Token 生命周期与强制失效策略",
+    "使用了短效 Access Token (如 15 分钟) 配合安全的 Refresh Token 轮换与撤销机制",
+    "系统属于无需保持长会话的无状态 API，且每次请求均独立鉴权（如 mTLS 或短期临时凭证）",
+    "高敏感系统已实施基于行为的动态会话终止或操作级步数认证（Step-up Auth）",
+    "纯内部测试环境且网络完全隔离，经安全评审确认可接受长会话风险",
+    "多环境配置中各环境均保持了相同或更高安全级别的会话超时策略",
+    "认证豁免路径仅包含无副作用的公开端点（登录页、注册页、健康检查），无写操作或敏感数据访问"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-613",
+    "session_type": "enum['server_side_session', 'jwt_token', 'cookie_based', 'hybrid']",
+    "missing_expiration_type": "array — 缺失的过期机制 (如 ['idle_timeout', 'absolute_timeout', 'logout_invalidation', 'jwt_exp_too_long', 'cookie_residual', 'profile_override', 'exemption_bypass'])",
+    "configured_timeout_value": "string (提取到的实际超时配置值，如 '30 days' 或 '0 (never)')",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['session-timeout=0', 'setMaxInactiveInterval(-1)'])",
+    "profile_difference_found": "boolean — 是否发现多环境配置安全差异",
+    "exemption_path_issue_found": "boolean — 是否发现认证豁免路径包含敏感操作",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "MEDIUM",
+    "remediation": "string"
+  }
+}

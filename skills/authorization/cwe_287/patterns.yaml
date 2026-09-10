@@ -1,0 +1,113 @@
+# CWE-287 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(login|authenticate|signin|verify|doLogin|attemptLogin|handleAuth|authCallback|resetPassword|changePassword)/i]'
+  - 'ClassDef[name=~/(AuthController|LoginController|SecurityController|TokenController|PasswordController|SessionManager|AuthFilter|AuthenticationFilter)/i]'
+  - 'Call[name=~/(authenticate|login|verify|parseClaims|setSigningKey|createToken|generateToken|validateToken|checkPassword|matches)/i]'
+  - 'Comparison[operator==''==''][operand~=/password|token|secret|otp|pin|code/i]'
+  - 'JWT[verify_signature=false]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*(login|auth|signin|token|password|reset)/i]'
+
+semantic_keywords:
+  - login
+  - authenticate
+  - password
+  - token
+  - jwt
+  - session
+  - rememberMe
+  - bypass
+  - hardcoded
+  - default credential
+  - weak comparison
+  - otp
+  - mfa
+  - 2fa
+  - two_factor
+  - verification_code
+  - pin
+  - captcha
+  - brute_force
+  - lockout
+  - rate_limit
+  - max_attempts
+  - session_fixation
+  - session_regenerate
+  - invalidate
+  - none_algorithm
+  - empty_secret
+  - weak_secret
+  - expired_token
+
+file_context:
+  - auth_controller
+  - login_handler
+  - security_config
+  - token_service
+  - auth_filter
+  - session_manager
+  - password_service
+  - user_service
+  - credential_validator
+  - mfa_handler
+  - otp_service
+  - reset_password
+
+sensitive_operations:
+  - login
+  - logout
+  - register
+  - reset_password
+  - change_password
+  - verify_token
+  - refresh_token
+  - invalidate_session
+  - enable_mfa
+  - disable_mfa
+  - verify_otp
+  - forgot_password
+  - confirm_email
+  - unlock_account
+
+logic_query_keywords_generic:
+  auth_entry:
+    - login
+    - authenticate
+    - signin
+    - verify
+    - auth
+    - token
+    - session
+  weak_patterns:
+    - ==
+    - equals
+    - none
+    - allow_anonymous
+    - skip_auth
+    - hardcoded
+    - default
+  token_ops:
+    - jwt
+    - decode
+    - verify
+    - parse
+    - session
+    - sign
+    - encode
+  password_ops:
+    - bcrypt
+    - argon2
+    - scrypt
+    - hash
+    - salt
+    - pbkdf2
+
+sanitizers:
+  - 使用框架标准认证过滤器（Spring Security / Shiro / Django Auth / Passport）且全局默认 deny
+  - 密码使用 bcrypt/argon2/scrypt 等自适应哈希且恒定时间比较
+  - JWT 完整校验签名（拒绝 none）、exp、iss、aud，密钥强度≥256位
+  - 登录成功后 session.invalidate() + request.getSession(true) 重新生成 Session ID
+  - 登录接口有频率限制（≤10次/分钟）+ 账户锁定（5次失败锁定30分钟）+ 验证码
+  - 认证失败统一返回 401 且不创建 session、不泄露失败原因
+  - '认证由外部 IdP（如 Auth0, Okta, Keycloak）统一处理，应用层仅验证 token'
+  - MFA/2FA 与服务端认证流程强绑定，不可被 API 直接调用跳过

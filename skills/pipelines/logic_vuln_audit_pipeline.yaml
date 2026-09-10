@@ -1,0 +1,96 @@
+# Pipeline: logic_vuln_audit_pipeline
+# 逻辑漏洞审计流水线
+
+skill_id: logic_vuln_audit_pipeline
+name: 逻辑漏洞审计流水线
+summary: 'Joern logic_scan（多 CWE 伴随分析）-> Java 路由/鉴权 playbook 叠加 -> 报告'
+min_score_to_activate: 0.28
+start_node_id: set_context
+trigger_keywords:
+  - 逻辑漏洞
+  - 业务逻辑
+  - 鉴权
+  - 越权
+  - idor
+  - access control
+  - logic scan
+  - run_logic_scan
+  - jwt
+  - path traversal
+  - sql injection
+  - xss
+  - xxe
+  - deserialization
+  - command injection
+  - privilege escalation
+  - brute force
+  - session fixation
+  - race condition
+  - mass assignment
+  - weak password
+  - payment tampering
+  - csrf
+  - cors
+  - hardcoded credential
+  - ssrf
+  - cwe-862
+  - cwe-863
+  - cwe-639
+  - cwe-285
+  - cwe-284
+  - cwe-287
+  - cwe-384
+  - cwe-613
+  - cwe-640
+  - cwe-307
+  - cwe-521
+  - cwe-269
+  - cwe-276
+  - cwe-915
+  - cwe-610
+  - cwe-362
+  - cwe-367
+  - cwe-306
+  - cwe-798
+  - cwe-352
+  - cwe-840
+  - cwe-841
+  - cwe-836
+  - cwe-918
+  - cwe-341
+  - cwe-22
+  - cwe-89
+  - cwe-79
+  - cwe-611
+  - cwe-502
+  - cwe-78
+  - cwe-200
+completion_hints:
+  - 须先 JoernTool.run_logic_scan，再 java_attack_surface 叠加 HTTP 面审计
+  - logic_query_failures 非空时不得直接 finish，应重试或加载 java-auth-audit
+  - 报告须区分代码模式级与路由级发现
+  - run_logic_scan 已内置多 CWE 伴随分析，单次 LLM 调用会同时检查关联 CWE 并产出 companion_verdicts
+collab_skill_ids:
+  - java_attack_surface
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    arguments:
+      language: java
+    success_next: run_logic_scan
+
+  - node_id: run_logic_scan
+    tool_name: JoernTool.run_logic_scan
+    success_next: run_attack_surface
+
+  - node_id: run_attack_surface
+    tool_name: Skill.run
+    arguments:
+      skill_id: java_attack_surface
+    success_next: done
+
+  - node_id: done
+    tool_name: set_context
+    completion_signal: logic_vuln_audit_pipeline_done
+

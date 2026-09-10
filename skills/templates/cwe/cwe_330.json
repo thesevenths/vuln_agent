@@ -1,0 +1,69 @@
+{
+  "skill_id": "cwe_330_insufficient_randomness",
+  "source_cwe": ["CWE-330"],
+  "related_cwes": ["CWE-338", "CWE-341", "CWE-798"],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "Call[name=~/(Random|Math\\.random|ThreadLocalRandom|java\\.util\\.Random|srand|rand)/i]",
+      "NewExpr[name=~/(Random|SplittableRandom)/i]"
+    ],
+    "semantic_keywords": [
+      "random", "token", "session id", "nonce", "salt", "otp",
+      "verification code", "reset link", "UUID"
+    ],
+    "file_context": ["auth", "token", "session", "otp", "security"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "weak_rng": ["new Random()", "Math.random()", "ThreadLocalRandom.current()", "java.util.Random"],
+      "secure_rng": ["SecureRandom", "SecureRandom.getInstanceStrong()"],
+      "security_context": ["token", "session", "nonce", "salt", "otp", "resetLink", "verificationCode", "apiKey"]
+    },
+    "generic": {
+      "weak_rng": ["random.random()", "Math.random()", "rand()", "mt_rand()"],
+      "secure_rng": ["secrets.token_bytes()", "crypto.randomBytes()", "SecureRandom"],
+      "security_context": ["token", "session", "nonce", "otp", "password_reset"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别随机数用途】随机数是否用于安全相关场景（令牌、会话ID、OTP、盐值）？",
+    "   - 仅用于UI/游戏等非安全场景 → 不构成漏洞",
+    "   - 用于安全场景 → 继续分析",
+    "Step 2: 【检查RNG类型】是否使用了密码学安全的随机数生成器？",
+    "   - ❌ java.util.Random / Math.random() → 可预测（线性同余）",
+    "   - ✅ SecureRandom → 密码学安全",
+    "Step 3: 【评估可预测性】弱RNG生成的安全令牌是否可被攻击者预测/枚举？",
+    "Step 4: 【检查种子来源】SecureRandom 是否使用了可预测的种子？",
+    "Step 5: 【确认影响】可预测的随机数可能导致什么后果？（会话劫持、OTP绕过、令牌伪造）"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "String token = Long.toHexString(new Random().nextLong());",
+        "vulnerability_analysis": "java.util.Random 使用线性同余算法，输出可预测。若此 token 用于密码重置或会话标识，攻击者可通过观察少量输出推算内部状态，预测后续 token。",
+        "fix_pattern": "SecureRandom sr = new SecureRandom();\nbyte[] bytes = new byte[32]; sr.nextBytes(bytes);\nString token = Base64.getUrlEncoder().encodeToString(bytes);"
+      }
+    ],
+    "mitigation_rules": [
+      "安全场景（令牌/会话/OTP/盐值）必须使用 SecureRandom",
+      "禁止对 java.util.Random 的输出做任何安全用途",
+      "令牌长度至少 128 bit（16字节），推荐 256 bit",
+      "不要手动设置 SecureRandom 的种子"
+    ]
+  },
+  "sanitizers": [
+    "使用 SecureRandom 且未手动设置种子",
+    "随机数仅用于非安全场景（UI动画、游戏、测试数据）",
+    "使用 crypto.randomBytes() / secrets 模块等密码学安全API"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-330",
+    "rng_type": "string (java.util.Random / Math.random / SecureRandom)",
+    "security_usage": "string (token/session/otp/salt)",
+    "risk_level": "MEDIUM",
+    "remediation": "string"
+  }
+}

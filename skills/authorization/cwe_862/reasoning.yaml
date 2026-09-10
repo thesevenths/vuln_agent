@@ -1,0 +1,73 @@
+# CWE-862 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【路由×安全配置交叉】若有 route_index/public_endpoints/security_filter_chain/shiro_security_config 结果：建立端点认证状态表（需登录/permitAll/方法级注解/未配置）；全局缺认证→862/306；有登录但无资源归属→转 639/285。'
+  - 'Step 0b: 【组件扫描联动】若有组件扫描命中 auth_bypass/missing_auth 类规则：先查该组件配置与已知绕过路径，再分析本候选方法。'
+  - 'Step 1: 【识别敏感操作】当前函数是否执行了数据读写、状态变更或资源访问？对照 semantic_keywords 和 logic_query_keywords.sensitive_ops。'
+  - 'Step 2: 【检查显式鉴权】函数入口或前置中间件是否存在身份验证？注意：认证≠授权。对照 anti_patterns.no_authorization_check 和 authentication_only_no_authorization。'
+  - 'Step 3: 【追踪授权逻辑】敏感操作前是否有当前用户与目标资源归属校验？对照 control_detection_patterns.resource_ownership_check。'
+  - 'Step 4: 【评估业务边界】即使有 RBAC，是否忽略水平越权？角色检查通过但资源不属于当前用户？'
+  - 'Step 5: 【反证清单】permitAll 是否仅覆盖 /login、/health；是否存在 anyRequest().authenticated()；路径前缀绕过。对照 anti_patterns.endpoint_not_in_security_config。'
+  - 'Step 6: 【检查全局默认策略】是否配置了全局默认拒绝（Default Deny）策略。对照 control_detection_patterns.global_default_deny。'
+  - 'Step 7: 【八项确认标准】缺一不得 confirmed：(1)操作涉及敏感数据/功能 (2)无显式授权检查 (3)无全局默认拒绝覆盖 (4)认证≠授权 (5)无资源归属校验 (6)permitAll 未误覆盖 (7)RBAC 未遗漏该端点 (8)组件无已知绕过'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'function runEmployeeQuery($dbName, $name){
+    ...
+    SELECT * FROM employees WHERE name = :name
+    ...
+}'
+      vulnerability_analysis: 虽然使用了预编译语句防止了 SQL 注入（CWE-89），但函数内部完全没有检查调用者是否有权查询员工表。攻击者可遍历姓名获取所有员工信息。
+      fix_pattern: '在查询前增加权限校验：if (!currentUser.canAccess(''employees'')) throw new ForbiddenException();'
+    - code_snippet: '@GetMapping("/api/orders/{orderId}")
+public Order getOrder(@PathVariable Long orderId) {
+    return orderRepository.findById(orderId).orElseThrow();
+}'
+      vulnerability_analysis: '订单查询接口使用 @PathVariable 接收 orderId，直接传给 findById 查询。虽然有全局认证（用户必须登录），但未验证当前用户是否为该订单的所有者。已认证用户可遍历 orderId 查看他人订单（水平越权 IDOR）。'
+      fix_pattern: '@GetMapping("/api/orders/{orderId}") public Order getOrder(@PathVariable Long orderId, @AuthenticationPrincipal User user) { Order order = orderRepository.findById(orderId).orElseThrow(); if (!order.getUserId().equals(user.getId())) throw new AccessDeniedException(); return order; }'
+    - code_snippet: '@app.put("/api/users/{user_id}")
+async def update_user(user_id: int, data: UserUpdate):
+    await User.filter(id=user_id).update(**data.dict())'
+      vulnerability_analysis: 用户更新接口无所有权检查。任何已认证用户可通过修改 user_id 更新任意用户的资料。缺少 current_user 参数和所有权验证。
+      fix_pattern: 'async def update_user(user_id: int, data: UserUpdate, current_user: User = Depends(get_current_user)): if user_id != current_user.id and not current_user.is_admin: raise HTTPException(403)'
+    - code_snippet: 'app.get(''/api/documents/:docId'', authMiddleware, async (req, res) => {
+    const doc = await Document.findByPk(req.params.docId);
+    res.json(doc);
+});'
+      vulnerability_analysis: '虽然有 authMiddleware 确保用户已登录，但 Document.findByPk 仅按 docId 查询，未绑定 req.user.id。这是典型的''有认证无授权''缺陷——用户可访问任何文档（水平越权）。'
+      fix_pattern: 'const doc = await Document.findOne({ where: { id: req.params.docId, userId: req.user.id } }); if (!doc) return res.status(404).json({error: ''Not found''});'
+    - code_snippet: 'func DeleteRecord(c *gin.Context) {
+    id := c.Param("id")
+    db.Delete(&Record{}, id)
+    c.JSON(200, gin.H{"status": "deleted"})
+}'
+      vulnerability_analysis: 删除操作仅按 id 执行，无所有权检查。Go 无框架级授权保护，完全依赖开发者手动添加。任何已认证用户可删除任意记录。
+      fix_pattern: 'userID := c.GetUint("userID"); result := db.Where("id = ? AND user_id = ?", id, userID).Delete(&Record{}); if result.RowsAffected == 0 { c.JSON(404, gin.H{"error": "not found"}); return }'
+  mitigation_rules:
+    - 采用 RBAC/ABAC 框架，在架构层面强制授权检查，减少遗漏。
+    - Web 应用必须在服务端对每个敏感页面/接口执行授权校验，不可依赖前端隐藏。
+    - 实施 Default Deny 策略，未明确允许的访问一律拒绝。
+    - 区分认证绕过（未登录可访问）与越权/BOLA（登录后访问他人资源）。
+    - 敏感数据访问必须同时校验角色权限和资源所有权。
+    - 在多租户系统中，所有查询必须包含租户 ID 过滤。
+
+anti_patterns:
+  - description
+  - no_authorization_check
+  - authentication_only_no_authorization
+  - public_sensitive_data
+  - endpoint_not_in_security_config
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-862
+  missing_check_type: 'array — 缺失检查类型 (如 [''no_auth_check'', ''auth_only_no_authz'', ''horizontal_privilege_missing'', ''vertical_privilege_missing'', ''endpoint_not_in_security_config''])'
+  endpoint_auth_map: 'array — [{path, method, auth_status: required|permitAll|method_guard|unconfigured}]'
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''no_authorization_check.java'', ''authentication_only_no_authorization.python''])'
+  control_missing: 'array — 缺失的安全控制 (如 [''global_default_deny'', ''resource_ownership_check'', ''rbac_enforcement''])'
+  reasoning_trace: string (必须引用端点认证状态表作为推理依据)
+  business_impact: 'string (从 common_consequences 映射: Confidentiality/Integrity/Access Control)'
+  risk_level: CRITICAL
+  remediation: string (结合 potential_mitigations 生成具体修复建议)

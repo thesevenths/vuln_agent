@@ -1,0 +1,59 @@
+# CWE-367 检测模式
+
+ast_patterns:
+  - 'IfStmt[condition=~/(exists|canRead|isFile|hasPermission|balance|available)/i][success_path.contains_mutate=true]'
+  - 'Sequence[check_call][mutate_call][no_lock_between=true]'
+  - 'FileOp[check=exists][action=delete|write|move]'
+
+semantic_keywords:
+  - check then act
+  - exists
+  - canRead
+  - isFile
+  - Files.exists
+  - balance
+  - inventory
+  - stock
+  - quota
+  - symlink
+  - race
+  - synchronized
+  - lock
+  - transaction
+  - atomic
+  - compareAndSet
+
+file_context:
+  - service
+  - file_handler
+  - payment
+  - inventory
+  - upload
+
+logic_query_keywords_generic:
+  check_patterns:
+    - exists
+    - can_read
+    - is_file
+    - check_balance
+    - get_stock
+    - has_quota
+  mutate_patterns:
+    - delete
+    - write
+    - move
+    - transfer
+    - withdraw
+    - decrement
+  mitigation_patterns:
+    - lock
+    - mutex
+    - transaction
+    - atomic
+    - for update
+
+sanitizers:
+  - Check 与 Use 在同一数据库事务且使用 SELECT FOR UPDATE 或等价行锁
+  - 使用原子 API（deleteIfExists、AtomicInteger、compareAndSet）合并检查与变更
+  - 文件路径经 canonicalize 后绑定到不可变句柄，Use 阶段不再重新解析用户路径
+  - 业务上该资源为单线程批处理且不存在外部并发入口（需 L2 配置证据）

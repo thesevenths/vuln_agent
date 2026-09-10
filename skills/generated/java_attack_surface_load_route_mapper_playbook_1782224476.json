@@ -1,0 +1,37 @@
+{
+  "draft_type": "rewrite_candidate",
+  "skill_id": "java_attack_surface",
+  "event": {
+    "skill_id": "java_attack_surface",
+    "node_id": "load_route_mapper_playbook",
+    "attempts": 8.0,
+    "success_rate": 0.0,
+    "reason": "节点低表现触发策略选择器，选择策略 security_focus_glob (score=0.7014)",
+    "replacement_tool": "FileTool.glob_files",
+    "strategy_id": "security_focus_glob",
+    "strategy_score": 0.7014,
+    "selector_features": {
+      "tool_name": "JavaAuditTool.load_playbook",
+      "tool_family": "other",
+      "is_parallel": false,
+      "attempts": 8.0,
+      "success_rate": 0.0,
+      "has_direct_file_read": false,
+      "has_file_glob": false
+    },
+    "family_success_rate": 0.4286,
+    "replacement_node": {
+      "tool_name": "FileTool.glob_files",
+      "arguments": {
+        "pattern": "**/*Security*.java",
+        "limit": 12
+      },
+      "parallel_actions": [],
+      "success_next": "load_auth_playbook",
+      "failure_next": null,
+      "completion_signal": null,
+      "expert_guidance": {}
+    }
+  },
+  "note": "该草稿由自动改写生成，需人工审核后合并到 skills/templates/"
+}

@@ -1,0 +1,52 @@
+# CWE-899 检测模式
+
+ast_patterns:
+  - 'FunctionCall[name=~/(check|verify|auth|permit)/i]'
+  - 'IfStmt[condition.type~=/role|permission|owner/i]'
+  - 'Method[methodRef][no_auth_guard_on_alternate_path=true]'
+
+semantic_keywords:
+  - permission
+  - role
+  - owner
+  - admin
+  - token
+  - bypass
+  - parallel
+  - internal
+  - helper
+  - direct call
+  - missing branch
+
+file_context:
+  - controller
+  - service
+  - middleware
+  - security
+  - filter
+
+logic_query_keywords_generic:
+  authz_ops:
+    - check
+    - verify
+    - auth
+    - permit
+    - has_permission
+    - is_authorized
+  identity_sources:
+    - session
+    - jwt
+    - token
+    - principal
+    - get_current_user
+  coverage_gaps:
+    - missing guard
+    - else branch
+    - exception handler
+    - fallback path
+
+sanitizers:
+  - '存在 @PreAuthorize 或 @Secured 等框架级注解且参数动态绑定'
+  - 权限校验在数据库查询层通过 WHERE user_id = ? 实现
+  - 使用了成熟的 RBAC/ABAC 中间件且所有入口均注册
+  - Service 层 Policy 与 Controller 守卫一致，无 package-private 旁路

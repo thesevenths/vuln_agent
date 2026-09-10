@@ -1,0 +1,80 @@
+# Apache Shiro 权限模型
+# 框架特化检测模式（仅在识别到 Shiro 依赖时加载）
+
+# SecurityManager 配置
+security_manager:
+  patterns:
+    - "DefaultSecurityManager"
+    - "DefaultWebSecurityManager"
+    - "SecurityUtils.setSecurityManager"
+  risk: "SecurityManager 是 Shiro 的核心，配置错误影响全局"
+
+# Realm 认证
+realm:
+  patterns:
+    - "extends AuthorizingRealm"
+    - "doGetAuthenticationInfo"
+    - "doGetAuthorizationInfo"
+    - "ModularRealmAuthenticator"
+    - "AuthenticationToken"
+  risk: "Realm 实现决定认证/授权逻辑是否正确"
+
+# 过滤器链
+filter_chain:
+  patterns:
+    - "ShiroFilterFactoryBean"
+    - "filterChainDefinitionMap"
+    - "filterChainDefinitions"
+  built_in_filters:
+    anon: "匿名访问"
+    authc: "需要认证"
+    authcBasic: "HTTP Basic 认证"
+    perms: "权限校验"
+    port: "端口限制"
+    rest: "REST 方法限制"
+    roles: "角色校验"
+    ssl: "SSL 要求"
+    user: "已认证或记住我"
+  risk_patterns:
+    - "anon 覆盖敏感路径"
+    - "过滤器顺序错误（perms 在 authc 之前）"
+    - "通配符 /** 设为 anon"
+
+# Subject 编程式安全
+subject_api:
+  authentication:
+    - "SecurityUtils.getSubject()"
+    - "subject.login(token)"
+    - "subject.isAuthenticated()"
+    - "subject.getPrincipal()"
+  authorization:
+    - "subject.hasRole(roleName)"
+    - "subject.hasRoles(roleNames)"
+    - "subject.isPermitted(permission)"
+    - "subject.isPermittedAll(permissions)"
+    - "subject.checkRole(roleName)"
+    - "subject.checkPermission(permission)"
+  risk: "Subject 校验遗漏或仅检查登录未检查角色"
+
+# Remember Me
+remember_me:
+  patterns:
+    - "rememberMe"
+    - "CookieRememberMeManager"
+    - "setRememberMeCookie"
+    - "rememberMeCookieTemplate"
+  risk_patterns:
+    - "硬编码 rememberMe 密钥"
+    - "默认密钥（kPH+bIxk5D2deZiIxcaaaA==）"
+    - "Remember Me Cookie 未设 HttpOnly/Secure"
+
+# Session 管理
+session:
+  patterns:
+    - "sessionManager"
+    - "globalSessionTimeout"
+    - "sessionValidationInterval"
+    - "SessionDAO"
+    - "EnterpriseCacheSessionDAO"
+    - "MemorySessionDAO"
+  risk: "Session 超时未设置或 DAO 使用内存存储（重启丢失）"

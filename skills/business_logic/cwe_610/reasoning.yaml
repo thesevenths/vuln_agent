@@ -1,0 +1,43 @@
+# CWE-610 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别核心交易链路】定位涉及订单创建、价格计算、支付发起、资金转账、优惠券核销的核心业务端点。'
+  - 'Step 1: 【追踪关键参数来源】检查金额(amount)、单价(price)、数量(quantity)、折扣(discount)等核心财务参数是直接从客户端请求（HTTP Body/Query/Hidden Field）获取，还是从服务端数据库重新计算获取。'
+  - 'Step 2: 【评估服务端校验与覆盖逻辑】如果参数来自客户端，检查服务端是否使用可信数据源（如商品库）对其进行了严格的二次校验和覆盖计算（如 `actual_price = db_price * qty`），而非直接将其写入订单表或传给支付网关。'
+  - 'Step 3: 【检查签名与防篡改机制】对于必须在客户端传递的复杂订单摘要对象，检查是否实施了严格的服务端签名校验（如 HMAC/RSA），且签名密钥未泄露到前端。'
+  - 'Step 4: 【识别负数与边界风险】检查是否允许传入负数金额、负数数量（导致退款或增加余额），或是否存在整数溢出（CWE-190）导致金额校验绕过。'
+  - 'Step 5: 【检查运费与汇率逻辑】检查运费计算、优惠券抵扣金额、汇率转换是否完全依赖客户端传入的值，而未在服务端重新核算。'
+  - 'Step 6: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public String createOrder(@RequestBody OrderReq req) {
+    Order order = new Order();
+    order.setProductId(req.getProductId());
+    order.setTotalAmount(req.getTotalAmount()); // 直接使用客户端传入的金额
+    orderRepo.save(order);
+    return paymentGateway.pay(order);
+}'
+      vulnerability_analysis: '存在严重的支付逻辑漏洞（订单金额篡改）。服务端直接信任客户端传入的 `totalAmount` 并用于创建支付单。攻击者可通过抓包将金额修改为 0.01 元，从而以极低成本购买高价商品。'
+      fix_pattern: '服务端必须根据 `productId` 从数据库查询真实单价，结合 `quantity` 重新计算总价：`BigDecimal realPrice = productRepo.getPrice(req.getProductId()).multiply(req.getQuantity()); order.setTotalAmount(realPrice);`，忽略客户端传入的金额字段。'
+    - code_snippet: 'def apply_coupon(user_id, coupon_code, discount_amount):
+    db.execute(''UPDATE cart SET total = total - %s WHERE user_id = %s'', (discount_amount, user_id))'
+      vulnerability_analysis: '存在折扣金额篡改漏洞。抵扣金额 `discount_amount` 由客户端控制，攻击者可传入大于订单总价的数值，导致订单金额变为负数，甚至可能触发系统的“负数订单退款”逻辑，实现薅羊毛或盗刷。'
+      fix_pattern: '服务端应根据 `coupon_code` 查询优惠券规则（如满减条件、折扣比例），在服务端计算实际抵扣金额，并校验抵扣后金额是否 >= 0。'
+  mitigation_rules:
+    - 核心交易金额、单价、折扣、运费必须由服务端根据数据库实时计算，严禁信任客户端传入的财务数值。
+    - 若业务架构必须传递复杂订单摘要给前端，必须使用服务端私钥进行强密码学签名（如 HMAC-SHA256），并在服务端验签。
+    - '对数量、金额等数值型参数进行严格的边界校验（必须 > 0），防御负数订单和整数溢出攻击。'
+    - 支付网关回调时，必须严格校验网关返回的实际支付金额与系统订单应付金额是否完全一致。
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-610
+  tampered_parameter_type: 'enum[''unit_price'', ''total_amount'', ''quantity'', ''discount_amount'', ''shipping_fee'', ''exchange_rate'']'
+  data_source_flaw: 'string (如 ''直接信任 request body 中的 total_price 并写入订单表'')'
+  missing_validation: 'string (如 ''缺少服务端基于商品库的价格重算逻辑'' 或 ''缺少负数金额拦截'')'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: CRITICAL
+  remediation: string

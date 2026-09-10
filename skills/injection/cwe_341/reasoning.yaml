@@ -1,0 +1,36 @@
+# CWE-341 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别密码学操作】是否涉及加密/解密/签名/哈希/令牌生成？'
+  - 'Step 2: 【检查算法强度】使用的算法是否已被破解或被认为不安全？'
+  - '   - ❌ 弱算法: MD5, SHA-1, DES, RC4, ECB模式'
+  - '   - ✅ 安全算法: SHA-256+, AES-256-GCM, Ed25519, bcrypt/scrypt/Argon2'
+  - 'Step 3: 【检查密钥管理】密钥是否硬编码/弱随机/可预测？'
+  -    - ❌ new Random().nextInt() 生成密钥（可预测）
+  - '   - ❌ 硬编码字符串数组作为密钥（如 SECRETS = {"victory", "business"}）'
+  -    - ✅ SecureRandom + 至少 256 bit 密钥
+  - 'Step 4: 【检查JWT实现】是否存在以下问题？'
+  -    - 使用 none 算法（禁用签名验证）
+  -    - 弱对称密钥（< 256 bit）
+  -    - 未验证签名即解析 token
+  - 'Step 5: 【评估影响】密码学弱点可能导致什么后果？（数据泄露、身份伪造、令牌劫持）'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public static final String[] SECRETS = {"victory","business","credit"}; ... new Random().nextInt(SECRETS.length)'
+      vulnerability_analysis: JWT签名密钥来自硬编码字符串数组 + java.util.Random（非加密随机），攻击者可枚举所有候选密钥并伪造任意JWT令牌。CWE-341+CWE-330双重缺陷。
+      fix_pattern: 使用 SecureRandom 生成 256-bit 密钥，存储在安全的配置/密钥管理服务中
+  mitigation_rules:
+    - '使用经过验证的密码学库（BouncyCastle, JCA），不自行实现'
+    - 密钥必须由 SecureRandom 生成，长度至少 256 bit
+    - '禁止硬编码密钥，使用密钥管理服务（Vault, KMS）'
+    - JWT 必须使用 RS256/ES256 非对称算法或至少 HS256 + 256-bit 密钥
+    - 哈希密码必须使用 bcrypt/scrypt/Argon2，禁止 MD5/SHA-1
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-341
+  weak_component: 'enum[''algorithm'', ''key_generation'', ''key_storage'', ''protocol'']'
+  risk_level: HIGH
+  remediation: string

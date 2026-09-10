@@ -1,0 +1,116 @@
+# CWE-287 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别认证入口】定位登录、token 校验、session 建立、密码重置等认证端点或函数。同时识别认证过滤器/中间件的配置。'
+  - 'Step 1: 【检查凭据比较方式】密码是否使用安全哈希比较（bcrypt/argon2/scrypt），而非明文 equals/==。命中 anti_patterns.weak_password_comparison 则直接标记 High 候选。'
+  - 'Step 2: 【检查硬编码凭据】代码中是否存在硬编码的密码、密钥或默认凭据。命中 anti_patterns.hardcoded_credentials 则标记。'
+  - 'Step 3: 【评估 JWT/Token 安全性】验证 JWT 签名算法（拒绝 none）、密钥强度、过期时间校验、issuer/audience 验证。对照 anti_patterns.jwt_weakness 和 control_detection_patterns.token_validation。'
+  - 'Step 4: 【检查会话固定防御】登录成功后是否重新生成 Session ID。对照 anti_patterns.session_fixation 和 control_detection_patterns.session_regeneration。'
+  - 'Step 5: 【评估暴力破解防护】登录接口是否有频率限制、账户锁定、验证码等防护。对照 anti_patterns.brute_force_gap 和 control_detection_patterns.rate_limiting。'
+  - 'Step 6: 【检查认证失败处理】认证失败时是否 fail-closed（返回 401 且不创建 session），是否存在异常路径默认放行。'
+  - 'Step 7: 【检查密码策略】注册时是否验证密码强度（长度、复杂度、常见密码检查）。'
+  - 'Step 8: 【检查 MFA 可绕过性】如果存在多因素认证，是否可通过 API 直接调用跳过 MFA 步骤。'
+  - 'Step 9: 【组件扫描联动】若规则库命中 auth_bypass 类 CVE（组件名+版本来自扫描结果）：优先核查该组件已知绕过 URL/配置，再分析自定义认证代码。'
+  - 'Step 10: 【九项确认标准】缺一不得 confirmed：(1)密码使用安全哈希 (2)无硬编码凭据 (3)JWT 完整校验 (4)会话固定防御 (5)暴力破解防护 (6)认证失败 fail-closed (7)密码策略充分 (8)MFA 不可绕过 (9)组件无已知 auth_bypass CVE'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'if (password.equals("admin123")) {
+    session.setAuthenticated(true);
+}'
+      vulnerability_analysis: '硬编码凭据与明文 equals 比较。攻击者可直接使用已知密码 ''admin123'' 绕过认证。同时无密码强度策略、无暴力破解防护、无会话固定防御。'
+      fix_pattern: 1. 使用 PasswordEncoder.matches() 进行安全哈希比较；2. 移除硬编码密码，从安全存储读取；3. 添加账户锁定和频率限制；4. 登录后 session.invalidate() + request.getSession(true)。
+    - code_snippet: '@PostMapping("/login")
+public String login(HttpSession session, @RequestBody LoginRequest req) {
+    if (authService.authenticate(req)) {
+        session.setAttribute("user", req.getUsername());
+        return "success";
+    }
+    return "failed";
+}'
+      vulnerability_analysis: 登录成功后未调用 session.invalidate() 重新生成 Session ID，存在会话固定攻击风险。攻击者可预先设置 Session ID，诱使受害者在该 Session 上登录，从而劫持已认证的会话。
+      fix_pattern: 'request.getSession().invalidate(); HttpSession newSession = request.getSession(true); newSession.setAttribute("user", req.getUsername());'
+    - code_snippet: '@app.post("/login")
+async def login(credentials: Credentials):
+    user = await User.get_or_none(username=credentials.username)
+    if user and user.password == credentials.password:
+        return {"token": create_token(user)}
+    raise HTTPException(401, "Invalid credentials")'
+      vulnerability_analysis: 密码使用明文 == 比较而非 bcrypt/argon2 哈希验证。同时无登录频率限制（可暴力破解）、无账户锁定。数据库中的密码若为明文存储则双重风险。
+      fix_pattern: '1. 使用 bcrypt.checkpw() 或 passlib.hash.verify()；2. 添加 slowapi 频率限制 @limiter.limit(''5/minute'')；3. 实现账户锁定机制 is_account_locked()。'
+    - code_snippet: 'import jwt
+token = jwt.decode(token, key=''secret'', algorithms=[''HS256'', ''none''])'
+      vulnerability_analysis: 'JWT 解码接受 ''none'' 算法。攻击者可构造 alg=none 的 token 并移除签名，服务端仍会接受。密钥 ''secret'' 过短（<32字符），可被暴力破解。'
+      fix_pattern: 'jwt.decode(token, key=SECRET_KEY, algorithms=[''HS256''])  # 拒绝 none；使用 os.urandom(32).hex() 生成强密钥。'
+    - code_snippet: '<?php
+session_start();
+if ($_POST[''username''] === ''admin'' && $_POST[''password''] === ''admin123'') {
+    $_SESSION[''authenticated''] = true;
+    $_SESSION[''user''] = ''admin'';
+    header(''Location: /dashboard'');
+}'
+      vulnerability_analysis: 硬编码管理员凭据 + 明文比较 + 会话固定（无 session_regenerate_id）。攻击者可：1) 直接使用已知凭据登录；2) 预先设置 PHPSESSID 进行会话固定攻击。
+      fix_pattern: 1. 从数据库查询用户并使用 password_verify() 比较；2. 登录成功后 session_regenerate_id(true)；3. 添加 throttle 中间件限制登录频率。
+    - code_snippet: 'const jwt = require(''jsonwebtoken'');
+app.post(''/login'', (req, res) => {
+    if (req.body.password === users[req.body.username].password) {
+        const token = jwt.sign({user: req.body.username}, ''secret'');
+        res.json({token});
+    }
+});'
+      vulnerability_analysis: '明文密码比较 + JWT 使用弱密钥 ''secret'' 签名 + token 无过期时间。攻击者可暴力破解弱密钥后伪造任意 token。'
+      fix_pattern: '1. bcrypt.compare() 替代明文比较；2. 使用 crypto.randomBytes(32) 生成强密钥；3. jwt.sign 添加 expiresIn: ''1h''。'
+    - code_snippet: 'func LoginHandler(w http.ResponseWriter, r *http.Request) {
+    var creds Credentials
+    json.NewDecoder(r.Body).Decode(&creds)
+    if creds.Password == storedPassword {
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+        tokenString, _ := token.SignedString([]byte("secret"))
+        w.Write([]byte(tokenString))
+    }
+}'
+      vulnerability_analysis: 明文密码比较 + JWT 弱签名密钥。Go 没有框架级认证保护，完全依赖开发者实现。无登录频率限制。
+      fix_pattern: 1. bcrypt.CompareHashAndPassword() 替代明文比较；2. 使用 crypto/rand 生成强密钥；3. 添加 rate limit 中间件。
+    - code_snippet: '[HttpPost("login")]
+public IActionResult Login([FromBody] LoginModel model)
+{
+    if (model.Password == _config["AdminPassword"])
+    {
+        var token = GenerateJwtToken(model.Username);
+        return Ok(new { token });
+    }
+    return Unauthorized();
+}'
+      vulnerability_analysis: 密码从配置读取并明文比较。若 AdminPassword 在 appsettings.json 中硬编码，则凭据可从源码/配置泄露获取。无账户锁定机制。
+      fix_pattern: 1. 使用 UserManager.CheckPasswordAsync()；2. 凭据从 Secret Manager/Azure Key Vault 获取；3. 配置 LockoutOptions.MaxFailedAttempts。
+  mitigation_rules:
+    - 使用框架标准认证过滤器且全局默认 deny，避免自定义认证逻辑。
+    - 密码必须使用 bcrypt/argon2/scrypt 等自适应哈希算法存储，禁止明文或 MD5/SHA 系列直接哈希。
+    - JWT 必须完整校验签名（拒绝 none/弱密钥）、过期时间（exp）、发行者（iss）和受众（aud）。
+    - 登录成功后必须重新生成 Session ID（session.invalidate + new session），防止会话固定。
+    - 登录接口必须实施频率限制（如 5次/分钟）、账户锁定（如 5次失败锁定30分钟）和验证码。
+    - 认证失败统一返回 401，不创建 session，不泄露具体失败原因（用户名不存在 vs 密码错误）。
+    - 组件层 auth_bypass CVE 须与配置/代码证据闭合，不能仅凭版本号 confirmed。
+
+anti_patterns:
+  - description
+  - weak_password_comparison
+  - session_fixation
+  - hardcoded_credentials
+  - brute_force_gap
+  - jwt_weakness
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-287
+  auth_bypass_type: 'array — 认证缺陷类型 (如 [''hardcoded_credential'', ''weak_password_comparison'', ''session_fixation'', ''jwt_none_algorithm'', ''brute_force_gap'', ''mfa_bypass''])'
+  auth_bypass_vector: 'string (具体绕过路径，如 ''使用已知密码 admin123 直接登录'' 或 ''构造 alg=none JWT 绕过签名验证'')'
+  tainted_credential_param: string (指出具体哪个凭据参数存在安全问题)
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''weak_password_comparison.java'', ''session_fixation.java'', ''hardcoded_credentials.python''])'
+  control_missing: 'array — 缺失的安全控制 (如 [''password_strength_check'', ''session_regeneration'', ''rate_limiting'', ''token_validation''])'
+  component_cve_match: string (若命中组件 CVE，指出具体 CVE 编号和匹配条件)
+  reasoning_trace: string
+  business_impact: string
+  risk_level: CRITICAL
+  remediation: string

@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph CLI["main.py 启动"]
+        ARGS[argparse 解析]
+        BOOT["构造依赖<br/>JoernTool + DBTool<br/>GraphBuilder + AgentPlannerExecutor<br/>AgentState"]
+        MODES{--mode}
+    end
+
+    ARGS --> BOOT --> MODES
+
+    MODES -->|repl 默认| REPL[repl 循环]
+    MODES -->|source_scan / agent / reachability| AGT[run_agent_task]
+    MODES -->|generate-cve-skills| GEN[cve_skill_generator]
+
+    REPL -->|自然语言 / ask / source_scan| AGT
+    REPL -->|直接函数 已少用| DIRECT["run_source_scan state, graph<br/>⚠️ REPL 的 source_scan 也走 planner"]
+
+    AGT --> INTENT{"detect_logic_only_intent?"}
+    INTENT -->|是| LO[audit_mode=logic_only]
+    INTENT -->|否| PLAN
+    LO --> PLAN["planner.run state, user_request"]
+
+    PLAN --> LOOP["规划循环 max_steps<br/>plan → execute → observe → replan"]
+
+    LOOP --> TOOLS{下一步 tool}
+
+    TOOLS --> JSS["JoernTool.run_source_scan<br/>污点扫描主线<br/>logic_only 时拒绝"]
+    TOOLS --> JLS["JoernTool.run_logic_scan<br/>逻辑漏洞主线"]
+    TOOLS --> JTS["JoernTool.run_taint_queries<br/>仅原始 flows"]
+    TOOLS --> JTG["JoernTool.run_targeted_scan"]
+    TOOLS --> JEX["JoernTool.expand_flow_context"]
+    TOOLS --> FT["FileTool.read_file / glob_files<br/>读文件须经 project_file_index"]
+    TOOLS --> SK["Skill.run → expert DAG"]
+    TOOLS --> JA["JavaAuditTool.scan_routes 等"]
+    TOOLS --> DB["DBTool / GraphBuilder.run_reachability"]
+    TOOLS --> FIN["finish → 写报告"]
+
+    JSS --> GB1["GraphBuilder.run_source_scan"]
+    JLS --> GB2["GraphBuilder.run_logic_scan"]
+    GB1 --> JT1["tools.JoernTool.run_source_scan"]
+    GB2 --> JT2["tools.JoernTool.run_logic_scan"]
+    JT1 --> SCAN["JoernVulnScannerHTTP<br/>joern_vuln_scanner.py"]
+    JT2 --> SCAN

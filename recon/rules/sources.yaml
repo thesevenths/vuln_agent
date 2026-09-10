@@ -1,0 +1,75 @@
+# sources.yaml — Source 定义（外部输入/污点源）
+# 从 code-audit sinks_sources.md 迁移
+# 用于 entry_points scanner 识别外部输入来源
+
+sources:
+  # ── HTTP 参数 ──────────────────────────────────────────────────────────────
+  http_params:
+    risk: high
+    java:
+      annotations:
+        - "RequestParam"
+        - "PathVariable"
+        - "RequestBody"
+        - "RequestHeader"
+        - "CookieValue"
+        - "ModelAttribute"
+      methods:
+        - "request\\.getParameter"
+        - "request\\.getParameterValues"
+        - "request\\.getHeader"
+        - "request\\.getCookies"
+        - "request\\.getInputStream"
+        - "request\\.getReader"
+        - "request\\.getQueryString"
+    python:
+      methods:
+        - "request\\.args"
+        - "request\\.form"
+        - "request\\.get_json"
+        - "request\\.data"
+        - "request\\.cookies"
+        - "request\\.headers"
+
+  # ── 文件上传 ──────────────────────────────────────────────────────────────
+  file_upload:
+    risk: critical
+    java:
+      annotations:
+        - "RequestParam.*file"
+      types:
+        - "MultipartFile"
+        - "Part"
+    python:
+      methods:
+        - "request\\.files"
+
+  # ── WebSocket ─────────────────────────────────────────────────────────────
+  websocket:
+    risk: high
+    java:
+      annotations:
+        - "ServerEndpoint"
+        - "OnMessage"
+        - "OnOpen"
+
+  # ── 消息队列 ──────────────────────────────────────────────────────────────
+  message_queue:
+    risk: high
+    java:
+      annotations:
+        - "KafkaListener"
+        - "RabbitListener"
+        - "JmsListener"
+        - "SqsListener"
+
+  # ── 定时任务 ──────────────────────────────────────────────────────────────
+  scheduled_task:
+    risk: medium
+    java:
+      annotations:
+        - "Scheduled"
+      types:
+        - "CronTrigger"
+        - "Timer"
+        - "Quartz"

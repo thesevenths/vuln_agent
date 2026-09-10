@@ -1,0 +1,79 @@
+{
+  "skill_id": "cwe_285_business_logic_authorization",
+  "source_cwe": ["CWE-285"],
+  "related_cwes": ["CWE-862", "CWE-863", "CWE-639", "CWE-284"],
+  "priority": "P1",
+  "role": "fallback_and_business_logic_specialist",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionCall[name=~/(get|fetch|update|delete)/i][args.count > 0]",
+      "DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i]"
+    ],
+    "semantic_keywords": [
+      "medical record", "patient", "doctor", "private message", 
+      "financial transaction", "order ownership", "tenant isolation"
+    ],
+    "exclusion_patterns": [
+      "FilePermissionCheck", "OS_ACL_Check", "DB_User_Auth"
+    ]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "business_ops": ["get", "fetch", "update", "delete", "order", "transfer", "payment"],
+      "ownership_check": ["owner", "belongsTo", "isOwner", "tenant", "getOwner"]
+    },
+    "generic": {
+      "business_ops": ["get", "fetch", "update", "delete", "order", "transfer"],
+      "ownership_check": ["owner", "belongs_to", "is_owner", "tenant", "get_owner"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别业务敏感资源】当前操作是否涉及具有【业务级归属关系】的数据？(如: 病历、私信、订单、租户数据)",
+    "Step 2: 【区分通用vs业务授权】已有的权限检查是 OS/DB 层面的(如 file chmod, db user grant)，还是业务逻辑层面的(如 record.owner_id == session.user_id)?",
+    "Step 3: 【评估业务语义匹配度】即使有角色校验(RBAC)，是否忽略了资源归属？(参考演示代码2: 验证了用户身份，但未验证消息ID是否属于该用户)",
+    "Step 4: 【检查跨租户/跨主体隔离】在多租户或多用户系统中，是否存在数据泄露给非所属主体的路径？",
+    "Step 5: 【兜底归类判断】若发现授权缺陷但不符合 CWE-862(完全缺失)或 CWE-863(客户端信任)的典型模式 → 归入 CWE-285"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "DisplayPrivateMessage($id); // 仅验证了 AuthenticateUser(username, password)",
+        "vulnerability_analysis": "程序正确执行了身份认证(Authentication)，但缺少业务级授权(Business Authorization)。所有私有消息存储在同一目录，LookupMessageObject() 仅确保 ID 格式合法，未校验 $id 对应的消息收件人是否为当前登录用户。这属于 CWE-285 而非 CWE-862，因为认证存在但授权不充分。",
+        "fix_pattern": "my $Message = LookupMessageObject($id); if ($Message->{to} ne $authenticatedUser) die 'Unauthorized';"
+      },
+      {
+        "code_snippet": "function runEmployeeQuery($dbName, $name){ ... SELECT * FROM employees WHERE name = :name ... }",
+        "vulnerability_analysis": "虽然使用了预编译语句防止 SQL 注入(CWE-89)，且可能通过了 DB 用户认证，但函数未校验调用者是否有权查询员工表。这是业务逻辑层授权的缺失，属于 CWE-285。",
+        "fix_pattern": "if (!currentUser.hasPermission('VIEW_EMPLOYEES')) throw new ForbiddenException();"
+      }
+    ],
+    "mitigation_rules": [
+      "业务级授权检查必须独立于通用资源(文件/DB)访问控制",
+      "实施 Default Deny：未明确允许的业务访问一律拒绝",
+      "使用 RBAC/ABAC 框架时，确保策略包含资源归属关系(不仅是角色)",
+      "Web 应用必须在服务端对每个敏感页面执行业务级授权，不可依赖前端隐藏"
+    ]
+  },
+  "tool_calls": [
+    {"name": "classify_access_control_type", "desc": "判断现有权限检查是 OS/DB 层还是业务逻辑层"},
+    {"name": "trace_resource_ownership_relation", "desc": "分析目标资源与当前会话用户的业务归属关系(如 owner_id, tenant_id, patient_id)"},
+    {"name": "check_multi_tenant_isolation", "desc": "在多租户场景下验证数据隔离完整性"}
+  ],
+  "sanitizers": [
+    "存在明确的业务级资源所有权校验(如 WHERE patient_id = ? AND doctor_id = ?)",
+    "使用了 ABAC 策略引擎且策略包含资源属性与主体属性的绑定关系",
+    "该资源在安全设计文档中明确定义为全局公开且经评审确认",
+    "敏感操作前有二次业务确认机制(如主管审批、MFA)且覆盖所有路径"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-285",
+    "sub_category": "enum['business_logic_authz', 'horizontal_privilege', 'tenant_isolation_failure', 'incomplete_rbac']",
+    "auth_check_type_found": "enum['none', 'os_level', 'db_level', 'role_only', 'role_plus_ownership']",
+    "reasoning_trace": "string (必须说明为何不归入 862/863 而选择 285)",
+    "business_impact": "string (从 common_consequences 映射)",
+    "risk_level": "MEDIUM",
+    "remediation": "string (强调'业务级授权'而非通用ACL)"
+  }
+}

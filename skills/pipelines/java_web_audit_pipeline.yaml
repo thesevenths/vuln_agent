@@ -1,0 +1,36 @@
+# Pipeline: java_web_audit_pipeline
+# Java Web 全链路审计
+
+skill_id: java_web_audit_pipeline
+name: Java Web 全链路审计
+summary: '攻击面(java-audit-skills) -> Joern 污点深扫 -> PoC 报告'
+min_score_to_activate: 0.26
+start_node_id: bootstrap
+trigger_keywords:
+  - java
+  - java web
+  - spring
+  - 代码审计
+  - 全链路
+  - web 审计
+  - java-audit
+completion_hints:
+  - '按队列完成: java_attack_surface -> source_0day_pipeline -> poc_generation_validation'
+  - 深扫须 language=java；报告须含参数可控性（完全/条件/不可控）
+  - 可结合 JavaAuditTool.load_playbook(java-route-tracer) 追单条路由
+collab_skill_ids:
+  - java_attack_surface
+  - source_0day_pipeline
+  - poc_generation_validation
+
+nodes:
+  - node_id: bootstrap
+    tool_name: set_context
+    arguments:
+      language: java
+    success_next: noop_done
+
+  - node_id: noop_done
+    tool_name: set_context
+    completion_signal: pipeline_bootstrapped
+

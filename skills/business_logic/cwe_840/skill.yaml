@@ -1,0 +1,22 @@
+# CWE-840 Skill 元数据
+# 从 templates/cwe/cwe_840.json 迁移
+
+skill_id: cwe_840_business_logic_error
+source_cwe: CWE-840
+priority: P0
+
+related_cwes:
+  - cwe: CWE-841
+    reason: workflow_bypass - 工作流绕过是业务逻辑错误的子类型：跳过流程步骤违反业务不变量
+  - cwe: CWE-863
+    reason: incorrect_authorization - 授权逻辑错误可导致业务规则被违反（如用户自提管理员）
+  - cwe: CWE-472
+    reason: external_control_of_state - 客户端可控的状态参数使业务规则可被绕过
+  - cwe: CWE-20
+    reason: improper_input_validation - 业务字段（price/qty/status）未经验证即被信任
+  - cwe: CWE-367
+    reason: race_condition - 竞态条件可使业务不变量在并发下被违反（如超卖）
+  - cwe: CWE-269
+    reason: improper_privilege_management - 权限管理缺陷导致业务角色规则被违反
+
+description: 涉及金融计算、库存管理、优惠券/折扣、转账限额的业务端点是 CWE-840 的核心攻击面

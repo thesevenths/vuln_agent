@@ -1,0 +1,107 @@
+# CWE-841 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(checkout|confirm|submit|approve|verify|complete|finalize|pay|transfer|process|activate|ship|cancel|refund|redeem|claim)/i]'
+  - 'StateTransition[from_step][to_step]'
+  - 'MultiStepHandler[skips_validation=true]'
+  - 'ClassDef[name=~/(CheckoutController|OrderController|PaymentController|WorkflowController|ApprovalController|CartController|BookingController)/i]'
+  - 'Call[name=~/(setStatus|setState|transition|moveTo|completeStep|skipTo|jumpTo|processStep)/i]'
+  - 'Annotation[name=~/(PostMapping|PutMapping).*(checkout|confirm|submit|approve|pay|ship|cancel|refund|activate)/i]'
+
+semantic_keywords:
+  - step
+  - stage
+  - phase
+  - workflow
+  - checkout
+  - cart
+  - order_status
+  - skip
+  - bypass
+  - direct
+  - force
+  - hidden_field
+  - status=
+  - state_machine
+  - transition
+  - precondition
+  - postcondition
+  - current_step
+  - next_step
+  - previous_step
+  - complete
+  - payment_authorized
+  - shipping_complete
+  - order_confirmed
+  - approval_pending
+  - review_stage
+  - finalized
+
+file_context:
+  - checkout_controller
+  - order_service
+  - payment_service
+  - workflow_manager
+  - approval_handler
+  - cart_service
+  - booking_service
+  - shipping_handler
+  - refund_processor
+  - state_machine
+  - order_controller
+  - step_handler
+
+sensitive_operations:
+  - checkout
+  - confirm_order
+  - process_payment
+  - authorize_payment
+  - ship_order
+  - activate_account
+  - approve_request
+  - cancel_order
+  - refund
+  - redeem_coupon
+  - claim_reward
+  - submit_review
+  - publish_content
+  - transfer_ownership
+
+logic_query_keywords_generic:
+  workflow_ops:
+    - checkout
+    - confirm
+    - submit
+    - approve
+    - complete
+    - pay
+    - transfer
+    - finalize
+    - activate
+    - ship
+    - cancel
+    - refund
+    - redeem
+    - claim
+  state_fields:
+    - status
+    - step
+    - stage
+    - phase
+    - state
+  guards:
+    - validate_step
+    - check_previous
+    - require_step
+    - assert_state
+    - can_transition
+    - is_complete
+
+sanitizers:
+  - 服务端状态机（spring-statemachine / django-fsm / xstate）显式校验当前步骤/状态允许的目标操作
+  - 敏感终态操作需要不可伪造的服务端会话状态或签名 token
+  - 每步完成后在服务端持久化状态，客户端无法单独声明已完成前置步骤
+  - 一次性操作有幂等性控制（唯一约束 / idempotency key / 防重 token / 数据库唯一索引）
+  - 工作流进度由服务端签名 token 或加密状态 blob 保护，防客户端篡改
+  - 并发操作由数据库事务/分布式锁保护，防止竞态跳步
+  - 验证与操作在同一事务/请求中完成，无 TOCTOU 窗口

@@ -1,0 +1,53 @@
+# Python 语言元数据 + 框架信号
+
+language: python
+version: "3.8+"
+
+# 框架识别信号（依赖名 → 框架标签）
+framework_signals:
+  django:
+    dependency_patterns:
+      - "django"
+      - "djangorestframework"
+      - "django-rest-framework"
+    config_files:
+      - "**/settings.py"
+      - "**/settings/*.py"
+      - "**/urls.py"
+
+  flask:
+    dependency_patterns:
+      - "flask"
+      - "flask-login"
+      - "flask-jwt-extended"
+      - "flask-security"
+      - "flask-restful"
+    config_files:
+      - "**/config.py"
+      - "**/app.py"
+      - "**/__init__.py"
+
+  fastapi:
+    dependency_patterns:
+      - "fastapi"
+      - "uvicorn"
+      - "starlette"
+    config_files:
+      - "**/main.py"
+      - "**/app/main.py"
+      - "**/config.py"
+
+# 通用 Python 安全模式
+common_patterns:
+  env_config:
+    - "os.environ.get"
+    - "os.getenv"
+    - "dotenv"
+    - "python-decouple"
+  crypto:
+    - "cryptography"
+    - "bcrypt"
+    - "argon2"
+    - "passlib"
+    - "hashlib"
+    - "hmac"

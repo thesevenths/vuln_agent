@@ -1,0 +1,124 @@
+# Pipeline: expert_java_auth_bypass
+# Java 认证/授权绕过专家分析
+
+skill_id: expert_java_auth_bypass
+name: Java 认证/授权绕过专家分析
+summary: 路由扫描 → 加载 auth playbook → 安全配置读取(并行) → 端点覆盖检查 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - auth_bypass
+  - 认证绕过
+  - 权限绕过
+  - 越权
+  - BOLA
+  - IDOR
+  - CWE-862
+  - CWE-287
+  - CWE-306
+  - Spring Security
+  - permitAll
+  - 匿名访问
+completion_hints:
+  - 必须映射所有 HTTP 端点并标注认证状态
+  - 必须检查 permitAll/匿名白名单是否覆盖了敏感端点
+  - 越权类漏洞即使代码层面无问题也须标注 L3 待动态验证
+  - 报告中须给出未受保护的端点列表
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: scan_routes
+    expert_guidance:
+      analysis_focus: 准备认证/授权分析上下文
+      expert_rules:
+        - 认证绕过：未登录可访问需认证的端点
+        - 越权(IDOR/BOLA)：登录用户可访问他人资源
+        - 二者分析方法不同：前者看 Security 配置，后者看数据访问控制
+
+  - node_id: scan_routes
+    tool_name: JavaAuditTool.scan_routes
+    success_next: load_auth_playbook
+    failure_next: load_auth_playbook
+    expert_guidance:
+      analysis_focus: 扫描所有 HTTP 路由端点
+      required_evidence:
+        - 完整的端点列表（URL + HTTP 方法 + Controller 类名）
+        - '每个端点的注解（@RequestMapping/@GetMapping 等）'
+        - '是否有 @PreAuthorize/@Secured 等端点级权限控制'
+
+  - node_id: load_auth_playbook
+    tool_name: JavaAuditTool.load_playbook
+    arguments:
+      playbook_id: java-auth-audit
+    success_next: read_security_config
+    failure_next: read_security_config
+
+  - node_id: read_security_config
+    tool_name: null
+    success_next: check_endpoint_coverage
+    failure_next: check_endpoint_coverage
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Security*.java'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Filter*.java'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Interceptor*.java'
+          limit: 15
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/application*.yml'
+          limit: 10
+    expert_guidance:
+      analysis_focus: 读取安全配置，映射端点→认证状态
+      required_evidence:
+        - SecurityFilterChain 或 WebSecurityConfigurerAdapter 的完整配置
+        - permitAll/anonymous 白名单列表
+        - 自定义 Filter/Interceptor 的拦截路径
+        - CSRF/CORS 配置
+      refutation_checklist:
+        - 'permitAll 是否仅覆盖公开端点（如 /login, /register, /health）'
+        - 是否有默认认证（anyRequest().authenticated()）
+        - 自定义 Filter 是否在所有路径上生效
+        - '是否有路径前缀绕过（如 /api/../admin 绕过 /api/** 的权限检查）'
+      false_positive_patterns:
+        - 所有敏感端点都在认证保护下
+        - permitAll 仅覆盖静态资源和公开 API
+        - 自定义 Filter 正确拦截了所有需认证路径
+        - 使用了 Spring Security 的默认安全配置（默认全部需认证）
+
+  - node_id: check_endpoint_coverage
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*Controller*.java'
+      limit: 30
+    success_next: verify
+    failure_next: verify
+    expert_guidance:
+      analysis_focus: 交叉检查：路由列表 vs 安全配置覆盖范围
+      required_evidence:
+        - 未在 Security 配置中显式保护的端点列表
+        - 'Controller 中有 @PreAuthorize 但 Security 无对应配置的端点'
+      expert_rules:
+        - 将路由扫描结果与 Security 配置交叉对比
+        - 标记每个端点的认证状态：需认证/免认证/部分保护/未配置
+        - '特别关注：管理端点(/admin/**)、文件上传端点、API 端点'
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定认证/授权漏洞是否成立
+      expert_rules:
+        - 认证绕过：列出未受保护的敏感端点 + 可能的利用方式
+        - 越权(BOLA)：即使代码层面无问题也须标注「L3 待动态验证」
+        - 报告中须包含：(1) 端点认证映射表 (2) 未保护端点列表 (3) 风险评估
+

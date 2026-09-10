@@ -1,0 +1,20 @@
+flowchart LR
+    Q[queries.py]
+
+    Q --> TQ["污点集<br/>java_queries / cpp_queries_merged"]
+    Q --> RQ[java_reflection_queries]
+    Q --> LQ["逻辑集<br/>get_logic_queries framework<br/>java_logic_queries 等"]
+
+    Q --> IMP["每条 DSL 首行<br/>import io.shiftleft.semanticcpg.language._"]
+
+    IMP --> TQ & RQ & LQ
+
+    TQ --> MAP["_run_query_map"]
+    RQ --> MAP
+    LQ --> MAP
+
+    MAP --> CP["checkpoint 可选<br/>taint / cpg_logic"]
+    MAP --> POST["_post_query → Joern Server"]
+    MAP --> OUT["Dict query_name → result_text"]
+
+    VAL[logic_query_validate<br/>静态校验 import + DSL] -.-> Q

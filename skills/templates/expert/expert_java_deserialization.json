@@ -1,0 +1,127 @@
+{
+  "skill_id": "expert_java_deserialization",
+  "name": "Java 反序列化专家分析",
+  "summary": "定向扫描 deserialization → Gadget 链检查 → 依赖版本读取(并行) → 类型过滤检查 → 反证 → 收口",
+  "trigger_keywords": [
+    "insecure_deserialization", "反序列化", "CWE-502",
+    "ObjectInputStream", "readObject", "Gadget", "XStream", "Jackson"
+  ],
+  "completion_hints": [
+    "必须检查 Gadget 矩阵：JDK 内置链、commons-collections、spring-beans 等",
+    "必须确认依赖版本是否在已知可利用范围",
+    "必须检查是否配置了类型过滤/白名单"
+  ],
+  "min_score_to_activate": 0.2,
+  "start_node_id": "set_context",
+  "nodes": [
+    {
+      "node_id": "set_context",
+      "tool_name": "set_context",
+      "arguments": {},
+      "success_next": "targeted_scan",
+      "expert_guidance": {
+        "analysis_focus": "准备 Java 反序列化漏洞分析上下文",
+        "expert_rules": [
+          "反序列化漏洞 = 不可信数据 → readObject/fromXML/fromJson → Gadget 链执行",
+          "三个必要条件：(1) 有反序列化入口 (2) 有可用 Gadget (3) 无类型过滤"
+        ]
+      }
+    },
+    {
+      "node_id": "targeted_scan",
+      "tool_name": "JoernTool.run_targeted_scan",
+      "arguments": {
+        "vuln_types": ["insecure_deserialization"],
+        "language": "java"
+      },
+      "success_next": "check_gadget_chain",
+      "failure_next": "check_gadget_chain",
+      "expert_guidance": {
+        "analysis_focus": "扫描反序列化相关 flow",
+        "expert_rules": [
+          "重点关注 ObjectInputStream.readObject、XStream.fromXML、ObjectMapper.readValue",
+          "注意 Kryo/Hessian/Protostuff 等非标准序列化框架"
+        ]
+      }
+    },
+    {
+      "node_id": "check_gadget_chain",
+      "tool_name": "FileTool.glob_files",
+      "arguments": {"pattern": "**/*Deserializer*.java", "limit": 10},
+      "success_next": "read_dependency_versions",
+      "failure_next": "read_dependency_versions",
+      "expert_guidance": {
+        "analysis_focus": "检查是否存在可用 Gadget 链",
+        "required_evidence": [
+          "项目依赖中是否存在已知 Gadget 库（commons-collections/commons-beanutils/spring-beans 等）",
+          "反序列化入口是否接收外部输入",
+          "是否有自定义 readObject 方法"
+        ],
+        "expert_rules": [
+          "Gadget 矩阵检查优先级：JDK 内置链 > commons-collections > spring > xalan > bcel",
+          "即使没有直接 Gadget 库，JDK 内置的 EventHandler/ProcessBuilder 链可能可用"
+        ]
+      }
+    },
+    {
+      "node_id": "read_dependency_versions",
+      "parallel_actions": [
+        {"tool_name": "FileTool.glob_files", "arguments": {"pattern": "**/pom.xml", "limit": 10}},
+        {"tool_name": "FileTool.glob_files", "arguments": {"pattern": "**/build.gradle*", "limit": 10}},
+        {"tool_name": "FileTool.glob_files", "arguments": {"pattern": "**/*Security*.java", "limit": 15}}
+      ],
+      "success_next": "check_type_filtering",
+      "failure_next": "check_type_filtering",
+      "expert_guidance": {
+        "analysis_focus": "读取依赖版本，确认 Gadget 可用性",
+        "required_evidence": [
+          "commons-collections 版本（3.2.1+/4.0 修复了部分 Gadget）",
+          "commons-beanutils 版本",
+          "Jackson 版本及是否启用 defaultTyping",
+          "XStream 版本及是否配置安全框架"
+        ],
+        "refutation_checklist": [
+          "commons-collections 是否升级到安全版本",
+          "Jackson ObjectMapper 是否禁用了 defaultTyping",
+          "XStream 是否调用 allowTypes/setupDefaultSecurity"
+        ]
+      }
+    },
+    {
+      "node_id": "check_type_filtering",
+      "tool_name": "FileTool.glob_files",
+      "arguments": {"pattern": "**/*Filter*.java", "limit": 15},
+      "success_next": "verify",
+      "failure_next": "verify",
+      "expert_guidance": {
+        "analysis_focus": "检查是否配置了反序列化类型过滤",
+        "refutation_checklist": [
+          "是否使用 ObjectInputFilter（JDK 9+）或 SerialKiller",
+          "是否配置了 JEP 290 反序列化过滤",
+          "WebLogic/JBoss 等中间件是否有内置反序列化补丁",
+          "Jackson 是否使用 @JsonTypeInfo(use=Id.CLASS) 的不安全配置"
+        ],
+        "false_positive_patterns": [
+          "配置了 ObjectInputFilter 白名单",
+          "Jackson 禁用 defaultTyping 且无 @JsonTypeInfo",
+          "XStream 调用 setupDefaultSecurity()",
+          "反序列化入口仅接收内部可信数据（非用户输入）"
+        ]
+      }
+    },
+    {
+      "node_id": "verify",
+      "tool_name": "FileTool.write_report",
+      "arguments": {"subdir": "source_scan"},
+      "completion_signal": "expert_analysis_done",
+      "expert_guidance": {
+        "analysis_focus": "综合判定反序列化漏洞是否成立",
+        "expert_rules": [
+          "判定为真实漏洞须满足：(1) 有反序列化入口 (2) 接收外部输入 (3) 有可用 Gadget (4) 无类型过滤",
+          "若依赖版本已修复 Gadget 但有 JDK 内置链，标注为「条件可利用」",
+          "报告中须列出可用 Gadget 链及对应依赖版本"
+        ]
+      }
+    }
+  ]
+}

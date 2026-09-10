@@ -1,0 +1,11 @@
+flowchart LR
+    AG[auth_guards / shiro / jaxrs] --> GM[guarded_methods]
+    SO[sensitive_operations] --> SENS[敏感方法列表]
+    PE[public_endpoints] --> PUB[公开端点]
+
+    SENS --> X{敏感方法 ∈ guarded?}
+    X -->|否| C1["candidate: missing_auth CWE-862"]
+    PUB --> C2["candidate: public_endpoint"]
+    IDO[idor_* queries] --> C3["candidate: idor CWE-639"]
+    WF[workflow_bypass] --> C4["candidate: workflow_bypass CWE-841"]
+    HC[hardcoded_credentials_v2] --> C5["candidate: hardcoded_cred CWE-798"]

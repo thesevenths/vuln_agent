@@ -1,0 +1,76 @@
+# 控制驱动审计方法论
+# 核心思想：先枚举所有操作，再逐一验证保护；保护缺失即为漏洞
+
+control_driven_audit:
+  philosophy: >
+    传统 SAST 以"污点追踪"为核心（source → sink），但逻辑漏洞的关键不在于数据流是否危险，
+    而在于某个操作是否缺少应有的安全控制。
+    因此采用"控制驱动"范式：枚举操作 → 枚举控制 → 交叉比对缺口。
+
+  three_step_architecture:
+    step_1_joern_enumeration:
+      description: "通过 java_logic_queries 并行执行枚举查询"
+      queries:
+        endpoint_enumeration: "所有 HTTP 路由方法（含注解元数据）"
+        auth_guards: "所有鉴权守卫（@PreAuthorize / SecurityFilterChain / AOP）"
+        public_endpoints: "无守卫覆盖的公开端点（排除 identity-bound 方法）"
+        security_filter_chain: "SecurityConfig / Shiro / 拦截器配置"
+        sensitive_operations: "敏感操作调用（DB 写入 / 文件 / 命令执行）"
+        class_level_auth: "类级别安全注解"
+      output_format: "TAG | caller | file | line | annotations"
+
+    step_2_source_corroboration:
+      description: "对每个候选读取原始源码补证"
+      method: "_read_original_source（默认窗口 60 行）"
+      preserves:
+        - "注解、注释、方法间空间关系"
+        - "_fetch_class_protection_matrix 查询同一 Controller 类所有方法注解状态"
+      priority: >
+        source_evidence_type = 'original_file' 优先；
+        仅当本地文件不可用时回退 'joern_reconstructed'。
+
+    step_3_llm_analysis:
+      description: "LLM 接收源码 + 查询结果 + CWE skill 进行综合分析"
+      inputs:
+        - "原始源码（带 source_quality_note）"
+        - "Joern 查询结果（守卫矩阵 + 公开端点列表）"
+        - "CWE skill 的 reasoning_workflow + confirmation_criteria"
+      output: "结构化 finding（vulnerability_confirmed + code_flow + exploit_poc）"
+
+  five_protection_forms:
+    description: "对 Spring 项目，必须覆盖以下 5 种授权保护形式"
+    forms:
+      - id: 1
+        name: "方法级注解"
+        examples: ["@PreAuthorize", "@Secured", "@RolesAllowed"]
+        detection: "auth_guards 查询"
+      - id: 2
+        name: "类级注解"
+        examples: ["Controller 类上 @PreAuthorize"]
+        detection: "class_level_auth 查询"
+      - id: 3
+        name: "SecurityConfig 规则"
+        examples: ["SecurityFilterChain", "antMatchers", "requestMatchers"]
+        detection: "security_filter_chain 查询"
+      - id: 4
+        name: "AOP 切面"
+        examples: ["自定义 @Aspect 鉴权"]
+        detection: "aop_auth_aspects 查询"
+      - id: 5
+        name: "框架默认值"
+        examples: ["anyRequest().authenticated()"]
+        detection: "security_filter_chain + 配置推断"
+
+  applicable_cwes:
+    - cwe: CWE-862
+      scope: "Missing Authorization — 完全无保护"
+    - cwe: CWE-863
+      scope: "Incorrect Authorization — 保护逻辑错误"
+    - cwe: CWE-306
+      scope: "Missing Authentication for Critical Function"
+    - cwe: CWE-352
+      scope: "CSRF — 缺少状态变更的 CSRF 保护"
+    - cwe: CWE-639
+      scope: "IDOR — 缺少资源所有权绑定"
+    - cwe: CWE-269
+      scope: "Improper Privilege Management — 权限提升无控制"

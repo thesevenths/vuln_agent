@@ -1,0 +1,26 @@
+# CWE-798 Skill 元数据
+# 从 templates/cwe/cwe_798.json 迁移
+
+skill_id: cwe_798_hardcoded_credentials
+source_cwe: CWE-798
+priority: P1
+
+related_cwes:
+  - cwe: CWE-1391
+    reason: use_of_hardcoded_physical_or_logical_credentials - 物理设备或逻辑系统中的硬编码凭据
+  - cwe: CWE-287
+    reason: improper_authentication - 硬编码凭据导致所有实例共享相同认证，无法独立管理
+  - cwe: CWE-320
+    reason: key_management_errors - 硬编码加密密钥是密钥管理不当的典型形态
+  - cwe: CWE-257
+    reason: storing_passwords_in_recoverable_format - 硬编码密码通常以明文或可逆加密形式存储
+  - cwe: CWE-798
+    reason: self_reference - 自身引用，用于关联分析
+  - cwe: CWE-521
+    reason: weak_password_requirements - 硬编码密码往往同时是弱密码（如 admin/admin123）
+  - cwe: CWE-276
+    reason: incorrect_default_permissions - 硬编码默认管理员凭据是默认权限过高的常见原因
+  - cwe: CWE-312
+    reason: cleartext_storage_of_sensitive_information - 硬编码凭据通常以明文形式存储在代码或配置中
+
+description: 凭据使用和存储操作是 CWE-798 的核心检测面

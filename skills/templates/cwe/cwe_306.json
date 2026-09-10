@@ -1,0 +1,460 @@
+{
+  "skill_id": "cwe_306_missing_auth_critical_function",
+  "source_cwe": ["CWE-306"],
+  "related_cwes": [
+    {"cwe": "CWE-287", "reason": "improper_authentication - 认证机制存在缺陷使关键功能实质上无认证保护"},
+    {"cwe": "CWE-307", "reason": "brute_force - 关键功能缺少认证 + 无暴力破解防护 = 完全暴露"},
+    {"cwe": "CWE-602", "reason": "client_side_enforcement - 仅依赖前端认证检查，服务端关键功能无保护"},
+    {"cwe": "CWE-919", "reason": "weakness_in_mobile_app - 移动端 API 关键功能常遗漏服务端认证"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - 缺少认证通常伴随缺少授权：无身份验证即无权限检查"},
+    {"cwe": "CWE-269", "reason": "improper_privilege_management - 无认证的关键功能可能被利用进行权限提升"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[access_modifier=public][name=~/(create|delete|update|admin|config|reset|transfer|withdraw|export|import|execute|send|deploy|restart|shutdown)/i]",
+      "ClassDef[name=~/(Admin|Manager|Config|Payment|Account|System|Internal|Debug|Test|Backup)/i]",
+      "Annotation[name=~/(RequestMapping|PostMapping|PutMapping|DeleteMapping|GetMapping)/i]",
+      "RouteHandler[method=~/(GET|POST|PUT|DELETE|PATCH)/i]",
+      "DBQuery[operation=~/(INSERT|UPDATE|DELETE|DROP|TRUNCATE)/i]"
+    ],
+    "semantic_keywords": [
+      "bank account", "ssn", "password reset", "user creation",
+      "system config", "payment", "transfer", "admin panel",
+      "sensitive data", "pii", "financial", "export", "import",
+      "debug", "internal", "test", "backup", "deploy",
+      "restart", "shutdown", "execute", "send_mail",
+      "database", "migrate", "seed", "truncate"
+    ],
+    "file_context": [
+      "controller", "service", "api_endpoint", "admin_module",
+      "internal_api", "debug_endpoint", "system_controller",
+      "backup_handler", "export_service", "config_controller"
+    ],
+    "operation_triggers": {
+      "description": "关键功能端点是 CWE-306 的核心攻击面，必须确认每个端点都有认证保护",
+      "sensitive_operations": [
+        "create_user", "delete_user", "update_config", "reset_password",
+        "transfer_funds", "withdraw", "export_data", "import_data",
+        "execute_command", "send_notification", "deploy_application",
+        "restart_service", "shutdown_system", "backup_database",
+        "modify_permissions", "create_admin", "delete_record"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Get|Post|Put|Delete|Patch)Mapping.*/(admin|config|system|internal|debug|test|backup|export|import|deploy)",
+          "@RequestMapping.*/(admin|config|system|manage|user)"
+        ],
+        "python": [
+          "@app\\.route.*/(admin|config|system|internal|debug|test|backup|export|import)",
+          "@router\\.(get|post|put|delete).*/(admin|config|system|manage|user)"
+        ],
+        "go": [
+          "\\.(GET|POST|PUT|DELETE)\\(.*/(admin|config|system|internal|debug|test|backup|export)",
+          "r\\.(GET|POST)"
+        ],
+        "javascript": [
+          "router\\.(get|post|put|delete).*/(admin|config|system|internal|debug|test|backup|export)",
+          "@(Get|Post|Put|Delete)\\(.*/(admin|config|system)"
+        ],
+        "php": [
+          "Route::(get|post|put|delete).*/(admin|config|system|internal|debug|test|backup|export)",
+          "@Route.*methods.*(?:GET|POST).*/(admin|config|system)"
+        ],
+        "dotnet": [
+          "\\[Http(Get|Post|Put|Delete)\\].*/(admin|config|system|internal|debug|test|backup|export)",
+          "\\[AllowAnonymous\\].*/(admin|config|system)"
+        ],
+        "ruby": [
+          "(get|post|put|delete)\\s+\"/(admin|config|system|internal|debug|test|backup|export)",
+          "resources\\s+:(admin|config|system)"
+        ],
+        "rust": [
+          "\\.route.*/(admin|config|system|internal|debug).*method.*(?:GET|POST|PUT|DELETE)",
+          "\\.get\\(.*/(admin|config|system)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "critical_ops": [
+        "createBankAccount", "deleteUser", "resetPassword", "updateConfig",
+        "transfer", "withdraw", "grantRole", "createUser",
+        "exportData", "importData", "executeCommand",
+        "deployApplication", "restartService", "backupDatabase"
+      ],
+      "auth_checks": [
+        "isAuthenticated", "getAuthentication", "SecurityContextHolder",
+        "hasRole", "@PreAuthorize", "@Secured", "@RolesAllowed",
+        "RequiresAuthentication", "Subject.isAuthenticated",
+        "RequiresPermissions", "RequiresRoles"
+      ],
+      "security_config": [
+        "SecurityFilterChain", "authorizeHttpRequests", "authorizeRequests",
+        "permitAll", "antMatchers", "requestMatchers",
+        "filterChainDefinitions", "shiro.ini", "anon", "authc",
+        "anyRequest"
+      ],
+      "jaxrs_public_risk": [
+        "@PermitAll", "@Path", "ContainerRequestFilter",
+        "jaxrs_unprotected", "jaxrs_no_filter"
+      ]
+    },
+    "python": {
+      "django_auth_checks": [
+        "login_required", "permission_required", "IsAuthenticated",
+        "permission_classes", "has_perm", "user_passes_test"
+      ],
+      "flask_auth_checks": [
+        "login_required", "is_authenticated", "@requires_auth",
+        "flask_login", "current_user"
+      ],
+      "fastapi_auth_checks": [
+        "Depends(get_current_user)", "Depends(oauth2_scheme)",
+        "HTTPBearer", "APIKeyHeader", "OAuth2PasswordBearer"
+      ],
+      "critical_ops": [
+        "create_account", "delete_user", "reset_password",
+        "update_config", "transfer", "export_data",
+        "execute_command", "send_mail"
+      ]
+    },
+    "php": {
+      "laravel_auth_checks": [
+        "middleware.*auth", "Auth::check", "auth()",
+        "Gate::allows", "authorize", "@can"
+      ],
+      "symfony_auth_checks": [
+        "isGranted", "denyAccessUnlessGranted",
+        "@IsGranted", "Security::getUser"
+      ],
+      "critical_ops": [
+        "createUser", "deleteUser", "updateConfig",
+        "exportData", "executeCommand"
+      ]
+    },
+    "go": {
+      "auth_checks": [
+        "AuthRequired", "JWTMiddleware", "RequireAuth",
+        "AuthMiddleware", "checkAuth", "isAuthenticated"
+      ],
+      "critical_ops": [
+        "CreateUser", "DeleteUser", "UpdateConfig",
+        "ExportData", "ExecuteCommand", "BackupDB"
+      ]
+    },
+    "javascript": {
+      "express_auth_checks": [
+        "authMiddleware", "isAuthenticated", "ensureAuthenticated",
+        "requireAuth", "passport.authenticate", "verifyToken"
+      ],
+      "nestjs_auth_checks": [
+        "AuthGuard", "JwtAuthGuard", "@UseGuards",
+        "@Roles", "RolesGuard"
+      ],
+      "critical_ops": [
+        "createUser", "deleteUser", "updateConfig",
+        "exportData", "executeCommand", "sendEmail"
+      ]
+    },
+    "dotnet": {
+      "auth_checks": [
+        "[Authorize]", "[Authorize(Roles", "IsInRoleAsync",
+        "HttpContext.User", "ClaimsPrincipal",
+        "RequireAuthenticatedUser"
+      ],
+      "critical_ops": [
+        "CreateUser", "DeleteUser", "UpdateConfig",
+        "ExportData", "ExecuteCommand", "BackupDatabase"
+      ]
+    },
+    "ruby": {
+      "auth_checks": [
+        "before_action.*:authenticate", "before_action.*:require_login",
+        "devise.*authenticate", "warden.authenticate",
+        "authorize!", "require_admin"
+      ],
+      "critical_ops": [
+        "create_user", "delete_user", "update_config",
+        "export_data", "execute_command"
+      ]
+    },
+    "rust": {
+      "auth_checks": [
+        "#[authorize]", "AuthMiddleware", ".wrap(Auth)",
+        "is_authenticated", "require_auth"
+      ],
+      "critical_ops": [
+        "create_user", "delete_user", "update_config",
+        "export_data", "execute_command"
+      ]
+    },
+    "generic": {
+      "critical_ops": [
+        "create", "delete", "update", "remove", "reset",
+        "transfer", "withdraw", "admin", "config",
+        "export", "import", "execute", "deploy",
+        "backup", "restore", "shutdown"
+      ],
+      "auth_checks": [
+        "authenticate", "authorize", "isAuthenticated",
+        "is_authenticated", "hasPermission", "checkAuth"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表关键功能缺少认证的高风险反模式",
+    "unprotected_admin_endpoint": {
+      "description": "管理端点无任何认证保护",
+      "java": [
+        "@(Get|Post|Put|Delete)Mapping.*admin.*without.*@PreAuthorize",
+        "class.*AdminController.*without.*@PreAuthorize.*class",
+        "@RequestMapping.*admin.*without.*hasRole"
+      ],
+      "python": [
+        "@app\\.route.*admin.*without.*login_required",
+        "@router\\.(get|post).*admin.*without.*Depends",
+        "def.*admin.*without.*@login_required"
+      ],
+      "javascript": [
+        "app\\.(get|post).*admin.*without.*authMiddleware",
+        "router\\.(get|post).*admin.*without.*isAuthenticated"
+      ],
+      "go": [
+        "r\\.(GET|POST).*admin.*without.*AuthRequired",
+        "c\\.JSON.*admin.*without.*checkAuth"
+      ],
+      "generic": [
+        "admin.*endpoint.*without.*auth",
+        "management.*api.*without.*authentication"
+      ]
+    },
+    "class_level_boolean_auth": {
+      "description": "使用类级别布尔变量存储认证状态，多线程下不可靠",
+      "java": [
+        "boolean.*isAuthenticated.*=.*false",
+        "boolean.*isLoggedIn.*=.*false",
+        "private.*boolean.*authenticated"
+      ],
+      "generic": [
+        "class.*level.*boolean.*auth",
+        "global.*is_logged_in",
+        "static.*authenticated"
+      ]
+    },
+    "debug_endpoint_exposed": {
+      "description": "调试/测试/内部端点在生产环境暴露",
+      "java": [
+        "@RequestMapping.*debug",
+        "@GetMapping.*test",
+        "@PostMapping.*internal",
+        "actuator.*without.*security"
+      ],
+      "python": [
+        "@app\\.route.*debug",
+        "@app\\.route.*test",
+        "DEBUG.*=.*True.*production"
+      ],
+      "generic": [
+        "debug.*endpoint.*production",
+        "test.*api.*live",
+        "internal.*api.*public"
+      ]
+    },
+    "secondary_channel_bypass": {
+      "description": "通过替代通道（WebSocket/SSE/GraphQL/gRPC）绕过主认证",
+      "generic": [
+        "websocket.*without.*auth",
+        "graphql.*without.*authenticate",
+        "grpc.*without.*interceptor.*auth",
+        "sse.*without.*auth"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "global_auth_filter": {
+      "description": "是否存在全局认证过滤器覆盖所有端点",
+      "java": [
+        "anyRequest\\(\\)\\.authenticated\\(\\)",
+        "filterChainDefinitions.*\\*\\*.*authc",
+        "SecurityFilterChain.*global",
+        "@PreAuthorize.*class.*level"
+      ],
+      "python": [
+        "@app\\.before_request.*check_auth",
+        "middleware.*AuthenticationMiddleware",
+        "app\\.use.*auth.*middleware"
+      ],
+      "php": [
+        "middleware.*auth.*global",
+        "Route::group.*middleware.*auth"
+      ],
+      "go": [
+        "r\\.Use\\(AuthMiddleware\\)",
+        "router\\.Group.*\\.Use\\(AuthRequired\\)"
+      ],
+      "javascript": [
+        "app\\.use.*authMiddleware",
+        "router\\.use.*isAuthenticated",
+        "@UseGuards.*AuthGuard.*global"
+      ],
+      "dotnet": [
+        "\\[Authorize\\].*class.*level",
+        "RequireAuthenticatedUser",
+        "AddAuthorization.*DefaultPolicy"
+      ],
+      "ruby": [
+        "before_action.*:authenticate_user!.*class",
+        "ApplicationController.*authenticate"
+      ],
+      "rust": [
+        "\\.wrap\\(Auth\\).*global",
+        "AuthMiddleware.*all.*routes"
+      ]
+    },
+    "method_level_auth": {
+      "description": "方法级别是否有显式认证注解",
+      "java": [
+        "@PreAuthorize", "@Secured", "@RolesAllowed",
+        "RequiresAuthentication", "RequiresPermissions",
+        "RequiresRoles"
+      ],
+      "python": [
+        "@login_required", "@permission_required",
+        "Depends(get_current_user)", "Depends(oauth2_scheme)"
+      ],
+      "php": [
+        "middleware.*auth", "@can", "Gate::allows"
+      ],
+      "javascript": [
+        "authMiddleware", "isAuthenticated",
+        "@UseGuards(AuthGuard)", "passport.authenticate"
+      ],
+      "dotnet": [
+        "[Authorize]", "[Authorize(Roles"
+      ],
+      "ruby": [
+        "before_action.*:authenticate",
+        "authorize!"
+      ]
+    },
+    "security_config_coverage": {
+      "description": "安全配置是否覆盖了关键端点",
+      "java": [
+        "requestMatchers.*admin.*authenticated",
+        "antMatchers.*admin.*hasRole",
+        "filterChainDefinitions.*admin.*authc"
+      ],
+      "generic": [
+        "security.*config.*covers.*admin",
+        "auth.*policy.*covers.*critical",
+        "route.*guard.*covers.*sensitive"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【路由×安全配置交叉】枚举关键功能端点，对照 SecurityFilterChain/Shiro security_config/jaxrs 守卫：标记未受保护的关键 API。建立端点认证状态表。",
+    "Step 0b: 【组件扫描联动】若扫描命中 default_exposure/auth_bypass（如 Actuator、Shiro、Spring Security 规则项）：先验证配置是否触发已知未授权面，再分析业务方法。",
+    "Step 1: 【识别关键功能】当前函数是否涉及创建/删除敏感实体、PII/金融、系统级操作、资源密集型任务？对照 semantic_keywords 和 logic_query_keywords.critical_ops。",
+    "Step 2: 【检查显式认证守卫】关键操作前是否有身份验证？检查方法级注解（@PreAuthorize/@login_required/AuthGuard）和全局过滤器覆盖。对照 control_detection_patterns.method_level_auth 和 control_detection_patterns.global_auth_filter。",
+    "Step 3: 【评估认证状态可靠性】是否用类级布尔标志而非 Session/Token 实时状态？对照 anti_patterns.class_level_boolean_auth。",
+    "Step 4: 【检查二次通道】调试接口、内部 API、WebSocket、GraphQL、gRPC 是否绕过主认证？对照 anti_patterns.debug_endpoint_exposed 和 anti_patterns.secondary_channel_bypass。",
+    "Step 5: 【确认客户端校验依赖】仅前端认证、服务端未复验 → 视为缺失认证。",
+    "Step 6: 【检查认证豁免范围】permitAll/AllowAnonymous 白名单是否误覆盖了关键功能端点？",
+    "Step 7: 【八项确认标准】缺一不得 confirmed：(1)关键功能已识别 (2)全局过滤器覆盖 (3)方法级认证存在 (4)认证状态可靠 (5)无二次通道绕过 (6)非仅前端校验 (7)认证豁免未误覆盖 (8)组件无已知 auth_bypass"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "@RestController\npublic class AdminController {\n    @GetMapping(\"/admin/users\")\n    public List<User> getAllUsers() {\n        return userService.findAll();\n    }\n\n    @PostMapping(\"/admin/config\")\n    public void updateConfig(@RequestBody Config config) {\n        configService.update(config);\n    }\n}",
+        "vulnerability_analysis": "AdminController 的所有端点均无 @PreAuthorize/@Secured 注解。若全局 SecurityFilterChain 也未覆盖 /admin/** 路径，则这些管理端点完全无认证保护。攻击者可直接访问 /admin/users 获取所有用户数据，或 POST /admin/config 修改系统配置。",
+        "fix_pattern": "在类级别添加 @PreAuthorize(\"hasRole('ADMIN')\")，或确保 SecurityFilterChain 配置 .requestMatchers(\"/admin/**\").hasRole(\"ADMIN\")。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "public BankAccount createBankAccount(...) {\n    BankAccount account = new BankAccount();\n    ...\n    return account;\n}",
+        "vulnerability_analysis": "createBankAccount 是典型的关键功能（创建金融实体、处理 SSN），但方法体内无任何认证检查。攻击者可直接调用此公开方法创建任意银行账户。",
+        "fix_pattern": "if (!SecurityContextHolder.getContext().getAuthentication().isAuthenticated()) throw new AccessDeniedException();"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.get(\"/admin/users\")\nasync def get_users():\n    return await User.all()\n\n@app.delete(\"/api/records/{id}\")\nasync def delete_record(id: int):\n    await Record.filter(id=id).delete()",
+        "vulnerability_analysis": "FastAPI 端点无 Depends(get_current_user) 认证依赖注入。管理端点 /admin/users 和删除端点 /api/records/{id} 完全暴露。攻击者可无认证访问所有用户数据和删除任意记录。",
+        "fix_pattern": "async def get_users(current_user: User = Depends(get_current_user)): 和 async def delete_record(id: int, current_user: User = Depends(get_current_user)):"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.get('/admin/dashboard', (req, res) => {\n    res.json(getAdminData());\n});\n\napp.post('/api/system/restart', (req, res) => {\n    restartService();\n    res.json({status: 'restarting'});\n});",
+        "vulnerability_analysis": "管理仪表板和系统重启端点均无 authMiddleware。攻击者可直接 GET /admin/dashboard 获取管理数据，POST /api/system/restart 重启服务导致 DoS。",
+        "fix_pattern": "app.get('/admin/dashboard', authMiddleware, requireRole('admin'), ...); app.post('/api/system/restart', authMiddleware, requireRole('admin'), ...);"
+      },
+      {
+        "language": "go",
+        "code_snippet": "r.GET(\"/admin/stats\", func(c *gin.Context) {\n    c.JSON(200, getStats())\n})\n\nr.POST(\"/api/config/update\", func(c *gin.Context) {\n    updateConfig(c)\n})",
+        "vulnerability_analysis": "Gin 路由无 AuthRequired() 中间件。管理统计和配置更新端点完全暴露。Go 没有框架级认证保护，完全依赖开发者手动添加中间件。",
+        "fix_pattern": "adminGroup := r.Group(\"/admin\"); adminGroup.Use(AuthRequired()); adminGroup.GET(\"/stats\", getStats)"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "[ApiController]\npublic class AdminController : ControllerBase {\n    [HttpGet(\"admin/secrets\")]\n    public IActionResult GetSecrets() => Ok(secrets);\n\n    [HttpPost(\"admin/deploy\")]\n    public IActionResult Deploy([FromBody] DeployRequest req) {\n        // deploy logic\n        return Ok();\n    }\n}",
+        "vulnerability_analysis": "AdminController 无 [Authorize] 注解。在 ASP.NET Core 中，缺少 [Authorize] 意味着端点对匿名用户开放。攻击者可直接访问管理端点获取密钥或触发部署。",
+        "fix_pattern": "在类级别添加 [Authorize(Roles = \"Admin\")]，或在 Program.cs 中配置 RequireAuthenticatedUser() 作为默认策略。"
+      }
+    ],
+    "mitigation_rules": [
+      "所有关键功能必须在入口处执行服务端认证检查，不可依赖前端隐藏或客户端标记。",
+      "认证状态必须从可信源（Session/Token/DB）实时获取，禁止可变布尔标志。",
+      "对所有通信通道（HTTP/WebSocket/GraphQL/gRPC/SSE）实施统一认证。",
+      "基础设施层（S3/DB/Redis）须独立配置访问控制，不依赖应用层认证。",
+      "实施 Default Deny 策略：全局默认 authenticated，仅显式放行公开端点。",
+      "调试/测试/内部端点在部署时必须移除或通过 IP 白名单/VPN 限制访问。"
+    ],
+    "refutation_checklist": [
+      "端点是否在 SecurityFilterChain authenticated 保护下且不在 permitAll 白名单？",
+      "Shiro 是否对 /** 配置 authc 或等效过滤器？",
+      "JAX-RS 关键资源是否有 @RolesAllowed 或全局认证 Filter？",
+      "FastAPI 是否使用 Depends(get_current_user) 保护关键端点？",
+      "Express/NestJS 是否使用 authMiddleware/AuthGuard 保护关键路由？",
+      "Go/Gin 是否使用 AuthRequired() 中间件保护管理路由组？",
+      "ASP.NET Core 是否在类级别或全局配置 [Authorize]？",
+      "调试/测试/Actuator 端点是否在生产环境移除或限制访问？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "classify_function_criticality", "desc": "基于函数名、参数、返回值判断是否为关键功能（金融/管理/系统/数据导出等）。"},
+    {"name": "trace_auth_guard_presence", "desc": "检查函数入口及调用链上是否存在认证检查点。对照 control_detection_patterns.method_level_auth。"},
+    {"name": "check_route_protection", "desc": "交叉检查关键端点与安全配置覆盖范围。对照 control_detection_patterns.global_auth_filter 和 security_config_coverage。"},
+    {"name": "verify_auth_state_reliability", "desc": "分析认证状态变量的作用域与更新机制。对照 anti_patterns.class_level_boolean_auth。"},
+    {"name": "detect_secondary_channels", "desc": "查找绕过主认证的替代访问路径（WebSocket/GraphQL/gRPC/debug endpoint）。"},
+    {"name": "check_permit_all_scope", "desc": "检查 permitAll/AllowAnonymous 白名单是否误覆盖了关键功能端点。"},
+    {"name": "check_component_exposure", "desc": "关联组件扫描结果，检查已知暴露面（Actuator/Shiro/Spring Security 规则项）。"}
+  ],
+  "sanitizers": [
+    "函数被 @PreAuthorize/@Secured/@AuthenticationRequired/@RequiresAuthentication 保护",
+    "位于已配置全局认证中间件的路由组内（如 Spring Security filter chain / Shiro authc）",
+    "认证状态从 HttpSession/JWT Claims/OAuth2 Principal 实时获取",
+    "该功能经安全评审确认为公开匿名访问（如公开 API 文档、健康检查）",
+    "security_filter_chain 显示全局 authenticated 且路径不在 permitAll 白名单",
+    "调试/测试端点仅在开发环境可用，生产环境已移除或限制",
+    "所有通信通道（HTTP/WS/GraphQL/gRPC）均实施统一认证"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-306",
+    "critical_function_type": "array — 关键功能类型 (如 ['data_creation', 'sensitive_data_access', 'admin_operation', 'resource_intensive', 'infrastructure_exposure', 'debug_endpoint'])",
+    "missing_auth_location": "string (指出应在何处添加认证检查)",
+    "endpoint_auth_map": "array — 关键端点认证状态表 [{path, method, auth_status: required|permitAll|method_guard|unconfigured}]",
+    "auth_state_flaw": "string (若存在不可靠认证状态，描述具体问题)",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['unprotected_admin_endpoint.java', 'debug_endpoint_exposed.python'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['global_auth_filter', 'method_level_auth', 'security_config_coverage'])",
+    "secondary_channel_found": "boolean — 是否发现绕过认证的替代通道",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "CRITICAL",
+    "remediation": "string"
+  }
+}

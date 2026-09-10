@@ -1,0 +1,100 @@
+{
+  "skill_id": "expert_cpp_buffer_overflow",
+  "name": "C/C++ 缓冲区溢出专家分析",
+  "summary": "定向扫描 buffer_overflow → 读取 sink 上下文 → 长度校验检查 → 反证验证 → 收口",
+  "trigger_keywords": [
+    "buffer_overflow", "缓冲区溢出", "memcpy", "strcpy", "sprintf",
+    "memcpy 溢出", "栈溢出", "堆溢出", "CWE-120", "CWE-134"
+  ],
+  "completion_hints": [
+    "必须确认 sink 函数的长度参数是否来自用户输入且未经上限校验",
+    "必须排除 sizeof/常量限定、snprintf 替代、上层 bounds check 等误报",
+    "报告中须标注长度参数的可控性：完全可控/条件可控/不可控"
+  ],
+  "min_score_to_activate": 0.2,
+  "start_node_id": "set_context",
+  "nodes": [
+    {
+      "node_id": "set_context",
+      "tool_name": "set_context",
+      "arguments": {},
+      "success_next": "targeted_scan",
+      "expert_guidance": {
+        "analysis_focus": "准备 C/C++ 缓冲区溢出分析上下文",
+        "expert_rules": ["缓冲区溢出的核心问题是：目标缓冲区大小固定，但写入长度未校验"]
+      }
+    },
+    {
+      "node_id": "targeted_scan",
+      "tool_name": "JoernTool.run_targeted_scan",
+      "arguments": {
+        "vuln_types": ["cpp_buffer_overflow", "cpp_can_or_buffer_parsing", "cpp_dangerous_func"]
+      },
+      "success_next": "read_sink_code",
+      "failure_next": "read_sink_code",
+      "expert_guidance": {
+        "analysis_focus": "仅扫描缓冲区溢出相关查询，避免全量扫描噪音",
+        "expert_rules": [
+          "重点关注 memcpy/memmove/strcpy/strcat/sprintf 等无界拷贝函数",
+          "注意 cpp_can_or_buffer_parsing 针对协议解析场景的 memcpy"
+        ]
+      }
+    },
+    {
+      "node_id": "read_sink_code",
+      "tool_name": "FileTool.glob_files",
+      "arguments": {"pattern": "**/*.c", "limit": 30},
+      "success_next": "check_length_validation",
+      "failure_next": "check_length_validation",
+      "expert_guidance": {
+        "analysis_focus": "定位 sink 函数所在源文件，准备精读",
+        "required_evidence": ["sink 函数完整方法体（±80行）", "目标缓冲区的声明与大小"],
+        "expert_rules": [
+          "用 FileTool.read_file 读取 sink 方法所在文件，start_line/end_line 覆盖 sink 行 ±80",
+          "同时关注目标缓冲区的声明（栈数组 vs 堆分配 vs 结构体成员）"
+        ]
+      }
+    },
+    {
+      "node_id": "check_length_validation",
+      "parallel_actions": [
+        {"tool_name": "FileTool.glob_files", "arguments": {"pattern": "**/*.h", "limit": 20}},
+        {"tool_name": "FileTool.glob_files", "arguments": {"pattern": "**/CMakeLists.txt", "limit": 5}}
+      ],
+      "success_next": "verify",
+      "failure_next": "verify",
+      "expert_guidance": {
+        "analysis_focus": "检查长度参数是否有校验逻辑",
+        "required_evidence": ["长度参数的来源链（是否来自用户输入）", "是否存在 if(len > max) 类校验"],
+        "refutation_checklist": [
+          "长度是否由 sizeof 限定（如 snprintf(buf, sizeof(buf), ...)）",
+          "是否有 if(len > MAX_SIZE) return ERROR 类守卫",
+          "是否使用 snprintf 替代 sprintf",
+          "上层调用方是否做了 bounds check",
+          "目标缓冲区是否动态分配且大小等于拷贝长度"
+        ],
+        "false_positive_patterns": [
+          "长度由 sizeof(buf) 或常量限定",
+          "调用方已做 if(len > max) return 守卫",
+          "使用 snprintf 且 size 参数正确",
+          "目标缓冲区大小 >= 源数据最大长度（编译期可确定）",
+          "memcpy 长度参数是编译期常量"
+        ]
+      }
+    },
+    {
+      "node_id": "verify",
+      "tool_name": "FileTool.write_report",
+      "arguments": {"subdir": "source_scan"},
+      "completion_signal": "expert_analysis_done",
+      "expert_guidance": {
+        "analysis_focus": "综合判定缓冲区溢出是否成立",
+        "expert_rules": [
+          "判定为真实漏洞必须满足：(1) sink 存在 (2) 长度参数可控 (3) 无有效校验",
+          "若长度参数部分可控（如经运算但未溢出检查），标注为「条件可控」",
+          "报告中必须引用具体的 sink 代码行和长度来源链"
+        ]
+      }
+    }
+  ]
+}

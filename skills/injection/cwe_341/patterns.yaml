@@ -1,0 +1,48 @@
+# CWE-341 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(Cipher|MessageDigest|SecretKey|KeyGenerator|Jwts|JWT|jwt|signingKey|encrypt|decrypt|hash)/i]'
+  - 'Literal[value=~/(MD5|SHA1|DES|RC4|ECB|victory|business|password|secret|changeme)/i]'
+
+semantic_keywords:
+  - encrypt
+  - decrypt
+  - hash
+  - sign
+  - verify
+  - JWT
+  - token
+  - secret key
+  - signing
+  - cipher
+  - digest
+  - MAC
+
+file_context:
+  - crypto
+  - security
+  - auth
+  - token
+  - jwt
+
+logic_query_keywords_generic:
+  weak_algos:
+    - md5
+    - sha1
+    - des
+    - rc4
+  weak_practices:
+    - random.random()
+    - Math.random()
+    - rand()
+  hardcoded_keys:
+    - secret
+    - key
+    - password
+    - token
+
+sanitizers:
+  - '使用 SecureRandom 生成密钥且密钥长度 >= 256 bit'
+  - 使用 AES-GCM 或 ChaCha20-Poly1305 等 AEAD 模式
+  - JWT 使用 RS256/ES256 非对称签名
+  - 密钥从环境变量/Vault/KMS 动态加载，无硬编码

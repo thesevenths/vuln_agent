@@ -1,0 +1,82 @@
+# CWE-863 检测模式
+
+ast_patterns:
+  - 'IfStmt[condition.type~=/==|!=|in/i]'
+  - 'VariableAccess[name=~/(role|permission|auth|token|user_type|isAdmin|is_admin|access_level|privilege)/i]'
+  - CookieRead / HeaderRead / ParamRead
+  - 'FunctionDef[name=~/(checkPermission|checkAuth|checkRole|hasAccess|isAuthorized|canAccess|authorize|validateAccess)/i]'
+  - 'Annotation[name=~/(PreAuthorize|Secured|RolesAllowed|RequiresPermissions|Authorize)/i]'
+  - 'Comparison[operand~=/role|permission|admin|user_type|access_level/i]'
+
+semantic_keywords:
+  - client-side check
+  - cookie role
+  - parameter-based auth
+  - hardcoded permission
+  - trust boundary violation
+  - role check
+  - admin check
+  - permission check
+  - access level
+  - vertical privilege
+  - privilege escalation
+  - role escalation
+  - incomplete check
+  - logic bypass
+  - auth bypass
+
+file_context:
+  - controller
+  - middleware
+  - view_handler
+  - auth_filter
+  - permission_service
+  - authorization_handler
+  - access_control
+  - role_checker
+  - guard
+  - policy
+
+sensitive_operations:
+  - admin_operation
+  - data_access
+  - config_change
+  - user_management
+  - role_change
+  - delete_operation
+  - export_data
+  - system_config
+  - manage_permissions
+
+logic_query_keywords_generic:
+  authz_variables:
+    - role
+    - permission
+    - auth
+    - token
+    - user_type
+    - is_admin
+    - access_level
+  untrusted_sources:
+    - cookie
+    - header
+    - parameter
+    - query
+    - body
+    - form
+  authz_checks:
+    - check_auth
+    - has_role
+    - is_admin
+    - authorize
+    - permission
+
+sanitizers:
+  - 授权变量严格从服务端 Session/安全 Token 中解析，且 Session ID 不可预测
+  - '使用了 @PreAuthorize/@Secured 等框架注解，且表达式引用了服务端上下文对象'
+  - 存在多层校验：既有角色校验，又有资源所有权校验（防水平越权）
+  - 客户端提交的权限标识仅作为 UI 提示，服务端仍独立重新验证
+  - 授权检查覆盖了所有到达敏感操作的路径，无绕过路径
+  - 使用了成熟的授权框架（Spring Security / CASL / CanCanCan / Pundit / django-guardian）
+  - 多租户场景下同时校验了租户隔离
+  - 异常处理路径也执行了授权检查（fail-closed）

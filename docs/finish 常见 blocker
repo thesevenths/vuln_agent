@@ -1,0 +1,22 @@
+flowchart LR
+    FIN[finish 请求]
+
+    FIN --> A["污点: ambiguous_flows > 0"]
+    FIN --> B["污点: pending_l2_reads 未读"]
+    FIN --> C["logic_query_failures 非空"]
+    FIN --> D["logic_inconclusive + L2 未读"]
+    FIN --> E["报告策略: confirmed 无 PoC 等"]
+    FIN --> F["logic L2 closure 未重跑 logic_scan"]
+
+    A --> FA["强制 FileTool 或增量 run_source_scan<br/>logic_only 时改 run_logic_scan"]
+    B --> FB["强制 FileTool.read_file<br/>须经 project_file_index 解析"]
+    C --> FC["增量 run_logic_scan<br/>incremental_query_names<br/>+ cached_query_results<br/>+ cached_findings"]
+    D --> FD["读 SecurityConfig → expand / 重跑 logic_scan"]
+    F --> FD
+
+    subgraph fc_detail [FC 增量 LLM 预期]
+        FC1["只重跑 affected_types 对应候选 LLM"]
+        FC2["其余 ckey 已在 cpg_logic_llm.json → 直接复用"]
+    end
+
+    FC -.-> fc_detail

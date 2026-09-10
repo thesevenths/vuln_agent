@@ -1,0 +1,97 @@
+{
+  "skill_id": "cwe_918_ssrf_logic_context",
+  "source_cwe": ["CWE-918"],
+  "related_cwes": ["CWE-441", "CWE-610", "CWE-20", "CWE-200"],
+  "priority": "P0",
+  "role": "server_side_request_abuse_specialist",
+  "differentiation_from_sast": [
+    "污点 SAST 常见结论：「用户参数到达了 RestTemplate.getForObject」—— 但无法判断 URL 是否经业务层 allowlist、是否仅内网回调、是否 metadata 服务场景。",
+    "本模板要求分析【业务语义】：webhook、头像抓取、PDF 导入、OAuth redirect、支付回调 URL 验证等场景的 SSRF 风险。",
+    "须结合 L2（application.yml 代理、Security 网络策略）判断内网/metadata (169.254.169.254) 是否可达，而非仅报告 sink 命中。"
+  ],
+  "trigger_condition": {
+    "ast_patterns": [
+      "HTTPHandler[method=~/(GET|POST)/i][calls_outbound_http=true]",
+      "Call[name=~/(RestTemplate|WebClient|HttpClient|URLConnection|openStream|URI\\.create|new URL)/i]",
+      "Param[name=~/(url|uri|link|callback|webhook|redirect|imageUrl|fetch)/i]"
+    ],
+    "semantic_keywords": [
+      "webhook", "callback", "fetch url", "import from url", "avatar", "preview",
+      "redirect_uri", "open redirect", "metadata", "169.254", "localhost", "127.0.0.1",
+      "internal", "allowlist", "blocklist", "dns rebinding", "file://", "gopher"
+    ],
+    "file_context": ["controller", "integration", "webhook", "import", "preview", "oauth"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "outbound_clients": ["RestTemplate", "WebClient", "HttpClient", "HttpURLConnection", "URLConnection", "openStream", "getForObject", "postForObject", "exchange", "URI.create", "new URL"],
+      "url_sources": ["url", "uri", "link", "callback", "webhook", "redirect", "imageUrl", "target", "endpoint", "fetch"],
+      "defense_patterns": ["allowlist", "whitelist", "blocklist", "deny", "isValidUrl", "validateUrl", "resolveSafe", "InetAddress", "getByName", "NoRedirectStrategy", "setFollowRedirects(false)"],
+      "dangerous_schemes": ["file:", "gopher:", "dict:", "ftp:", "http://169.254", "http://127.", "http://localhost", "http://[::1]"]
+    },
+    "flask": {
+      "outbound_clients": ["requests.get", "requests.post", "urllib.request", "httpx", "aiohttp"],
+      "url_sources": ["url", "uri", "link", "callback", "webhook"],
+      "defense_patterns": ["allowlist", "urlparse", "validate_url", "block_private"]
+    },
+    "express": {
+      "outbound_clients": ["axios", "fetch", "http.get", "request(", "got("],
+      "url_sources": ["url", "uri", "callback", "webhook", "redirect"],
+      "defense_patterns": ["allowlist", "validateUrl", "ssrf", "isPrivateIp"]
+    },
+    "generic": {
+      "outbound_clients": ["http", "fetch", "request", "curl", "open_stream"],
+      "defense_patterns": ["allowlist", "block_private", "no_redirect", "dns_pinning"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【业务入口】该出站 HTTP 的业务用途是什么？(用户头像、Webhook 测试、导入 PDF、SSO 回调验证、短链展开)",
+    "Step 2: 【URL 可控性】完整 URL 或 host/path 是否来自用户输入？是否存在仅校验格式但未限制目标网段的逻辑？",
+    "Step 3: 【防护层评估】是否有 allowlist、内网 IP 段阻断、禁止 file/gopher、禁用重定向、DNS 解析后二次校验？防护在代码还是仅配置？",
+    "Step 4: 【高价值目标】云 metadata (169.254.169.254)、内网 Redis/ES、管理面板、loopback 服务是否可被请求？结合 L2 判断网络隔离是否额外阻断。",
+    "Step 5: 【与污点 SAST 区分】仅有 parameter→RestTemplate 流不足以 confirmed；须证明业务上攻击者可指定内网/metadata URL 且防护缺失。",
+    "Step 6: confirmed 时 PoC 须含完整恶意 URL、预期泄露（metadata token、内网服务响应片段），并说明绕过任何弱校验的手法。"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "@PostMapping(\"/fetch\") String preview(@RequestParam String url) { return restTemplate.getForObject(url, String.class); }",
+        "vulnerability_analysis": "服务端代用户请求任意 URL，可访问 http://169.254.169.254/latest/meta-data/ 窃取云凭证。污点流与业务 SSRF 均成立，但修复须业务 allowlist 而非仅过滤 SQL。",
+        "fix_pattern": "URI u = validator.resolveAndValidatePublicHttp(url); // 解析后检查 IP 非 RFC1918/link-local；禁止重定向到内网。"
+      },
+      {
+        "code_snippet": "webhookService.testCallback(userSuppliedCallbackUrl); // 仅校验 startsWith(\"http\")",
+        "vulnerability_analysis": "Webhook 测试功能允许攻击者让服务器扫描内网端口。属于集成类业务 SSRF，需域名/IP 双重校验。",
+        "fix_pattern": "仅允许注册时预登记的 callback 域名；测试接口禁止任意 URL。"
+      }
+    ],
+    "mitigation_rules": [
+      "出站请求使用固定 allowlist 域名或路径模板，禁止任意 URL 模式",
+      "解析 URL 后做 DNS 解析，校验 IP 非私有/链路本地/元数据地址，并考虑 DNS rebinding 窗口",
+      "禁用自动跟随重定向或对重定向目标重复校验",
+      "metadata/内网访问场景须在 L2 确认无额外网络 ACL；报告标明 L2 缺口"
+    ]
+  },
+  "tool_calls": [
+    {"name": "trace_url_construction", "desc": "追踪出站 URL 各组成部分(host/path/scheme)的数据来源"},
+    {"name": "find_url_validation_logic", "desc": "定位 allowlist、私有 IP 过滤、scheme 限制的实现位置"},
+    {"name": "check_redirect_handling", "desc": "检查 HttpClient/RestTemplate 是否跟随重定向及重定向目标是否复验"}
+  ],
+  "sanitizers": [
+    "URL 仅允许匹配预定义 allowlist 的 host（非黑名单 alone）",
+    "请求前 DNS 解析并拒绝 RFC1918、127.0.0.0/8、169.254.0.0/16、::1 等地址",
+    "禁止 file://、gopher:// 等危险 scheme；禁用或严格校验重定向",
+    "该功能仅运维内网可调用且经网络 ACL 隔离（需 L2 证据，且仍建议代码层校验）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-918",
+    "business_scenario": "string (webhook/avatar/import/oauth等)",
+    "url_control_point": "string (用户可控的 URL 部分)",
+    "bypassed_defense": "string (缺失或薄弱的防护)",
+    "ssrf_poc": "string (含目标 URL 与预期泄露，必填若 confirmed)",
+    "l2_network_note": "string (配置/ACL 是否额外阻断)",
+    "remediation": "string"
+  }
+}

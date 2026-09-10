@@ -1,0 +1,83 @@
+# injection/ — 注入类 Skill（SAST 重叠区）
+# CWE 映射表 + Joern 主查询 + 伴随 CWE
+
+category: injection
+description: 注入类漏洞：SQL/XSS/命令注入/反序列化/XXE/路径穿越等
+
+skills:
+  - cwe: "89"
+    name: SQL Injection
+    path: cwe_89/
+    priority: P2
+    primary_queries: [sqli_risk]
+    companions: []
+
+  - cwe: "79"
+    name: Cross-Site Scripting (XSS)
+    path: cwe_79/
+    priority: P2
+    primary_queries: [xss_output_risk]
+    companions: []
+
+  - cwe: "78"
+    name: OS Command Injection
+    path: cwe_78/
+    priority: P2
+    primary_queries: [cmd_exec_risk]
+    companions: []
+
+  - cwe: "611"
+    name: XML External Entity (XXE)
+    path: cwe_611/
+    priority: P2
+    primary_queries: [xxe_risk]
+    companions: []
+
+  - cwe: "502"
+    name: Deserialization of Untrusted Data
+    path: cwe_502/
+    priority: P2
+    primary_queries: [deserialization_risk]
+    companions: []
+
+  - cwe: "22"
+    name: Path Traversal
+    path: cwe_22/
+    priority: P2
+    primary_queries: [file_ops_risk]
+    companions: []
+
+  - cwe: "918"
+    name: Server-Side Request Forgery (SSRF)
+    path: cwe_918/
+    priority: P2
+    primary_queries: [ssrf_risk]
+    companions: []
+
+  - cwe: "200"
+    name: Information Exposure
+    path: cwe_200/
+    priority: P2
+    primary_queries: [info_leak_candidates, info_leak_response, mass_data_exposure]
+    companions: []
+
+  - cwe: "798"
+    name: Hardcoded Credentials
+    path: cwe_798/
+    priority: P2
+    primary_queries: [hardcoded_credentials_v2]
+    companions: ["287"]
+
+  - cwe: "341"
+    name: Weak JWT / Crypto Key
+    path: cwe_341/
+    priority: P2
+    primary_queries: [jwt_weakness, jwt_endpoints]
+    companions: []
+
+  - cwe: "330"
+    name: Insufficiently Random Values
+    path: cwe_330/
+    priority: P2
+    primary_queries: [jwt_weakness]
+    companions: []

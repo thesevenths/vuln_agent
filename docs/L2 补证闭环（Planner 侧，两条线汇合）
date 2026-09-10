@@ -1,0 +1,45 @@
+flowchart TB
+    subgraph taint [污点线产物]
+        T1[pending_l2_reads 来自反证 LLM]
+        T2[ambiguous_flows]
+        T3[flow_findings_index inconclusive]
+    end
+
+    subgraph logic [逻辑线产物]
+        L1[logic_inconclusive]
+        L2F[logic_query_failures]
+    end
+
+    T1 --> FT[FileTool.read_file / glob_files]
+    L1 --> FT
+    FT --> IDX["resolve_l2_path<br/>_live_file_index 完整相对路径集"]
+    IDX --> CTX["planner_l2_context<br/>注入下次 scan / expand"]
+
+    CTX --> RS["重跑 run_source_scan<br/>review_mode 或 re_refute_only"]
+    CTX --> EX["expand_flow_context<br/>污点 flow 或 logic flow_id"]
+    CTX --> RL["重跑 run_logic_scan<br/>cached_query_results + cached_findings 合并"]
+
+    subgraph expand_paths [expand_flow_context 两条路径]
+        EX_T["污点: flow_text 来自 Joern flow"]
+        EX_L["_build_logic_flow_context<br/>method_source + caller + expansion_preview"]
+        EX_T --> EX_J["_run_llm_context_expansion_loop"]
+        EX_L --> EX_J
+    end
+
+    EX --> EX_T & EX_L
+
+    RS --> REFUTE["_run_refutation_check<br/>仅污点单 flow 重反证"]
+    RL --> LOGIC_ANA["_analyze_logic_candidate 重判<br/>无独立反证 LLM"]
+
+    L2F --> RL
+
+    subgraph incr_llm [增量 run_logic_scan 的 LLM 策略]
+        direction LR
+        I1["Joern: 只补 incremental_query_names"]
+        I2["LLM 受影响 type: 强制重跑"]
+        I3["LLM 非受影响 type: ckey 在 cpg_logic_llm.json 即复用<br/>不因 Planner L2 导致 fingerprint 漂移而重跑"]
+    end
+
+    RL -.-> incr_llm
+
+    REFUTE -.->|不经过| LOGIC_ANA

@@ -1,0 +1,67 @@
+# 资源归属校验方法论（IDOR 检测核心）
+# 通过资源标识符访问数据的端点必须验证所有权绑定
+
+ownership_verification:
+  philosophy: >
+    IDOR（Insecure Direct Object Reference）的核心缺陷是：
+    系统使用用户可控的资源 ID 查询数据，但未验证请求者是否拥有该资源。
+    检测关键在于找到"资源标识符来源"与"所有权绑定逻辑"之间的断裂。
+
+  detection_workflow:
+    step_0_identify_resource_access:
+      description: "识别针对用户/实体资源的读写操作"
+      examples: ["查询发票", "读取档案", "修改订单", "下载文件"]
+      joern_query: "idor_candidates — 匹配 findById/getById/deleteById 等 + ID 参数"
+
+    step_1_trace_id_origin:
+      description: "追溯资源标识符来源"
+      sources:
+        high_risk: ["URL param (@PathVariable)", "body field (@RequestBody)", "cookie", "header"]
+        lower_risk: ["Session 属性", "Token 解析", "DB 查询结果"]
+
+    step_2_check_ownership_binding:
+      description: "检查是否存在所有权绑定逻辑"
+      safe_pattern: "WHERE id = @id AND owner_id = @current_user_id"
+      vulnerable_pattern: "WHERE id = @id（仅依赖外部传入的 id）"
+      joern_patterns:
+        java:
+          safe: ["Where.*UserId.*==.*currentUserId", "Where.*OwnerId.*==.*userId"]
+          unsafe: ["findById(id) 无后续 owner 过滤"]
+        python:
+          safe: ["current_user.*\\.find", "where(user_id: current_user.id)"]
+        generic:
+          ownership_fields: ["user_id", "owner_id", "tenant_id", "account_id", "author_id", "created_by"]
+
+    step_3_evaluate_frontend_restriction:
+      description: "前端限制 ≠ 安全控制"
+      note: "即使前端有下拉框/列表限制，服务端必须独立验证资源归属"
+
+    step_4_evaluate_id_predictability:
+      description: "评估资源 ID 可预测性"
+      risky: "自增整数（auto_increment）— 攻击者可枚举"
+      safer: "不可猜测的 UUID — 但仍需服务端验证签发合法性"
+
+  anti_patterns:
+    description: "以下模式匹配到时应立即报警 — 代表 IDOR 高风险反模式"
+    direct_id_query:
+      description: "资源 ID 直接从请求参数传入数据库查询，无所有权过滤"
+    predictable_ids:
+      description: "资源 ID 为连续可预测整数"
+    front_end_only_restriction:
+      description: "仅依赖前端 UI 限制，服务端无独立校验"
+
+  control_detection_patterns:
+    ownership_binding_in_query:
+      description: "数据库查询中同时包含资源 ID 和当前用户身份条件"
+    framework_data_isolation:
+      description: "使用框架级数据隔离（如 Hibernate @Filter, EF Core Global Query Filter）"
+    unguessable_ids:
+      description: "使用 UUID/GUID/nanoid 等不可猜测标识符"
+
+  applicable_cwes:
+    - cwe: CWE-639
+      scope: "IDOR — 核心检测目标"
+    - cwe: CWE-862
+      scope: "Missing Authorization — IDOR 与完全缺少授权检查常共现"
+    - cwe: CWE-200
+      scope: "Information Exposure — IDOR 直接导致敏感信息泄露"

@@ -1,0 +1,13 @@
+# CWE-610 Skill 元数据
+# 从 templates/cwe/cwe_610.json 迁移
+
+skill_id: cwe_610_externally_controlled_reference
+source_cwe: CWE-610
+priority: P0
+
+related_cwes:
+  - CWE-472
+  - CWE-345
+  - CWE-863
+  - CWE-602
+  - CWE-190

@@ -1,0 +1,11 @@
+# CWE-352 Skill 元数据
+# 从 templates/cwe/cwe_352.json 迁移
+
+skill_id: cwe_352_csrf
+source_cwe: CWE-352
+priority: P1
+
+related_cwes:
+  - CWE-306
+  - CWE-862
+  - CWE-841

@@ -1,0 +1,75 @@
+# CWE-862 检测模式
+
+ast_patterns:
+  - 'FunctionDef[access_modifier=public]'
+  - 'RouteHandler[method=~/(GET|POST|PUT|DELETE)/i]'
+  - 'DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i]'
+  - 'Annotation[name=~/(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping)/i]'
+  - 'Call[name=~/(findById|getById|findOne|findAll|deleteById|updateById|execute|query|save|remove)/i]'
+
+semantic_keywords:
+  - sensitive
+  - private
+  - admin
+  - employee
+  - record
+  - user_data
+  - message
+  - config
+  - secret
+  - order
+  - invoice
+  - payment
+  - profile
+  - document
+  - tenant
+  - organization
+  - department
+
+file_context:
+  - controller
+  - api_handler
+  - service_layer
+  - repository
+  - data_access
+  - resource_handler
+
+sensitive_operations:
+  - read_user_data
+  - modify_record
+  - delete_entity
+  - access_config
+  - execute_command
+  - transfer_resource
+  - export_data
+  - import_data
+  - view_private_content
+
+logic_query_keywords_generic:
+  auth_checks:
+    - authenticate
+    - authorize
+    - isAuthenticated
+    - is_authenticated
+    - hasPermission
+    - checkAuth
+  sensitive_ops:
+    - create
+    - read
+    - update
+    - delete
+    - execute
+    - query
+    - save
+    - remove
+    - transfer
+
+sanitizers:
+  - 存在明确的资源所有权校验（如 record.user_id == session.user_id）
+  - '使用了经过审计的授权框架注解（如 @PreAuthorize, @Secured）且参数正确绑定'
+  - 该接口/资源在安全设计文档中明确定义为公开（public）且经评审确认
+  - 敏感操作前有二次确认机制（如支付密码、MFA）且覆盖了所有路径
+  - SecurityFilterChain 显示全局 authenticated 且该路径不在 permitAll 白名单
+  - RBAC/ABAC 框架覆盖了该端点的所有敏感操作
+  - 多租户场景下查询同时包含租户 ID 过滤
+  - 批量导出/列表接口也实施了授权过滤

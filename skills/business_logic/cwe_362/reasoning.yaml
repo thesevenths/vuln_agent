@@ -1,0 +1,107 @@
+# CWE-362 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别共享资源与并发入口】定位涉及资金、库存、积分、限量凭证扣减的端点，或涉及文件系统检查与操作的函数。'
+  - 'Step 1: 【分析状态读取与修改（Check-then-Act）】检查是否存在「先读取状态（如余额是否充足/文件是否存在），再进行修改或操作」的逻辑序列。'
+  - 'Step 2: 【评估同步机制（代码层）】验证在 Check 和 Act 之间，是否使用了适当的并发控制原语（如 synchronized、ReentrantLock、Atomic 类、分布式锁）。'
+  - 'Step 3: 【评估同步机制（数据层）】若依赖数据库，检查是否使用了事务（@Transactional）、悲观锁（FOR UPDATE）或原子更新语句（UPDATE ... SET stock = stock - 1 WHERE stock > 0），排除在应用层计算后直接 save() 的覆盖更新。'
+  - 'Step 4: 【识别 TOCTOU 漏洞】针对文件操作，检查 os.access() 或 File.exists() 与后续的 open() 之间是否存在时间窗口，是否可能被符号链接（Symlink）攻击利用。'
+  - 'Step 5: 【评估分布式环境风险】在微服务或多实例部署下，检查本地锁（如 JVM 锁）是否失效，是否缺乏 Redis/Zookeeper 等分布式锁保护。'
+  - 'Step 6: 【评估幂等性保护】检查关键操作（如支付扣款、优惠券领取、投票）是否设计了幂等性机制（如唯一约束、防重 Token、Idempotency Key），防止并发重复提交。'
+  - 'Step 7: 【检查乐观锁有效性】若使用了乐观锁（如 @Version），确认版本号检查与更新是否在同一原子操作内完成，且冲突时有正确的重试或拒绝策略。'
+  - 'Step 8: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public void deductStock(Long itemId, int qty) {
+    Item item = itemRepo.findById(itemId);
+    if (item.getStock() >= qty) {
+        item.setStock(item.getStock() - qty);
+        itemRepo.save(item);
+    }
+}'
+      vulnerability_analysis: '存在典型的竞态条件（库存超卖）。在并发请求下，多个线程可能同时读取到相同的 `item.getStock()`，通过检查后各自计算新库存并 `save()`，导致后写入的覆盖先写入的，最终库存扣减数量少于实际售出数量。'
+      fix_pattern: '使用数据库原子更新：`@Modifying @Query(''UPDATE Item i SET i.stock = i.stock - :qty WHERE i.id = :id AND i.stock >= :qty'')`；或使用悲观锁 `@Lock(LockModeType.PESSIMISTIC_WRITE)`。'
+    - code_snippet: 'if (os.access(filepath, os.W_OK)):
+    with open(filepath, ''w'') as f:
+        f.write(data)'
+      vulnerability_analysis: '存在 TOCTOU（Time-of-Check to Time-of-Use）漏洞。在 `os.access` 检查权限和 `open` 打开文件之间存在时间窗口。攻击者可利用符号链接（Symlink）替换该文件，诱使高权限进程覆盖系统敏感文件。'
+      fix_pattern: '遵循 EAFP 原则（Easier to Ask for Forgiveness than Permission），直接尝试以安全模式打开文件并捕获异常；或使用底层原子标志 `os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL)`。'
+    - code_snippet: '@Transactional
+public void transfer(Long fromId, Long toId, BigDecimal amount) {
+    Account from = accountRepo.findById(fromId);
+    Account to = accountRepo.findById(toId);
+    if (from.getBalance().compareTo(amount) >= 0) {
+        from.setBalance(from.getBalance().subtract(amount));
+        to.setBalance(to.getBalance().add(amount));
+        accountRepo.save(from);
+        accountRepo.save(to);
+    }
+}'
+      vulnerability_analysis: '虽然有 @Transactional 注解，但余额检查和扣减在应用层完成。在 READ_COMMITTED 隔离级别下，两个并发转账请求可能同时读到相同余额并通过检查，导致余额透支（双花问题）。@Transactional 仅提供事务边界，不自动解决并发读-改-写冲突。'
+      fix_pattern: '使用悲观锁：`@Lock(PESSIMISTIC_WRITE) Account findById(Long id)` 或 `SELECT ... FOR UPDATE`；或使用原子更新：`UPDATE account SET balance = balance - ? WHERE id = ? AND balance >= ?`。'
+    - code_snippet: 'func (s *OrderService) PlaceOrder(ctx context.Context, itemID string, qty int) error {
+    item, _ := s.db.GetItem(ctx, itemID)
+    if item.Stock >= qty {
+        item.Stock -= qty
+        s.db.SaveItem(ctx, item)
+        s.db.CreateOrder(ctx, &Order{ItemID: itemID, Qty: qty})
+    }
+    return nil
+}'
+      vulnerability_analysis: Go 服务中的库存竞态条件。在高并发场景下，多个 goroutine 同时读取 item.Stock 并通过检查，各自计算新库存后 SaveItem 覆盖写入，导致超卖。本地无锁且未使用数据库原子操作。
+      fix_pattern: '使用数据库原子更新：`UPDATE items SET stock = stock - $1 WHERE id = $2 AND stock >= $1`；或使用行级锁 `SELECT stock FROM items WHERE id = $1 FOR UPDATE` 在事务内完成。'
+    - code_snippet: 'app.post(''/api/coupon/claim'', async (req, res) => {
+    const coupon = await Coupon.findOne({ code: req.body.code });
+    if (coupon && coupon.remaining > 0 && !coupon.claimedBy.includes(req.user.id)) {
+        coupon.remaining -= 1;
+        coupon.claimedBy.push(req.user.id);
+        await coupon.save();
+        res.json({ success: true });
+    }
+});'
+      vulnerability_analysis: '优惠券领取接口存在竞态条件。并发请求可能同时读取到 coupon.remaining > 0 并通过检查，各自减 1 后 save()，导致优惠券被超额领取。claimedBy 数组检查同样可被竞态绕过。'
+      fix_pattern: '使用 MongoDB 原子操作：`Coupon.findOneAndUpdate({ code, remaining: { $gt: 0 }, claimedBy: { $ne: userId } }, { $inc: { remaining: -1 }, $push: { claimedBy: userId } })`；或使用 Redis 分布式锁。'
+    - code_snippet: '[HttpPost("withdraw")]
+public async Task<IActionResult> Withdraw(decimal amount)
+{
+    var account = await _context.Accounts.FindAsync(userId);
+    if (account.Balance >= amount)
+    {
+        account.Balance -= amount;
+        await _context.SaveChangesAsync();
+    }
+    return Ok();
+}'
+      vulnerability_analysis: .NET 中的余额竞态条件。在高并发下，多个请求可能同时通过 FindAsync 读取到相同余额，通过检查后各自减去金额并 SaveChanges，导致余额透支。EF Core 的 ChangeTracker 不会自动检测并发冲突（除非配置了乐观锁）。
+      fix_pattern: '使用乐观锁：在 Account 实体上添加 [Timestamp] 属性，EF Core 会自动在 UPDATE 时加入 WHERE 版本号检查；或使用原子 SQL：`UPDATE Accounts SET Balance = Balance - @amount WHERE Id = @id AND Balance >= @amount`。'
+  mitigation_rules:
+    - 使用数据库层面的原子操作或悲观锁/乐观锁处理并发状态变更，严禁在应用层读取、计算后再全量覆盖更新。
+    - 代码层使用线程安全的原子变量或互斥锁保护临界区。
+    - '分布式/多实例环境下必须使用分布式锁（如 Redisson, Zookeeper），本地锁无法跨进程生效。'
+    - 文件操作避免 Check-then-Act，直接尝试操作并捕获异常（EAFP 原则），或使用安全的临时文件创建 API。
+    - 关键业务操作（支付、领取、投票）必须设计幂等性机制：唯一约束（Unique Constraint）、防重 Token 或 Idempotency Key。
+    - '乐观锁（如 @Version）需配合正确的重试策略或冲突拒绝机制，避免静默丢失更新。'
+    - 在高并发场景下，考虑使用消息队列（如 Kafka、RabbitMQ）串行化处理关键操作，避免直接并发竞争。
+
+anti_patterns:
+  - description
+  - non_atomic_read_modify_write
+  - check_then_act_without_lock
+  - application_level_compute_then_save
+  - local_lock_in_distributed_env
+  - missing_idempotency
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-362
+  race_condition_type: 'enum[''check_then_act'', ''non_atomic_update'', ''toctou_file'', ''singleton_init'', ''distributed_race'', ''missing_idempotency'']'
+  shared_resource: 'string (如 ''account_balance'', ''inventory_count'', ''coupon_remaining'', ''temp_file'')'
+  missing_sync_mechanism: 'string (指出缺失的同步机制，如 ''缺少数据库行级锁'' 或 ''缺少分布式锁'' 或 ''缺少幂等性保护'')'
+  concurrency_context: 'enum[''single_jvm'', ''multi_instance'', ''distributed_microservice'']'
+  lock_scope: 'enum[''none'', ''local_only'', ''distributed'', ''database_level'']'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: HIGH
+  remediation: string

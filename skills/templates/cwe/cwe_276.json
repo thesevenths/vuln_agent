@@ -1,0 +1,278 @@
+{
+  "skill_id": "cwe_276_incorrect_default_permissions",
+  "source_cwe": [
+    "CWE-276"
+  ],
+  "related_cwes": [
+    {"cwe": "CWE-732", "reason": "incorrect_permission_assignment_for_multiple_actors - 多用户共享环境中权限分配错误"},
+    {"cwe": "CWE-250", "reason": "execution_with_unnecessary_privileges - 进程/服务以超出所需的权限运行"},
+    {"cwe": "CWE-284", "reason": "improper_access_control - 默认权限过于宽松是访问控制缺陷的常见形态"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - 默认公开权限使资源实质上无授权保护"},
+    {"cwe": "CWE-912", "reason": "hidden_functionality - 隐藏的默认管理员账户或后门凭据"},
+    {"cwe": "CWE-269", "reason": "improper_privilege_management - 默认权限过高是权限管理不当的具体表现"}
+  ],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "Call[name=~/(chmod|chown|mkdir|open|create_bucket|set_acl|setPosixFilePermissions)/i]",
+      "FunctionDef[name=~/(init_storage|setup_dirs|install|create_file|provision)/i]",
+      "Assignment[target=~/(umask|permissions|acl|mode)/i]"
+    ],
+    "semantic_keywords": [
+      "chmod",
+      "777",
+      "666",
+      "world-writable",
+      "public-read",
+      "public-read-write",
+      "umask",
+      "everyone",
+      "guest",
+      "acl",
+      "posix",
+      "permissions",
+      "mode"
+    ],
+    "file_context": [
+      "install_script",
+      "setup",
+      "init",
+      "dockerfile",
+      "terraform",
+      "cloudformation",
+      "storage_service",
+      "file_manager",
+      "docker_compose",
+      "kubernetes_yaml",
+      "ansible_playbook"
+    ],
+    "operation_triggers": {
+      "description": "资源初始化和权限设置操作是 CWE-276 的核心攻击面",
+      "sensitive_operations": [
+        "create_file", "create_directory", "set_permissions",
+        "create_bucket", "init_database", "setup_admin",
+        "deploy_container", "provision_infrastructure"
+      ],
+      "route_patterns": {
+        "java": ["Files.setPosixFilePermissions", "File.setReadable", "File.setWritable"],
+        "python": ["os.chmod", "os.mkdir", "os.umask"],
+        "go": ["os.Chmod", "os.MkdirAll", "os.OpenFile"],
+        "javascript": ["fs.chmod", "fs.mkdir", "fs.writeFileSync"],
+        "shell": ["chmod", "chown", "umask", "mkdir -p"],
+        "iac": ["aws_s3_bucket_acl", "google_storage_bucket_access_control"]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "file_ops": [
+        "Files.setPosixFilePermissions",
+        "PosixFilePermissions.fromString",
+        "File.setReadable",
+        "File.setWritable",
+        "File.setExecutable",
+        "rwxrwxrwx"
+      ],
+      "cloud_ops": [
+        "CannedAccessControlList.PublicRead",
+        "setAcl",
+        "withCannedAcl"
+      ]
+    },
+    "python": {
+      "file_ops": [
+        "os.chmod",
+        "os.umask",
+        "os.mkdir",
+        "os.open",
+        "stat.S_IRWXO",
+        "stat.S_IRWXG",
+        "0o777",
+        "0o666"
+      ],
+      "cloud_ops": [
+        "ACL='public-read'",
+        "put_bucket_acl",
+        "public_access_block_configuration"
+      ]
+    },
+    "shell_iac": {
+      "file_ops": [
+        "chmod 777",
+        "chmod a+w",
+        "chmod o+r",
+        "chmod -R 777",
+        "umask 000"
+      ],
+      "cloud_ops": [
+        "acl = \"public-read\"",
+        "AccessControl: PublicRead",
+        "block_public_acls = false"
+      ]
+    },
+    "generic": {
+      "file_ops": [
+        "permissions",
+        "mode",
+        "access_control",
+        "grant_access"
+      ],
+      "cloud_ops": [
+        "public",
+        "anonymous",
+        "global_access",
+        "internet_facing"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表默认权限配置中的高风险反模式",
+    "world_writable_files": {
+      "description": "文件或目录被设置为全局可写",
+      "java": ["PosixFilePermissions.fromString.*rwxrwxrwx", "Files.setPosixFilePermissions.*OTHERS_WRITE"],
+      "python": ["os.chmod.*0o777", "os.chmod.*0o666", "os.makedirs.*mode=0o777"],
+      "go": ["os.Chmod.*0777", "os.OpenFile.*0777"],
+      "javascript": ["fs.chmod.*0o777", "fs.chmodSync.*0o777"],
+      "shell": ["chmod 777", "chmod a+w", "chmod -R 777", "umask 000"],
+      "ruby": ["File.chmod.*0777", "FileUtils.chmod.*0777"],
+      "rust": ["set_permissions.*0o777"]
+    },
+    "public_cloud_storage": {
+      "description": "云存储资源默认设置为公开",
+      "java": ["CannedAccessControlList.PublicRead", "CannedAccessControlList.PublicReadWrite"],
+      "python": ["ACL='public-read'", "ACL='public-read-write'", "public_access_block.*false"],
+      "shell_iac": ["acl.*=.*public-read", "AccessControl.*PublicRead", "block_public_acls.*false"],
+      "generic": ["public.*bucket", "anonymous.*access", "internet_facing.*without.*auth"]
+    },
+    "default_admin_credentials": {
+      "description": "硬编码默认管理员凭据",
+      "java": ["admin.*admin123", "root.*root", "default.*password"],
+      "python": ["DEFAULT_PASSWORD", "admin_password.*=.*'admin'"],
+      "php": ["MYSQL_ROOT_PASSWORD.*root", "MYSQL_ALLOW_EMPTY_PASSWORD.*yes"],
+      "docker": ["MYSQL_ROOT_PASSWORD:.*root", "POSTGRES_PASSWORD:.*postgres"],
+      "generic": ["default.*admin.*password", "initial.*root.*credential"]
+    },
+    "overprivileged_service": {
+      "description": "服务账号权限过大",
+      "java": ["DataSource.*root", "username.*root.*password"],
+      "generic": ["admin.*access.*key", "all.*permissions.*token", "root.*service.*account"]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "least_privilege_enforcement": {
+      "description": "是否实施了最小权限原则",
+      "java": ["0o600", "0o700", "PosixFilePermissions.fromString.*rw-------"],
+      "python": ["stat.S_IRUSR.*stat.S_IWUSR", "os.chmod.*0o600", "os.chmod.*0o700"],
+      "shell": ["chmod 600", "chmod 700", "chmod 640", "umask 077"],
+      "go": ["os.FileMode.*0600", "os.FileMode.*0700"],
+      "generic": ["owner.*only", "least.*privilege", "minimal.*permissions"]
+    },
+    "cloud_block_public_access": {
+      "description": "云存储是否开启了阻止公共访问",
+      "python": ["public_access_block_configuration", "block_public_acls.*true"],
+      "iac": ["block_public_acls.*=.*true", "block_public_policy.*=.*true", "aws_s3_bucket_public_access_block"],
+      "generic": ["block.*public.*access", "deny.*anonymous"]
+    },
+    "container_security": {
+      "description": "容器是否使用非 root 用户运行",
+      "docker": ["USER.*nonroot", "USER.*app", "--user.*1000"],
+      "k8s": ["runAsNonRoot.*true", "runAsUser.*1000", "securityContext"],
+      "generic": ["non.*root.*user", "drop.*privileges"]
+    },
+    "iac_scanning": {
+      "description": "是否使用了 IaC 扫描工具拦截宽松配置",
+      "generic": ["checkov", "tfsec", "terrascan", "kics", "snyk.*iac"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别资源初始化点】定位文件系统操作（创建文件/目录）、云存储配置（S3/OSS Bucket）、或部署安装脚本（Dockerfile/Shell）。",
+    "Step 1: 【检查显式权限分配】分析代码中是否显式赋予了过于宽松的权限（如 `chmod 777`、`0o666`、`rwxrwxrwx`、`PublicRead`）。",
+    "Step 2: 【评估默认 Umask 依赖】若未显式指定权限，检查是否修改了系统 `umask`（如 `umask 0`），或依赖了不安全的操作系统默认值，导致新建文件默认对 Group/Others 可读写。",
+    "Step 3: 【检查云存储与IaC配置】在 Terraform/CloudFormation/SDK 中，检查存储桶或数据库实例是否默认开启了 Public Access 或绑定了 `0.0.0.0/0` 且无认证。",
+    "Step 4: 【评估安装目录安全性】检查 Web 根目录、配置文件目录或临时目录（/tmp）是否被设置为全局可写（World-Writable），这可能导致 Symlink 攻击或 Webshell 植入。",
+    "Step 5: 【确认最小权限原则】验证权限设置是否严格遵循“仅 Owner 可读写（如 600/700）”的最小特权原则。",
+    "Step 6: 【六项确认标准】缺一不得 confirmed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "os.chmod('/etc/myapp/config.ini', 0o777)",
+        "vulnerability_analysis": "将敏感配置文件设置为 777（全局可读、可写、可执行）。系统上的任何普通用户或低权限入侵者均可读取敏感凭据或篡改配置，导致权限提升或系统被接管。",
+        "fix_pattern": "使用 os.chmod('/etc/myapp/config.ini', 0o600)，确保只有文件所有者（通常是运行该服务的特权用户或专用服务账户）可以读写。"
+      },
+      {
+        "language": "shell",
+        "code_snippet": "# Docker Compose\nservices:\n  mysql:\n    environment:\n      MYSQL_ROOT_PASSWORD: root\n      MYSQL_ALLOW_EMPTY_PASSWORD: \"yes\"\n  redis:\n    ports:\n      - \"6379:6379\"",
+        "vulnerability_analysis": "Docker Compose 中 MySQL 使用默认密码 root 且允许空密码，Redis 无密码且绑定到 0.0.0.0:6379。攻击者可直接连接数据库获取全部数据，或连接 Redis 执行任意命令。",
+        "fix_pattern": "使用 Docker Secrets 管理密码：MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password；Redis 配置 --requirepass 和 --bind 127.0.0.1。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@PostConstruct\npublic void init() {\n    if (userRepository.count() == 0) {\n        User admin = new User(\"admin\", encoder.encode(\"admin123\"));\n        admin.setRole(\"ADMIN\");\n        userRepository.save(admin);\n    }\n}",
+        "vulnerability_analysis": "系统初始化时创建硬编码默认管理员账户 admin/admin123。攻击者可使用已知凭据登录并获得管理员权限。缺少强制首次修改密码机制。",
+        "fix_pattern": "String randomPassword = generateSecurePassword(); log.warn(\"Initial admin password: {}\", randomPassword); admin.setMustChangePassword(true);"
+      },
+      {
+        "language": "python",
+        "code_snippet": "s3.create_bucket(Bucket='company-backups', ACL='public-read')",
+        "vulnerability_analysis": "在创建云存储桶时显式指定了 `public-read` ACL，导致包含敏感备份数据的存储桶对互联网任何人公开可读，引发严重的数据泄露事件。",
+        "fix_pattern": "移除 `ACL='public-read'`，默认使用 `private`。通过 IAM 策略或 Pre-signed URL 授予特定用户或角色的访问权限，并开启 S3 Block Public Access 功能。"
+      }
+    ],
+    "mitigation_rules": [
+      "严格遵循最小权限原则（Principle of Least Privilege），文件/目录默认权限应设置为 600（文件）或 700（目录）。",
+      "禁止在代码或脚本中使用 `chmod 777` 或 `0o777`，禁止将 `umask` 设置为 `000`。",
+      "云存储资源（S3/OSS/Blob）必须默认私有，并强制开启“阻止公共访问（Block Public Access）”特性。",
+      "在 Dockerfile 或安装脚本中，明确指定非 root 用户运行，并严格限制应用目录的所有权和权限。"
+    ],
+    "refutation_checklist": [
+      "云存储桶是否受组织级 SCP (Service Control Policies) 或全局 Block Public Access 策略强制保护，即使代码写了 public 也会被拒绝？",
+      "操作系统层面是否通过 SELinux/AppArmor 限制了进程对非属主文件的访问，从而缓解了宽松文件权限的风险？",
+      "该资源是否为纯内存临时文件（如 `/dev/shm` 中的特定安全沙箱机制），且不涉及持久化敏感数据？",
+      "Docker/容器是否使用了非 root 用户运行，且挂载卷权限已限制？",
+      "数据库/缓存服务是否配置了密码认证和绑定地址限制？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_resource_creation",
+      "desc": "识别代码或脚本中创建文件、目录、云存储桶或数据库实例的入口点。"
+    },
+    {
+      "name": "analyze_permission_settings",
+      "desc": "提取并分析显式设置的权限掩码（如 0o777）、POSIX 权限字符串或云 ACL 策略。"
+    },
+    {
+      "name": "check_umask_defaults",
+      "desc": "检查进程或脚本是否修改了系统 umask，或在未指定权限时依赖了危险的默认环境。"
+    },
+    {
+      "name": "scan_iac_cloud_configs",
+      "desc": "扫描 Terraform、CloudFormation 或 Dockerfile 等基础设施即代码（IaC）文件中的权限与网络暴露配置。"
+    },
+    {
+      "name": "evaluate_world_writable_risk",
+      "desc": "评估全局可写（World-Writable）目录是否存在 Sticky Bit 缺失或 Symlink 攻击风险。"
+    }
+  ],
+  "sanitizers": [
+    "文件/目录权限严格遵循最小特权原则（如 0o600, 0o700, 0o640），明确拒绝 Others 组的访问",
+    "云存储资源配置为 Private，且账号级别开启了 Block Public Access (阻止公共访问)",
+    "基础设施由受控的 CI/CD 管道部署，且 IaC 扫描工具（如 Checkov, tfsec）强制拦截了宽松权限配置",
+    "使用了 SELinux/AppArmor 等强制访问控制（MAC）机制，在系统层面限制了进程对文件的越权访问",
+    "该资源为公开的静态资源目录（如 Web 服务器的 /images），且经过安全评审确认不包含敏感数据或执行权限"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-276",
+    "resource_type": "enum['local_file', 'directory', 'cloud_storage_bucket', 'database_instance', 'ipc_shared_memory']",
+    "permission_flaw": "string (描述具体的权限缺陷，如 'chmod 777', 'S3 public-read ACL', 'umask 000')",
+    "missing_least_privilege": "string (指出应采用的正确权限，如 '应设置为 0o600')",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

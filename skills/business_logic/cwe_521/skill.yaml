@@ -1,0 +1,13 @@
+# CWE-521 Skill 元数据
+# 从 templates/cwe/cwe_521.json 迁移
+
+skill_id: cwe_521_weak_password_requirements
+source_cwe: CWE-521
+priority: P1
+
+related_cwes:
+  - CWE-262
+  - CWE-307
+  - CWE-522
+  - CWE-916
+  - CWE-263

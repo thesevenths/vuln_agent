@@ -1,0 +1,14 @@
+# CWE-307 Skill 元数据
+# 从 templates/cwe/cwe_307.json 迁移
+
+skill_id: cwe_307_excessive_auth_attempts
+source_cwe: CWE-307
+priority: P1
+
+related_cwes:
+  - CWE-306
+  - CWE-521
+  - CWE-613
+  - CWE-798
+  - CWE-287
+  - CWE-203

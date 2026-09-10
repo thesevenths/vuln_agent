@@ -1,0 +1,12 @@
+# CWE-918 Skill 元数据
+# 从 templates/cwe/cwe_918.json 迁移
+
+skill_id: cwe_918_ssrf_logic_context
+source_cwe: CWE-918
+priority: P0
+
+related_cwes:
+  - CWE-441
+  - CWE-610
+  - CWE-20
+  - CWE-200

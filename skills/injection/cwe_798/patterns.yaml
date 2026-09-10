@@ -1,0 +1,95 @@
+# CWE-798 检测模式
+
+ast_patterns:
+  - 'StringLiteral[value.length > 4 && value =~ /[A-Za-z0-9+/=]{8,}/]'
+  - 'FunctionCall[name=~/(getConnection|authenticate|login|connect|sign|verify|encrypt|decrypt)/i]'
+  - 'Assignment[target.name=~/(password|passwd|pwd|secret|key|token|apiKey|api_key|privateKey|accessKey|secretKey|jwtSecret|sessionSecret|connectionString)/i]'
+  - 'Call[name=~/(setPassword|setSecret|setKey|setToken|setApiKey)/i]'
+
+semantic_keywords:
+  - password
+  - passwd
+  - pwd
+  - secret
+  - apiKey
+  - api_key
+  - token
+  - credential
+  - privateKey
+  - accessKey
+  - secretKey
+  - connectionString
+  - jwtSecret
+  - sessionSecret
+  - master_key
+  - jdbc
+  - mysql
+  - redis
+  - mongodb
+  - smtp
+  - AWS_ACCESS_KEY
+  - AKIA
+  - BEGIN RSA PRIVATE KEY
+  - BEGIN PRIVATE KEY
+  - sc0tt
+  - t1ger
+  - admin123
+  - root123
+
+file_context:
+  - config
+  - connection_manager
+  - auth_service
+  - test_fixture
+  - properties
+  - yaml_config
+  - env_file
+  - docker_compose
+  - initialization
+  - migration
+  - seed_data
+  - constants
+
+sensitive_operations:
+  - database_connect
+  - api_call
+  - encrypt_decrypt
+  - sign_verify
+  - smtp_send
+  - cloud_sdk_init
+  - jwt_sign
+  - session_create
+  - ssh_connect
+
+logic_query_keywords_generic:
+  cred_variables:
+    - password
+    - passwd
+    - secret
+    - api_key
+    - token
+    - credential
+    - private_key
+    - access_key
+    - jwt_secret
+    - session_secret
+    - connection_string
+  cred_patterns:
+    - getConnection
+    - authenticate
+    - login
+    - connect
+    - verify
+    - encrypt
+    - decrypt
+    - sign
+
+sanitizers:
+  - 凭证值来自环境变量/System.getenv/os.environ/process.env 或密钥管理服务 API 调用（Vault/KMS/SecretsManager）
+  - '字符串位于 @Test/pytest/describe 等测试框架标记的文件或方法中'
+  - '值为明显的占位符格式（如 ${DB_PASSWORD}、{{vault:secret}}、CHANGE_ME、YOUR_KEY_HERE、xxxxxx）'
+  - 使用了框架级安全配置（如 Spring Cloud Vault、jasypt ENC()、Rails credentials.yml.enc）且未 fallback 到硬编码
+  - 字符串为已知公开算法的哈希值（如 MD5/SHA256 长度特征）且用于完整性校验而非认证
+  - 配置文件已加密存储（如 sops、age、ansible-vault）且运行时解密注入
+  - 前端代码中仅包含设计为公开的标识符（如 Firebase apiKey），配合严格的安全规则使用
+  - CI/CD 管道中配置了 Secret Scanning（如 GitLeaks、TruffleHog）拦截意外提交的凭据

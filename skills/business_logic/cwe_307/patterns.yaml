@@ -1,0 +1,54 @@
+# CWE-307 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(login|signin|authenticate|auth|token|session|password_reset)/i]'
+  - 'ClassDef[name=~/(Auth|Login|Security|Session|Token)/i]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*?(login|auth|signin)/i]'
+
+semantic_keywords:
+  - login
+  - password
+  - authenticate
+  - brute force
+  - rate limit
+  - captcha
+  - lockout
+  - max attempts
+  - throttle
+  - failed attempts
+
+file_context:
+  - auth_controller
+  - login_service
+  - security
+  - session_manager
+  - api_gateway
+
+logic_query_keywords_generic:
+  auth_endpoints:
+    - login
+    - signin
+    - auth
+    - verify
+    - password_check
+  rate_limiting:
+    - rate_limit
+    - throttle
+    - limit
+    - cooldown
+    - delay
+    - block_ip
+  lockout_mechanisms:
+    - lock
+    - block
+    - ban
+    - attempts
+    - counter
+    - freeze
+
+sanitizers:
+  - 端点受全局 API 网关、WAF 或云 Bot Management 的严格速率限制与防暴破保护
+  - '使用了成熟框架的防暴力破解插件或中间件（如 Django Ratelimit, Spring Boot Bucket4j）'
+  - 认证由外部 IdP (OAuth2/OIDC) 处理，且 IdP 具备完善的防暴破与风险引擎策略
+  - 连续失败后强制触发 CAPTCHA 验证或 MFA 挑战
+  - 账户锁定状态由服务端 Redis/DB 可靠维护，且重置周期合理，无法被客户端重置

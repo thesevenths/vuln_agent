@@ -1,0 +1,48 @@
+# CWE-521 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(register|signup|createUser|changePassword|updatePassword|resetPassword|setPassword)/i]'
+  - 'ClassDef[name=~/(User|Account|Auth|Registration|Profile)/i]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*(register|password|reset)/i]'
+
+semantic_keywords:
+  - password
+  - passwd
+  - pwd
+  - strength
+  - complexity
+  - register
+  - signup
+  - reset
+  - min_length
+  - special_char
+
+file_context:
+  - user_service
+  - auth_controller
+  - registration
+  - profile_manager
+  - security_config
+
+logic_query_keywords_generic:
+  password_ops:
+    - set_password
+    - create_user
+    - update_pwd
+    - forgot_password
+  validation_rules:
+    - min_length
+    - uppercase
+    - lowercase
+    - digit
+    - special_char
+    - regex
+    - blacklist
+    - dictionary
+
+sanitizers:
+  - 认证由外部 IdP (OAuth2/OIDC/SAML) 处理，且 IdP 具备完善的密码策略与黑名单拦截
+  - '使用了无密码认证机制 (Passkey, WebAuthn, Magic Link, 硬件 Token)'
+  - 服务端集成了 zxcvbn 或类似成熟库，且阈值设置合理（如拒绝 score < 3 的密码）
+  - '框架自带的全局密码验证器已启用并配置了严格策略 (如 Django AUTH_PASSWORD_VALIDATORS, Spring Security Passay)'
+  - 系统为内部测试环境或无需高安全级别的临时系统（需结合业务上下文确认）

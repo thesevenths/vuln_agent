@@ -1,0 +1,43 @@
+# CWE-89 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(executeQuery|executeUpdate|execute|prepareStatement|createQuery|createNativeQuery|rawQuery)/i]'
+  - 'BinaryExpr[op=+][right=~/(request\.|param|input|user|req\.)/i]'
+
+semantic_keywords:
+  - SQL
+  - query
+  - SELECT
+  - INSERT
+  - UPDATE
+  - DELETE
+  - WHERE
+  - concatenat
+  - string format
+  - native query
+
+file_context:
+  - repository
+  - dao
+  - database
+  - query_builder
+  - controller
+
+logic_query_keywords_generic:
+  dangerous_calls:
+    - execute
+    - raw
+    - query
+    - exec
+  safe_patterns:
+    - parameterized
+    - prepared
+    - bind
+    - placeholder
+    - ?
+
+sanitizers:
+  - 使用 PreparedStatement 参数绑定
+  - '使用 JPA/ORM 的 setParameter 或 @Param'
+  - 动态值通过白名单正则校验（如仅允许数字/字母）
+  - 使用框架级查询构建器（如 QueryDSL、JOOQ）

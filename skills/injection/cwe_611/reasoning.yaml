@@ -1,0 +1,45 @@
+# CWE-611 分析推理流程
+
+reasoning_workflow:
+  - 'Step 1: 【识别XML解析】是否涉及XML解析/反序列化操作？'
+  - 'Step 2: 【检查解析器配置】XML解析器是否禁用了外部实体？'
+  -    - ❌ 默认配置（未禁用任何特性）
+  -    - ❌ 仅禁用部分特性（如仅禁用外部DTD但保留外部实体）
+  -    - ✅ 完全安全配置（见下方 sanitizers）
+  - 'Step 3: 【检查输入来源】XML数据是否来自不可信源？'
+  -    - HTTP请求体 / 文件上传 / API调用 → 高风险
+  -    - 内部系统间通信 → 中风险
+  - 'Step 4: 【评估影响】XXE可能导致什么后果？'
+  - '   - 读取服务器文件（file:///etc/passwd）'
+  - '   - SSRF（http://internal-service/...）'
+  -    - 拒绝服务（Billion Laughs Attack）
+  - 'Step 5: 【检查DTD处理】是否完全禁用了DTD或外部实体声明？'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: >-
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        Document doc = factory.newDocumentBuilder().parse(request.getInputStream());
+      vulnerability_analysis: >-
+        DocumentBuilderFactory 默认允许外部实体和DTD。攻击者提交包含恶意DOCTYPE的XML
+        即可读取服务器任意文件。
+      fix_pattern: >-
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+  mitigation_rules:
+    - XML解析器必须禁用外部实体和DTD（使用 OWASP 推荐配置）
+    - 优先使用 JSON 等不支持实体引用的数据格式
+    - 如需解析不受信XML，使用 defusedxml (Python) 或配置安全的 DocumentBuilderFactory
+    - S3/云存储的XML配置也需要同步禁用外部实体
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-611
+  parser_type: string (DOM/SAX/StAX/Unmarshaller)
+  disabled_features: 'array[string] (已禁用的安全特性列表)'
+  risk_level: CRITICAL
+  remediation: string

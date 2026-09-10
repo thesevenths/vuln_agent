@@ -1,0 +1,70 @@
+# Python Source 定义（污点源入口点）
+# 标记用户可控数据的入口，用于污点分析
+
+# Django 请求对象
+django_sources:
+  request_attributes:
+    - "request.POST"
+    - "request.GET"
+    - "request.body"
+    - "request.FILES"
+    - "request.COOKIES"
+    - "request.META"
+    - "request.headers"
+  method_calls:
+    - "request.POST.get"
+    - "request.GET.get"
+    - "request.data.get"
+    - "request.query_params.get"
+  form_data:
+    - "form.cleaned_data"
+    - "ModelForm"
+    - "form.save"
+
+# Flask 请求对象
+flask_sources:
+  request_attributes:
+    - "request.form"
+    - "request.args"
+    - "request.json"
+    - "request.values"
+    - "request.files"
+    - "request.cookies"
+    - "request.headers"
+    - "request.data"
+  method_calls:
+    - "request.form.get"
+    - "request.args.get"
+    - "request.get_json"
+    - "request.get_data"
+
+# FastAPI 请求对象
+fastapi_sources:
+  parameters:
+    - "Query"
+    - "Path"
+    - "Body"
+    - "Header"
+    - "Cookie"
+    - "Form"
+    - "File"
+    - "UploadFile"
+  pydantic_models:
+    - "BaseModel"
+    - "model_validate"
+    - "parse_obj"
+
+# 通用入口
+common_sources:
+  file_upload:
+    - "UploadedFile"
+    - "InMemoryUploadedFile"
+    - "SimpleUploadedFile"
+  websocket:
+    - "WebSocket"
+    - "websocket.receive"
+    - "websocket.receive_text"
+  task_queues:
+    - "celery.task"
+    - "@shared_task"
+    - "@app.task"

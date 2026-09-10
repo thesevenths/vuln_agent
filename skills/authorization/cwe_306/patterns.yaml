@@ -1,0 +1,102 @@
+# CWE-306 检测模式
+
+ast_patterns:
+  - 'FunctionDef[access_modifier=public][name=~/(create|delete|update|admin|config|reset|transfer|withdraw|export|import|execute|send|deploy|restart|shutdown)/i]'
+  - 'ClassDef[name=~/(Admin|Manager|Config|Payment|Account|System|Internal|Debug|Test|Backup)/i]'
+  - 'Annotation[name=~/(RequestMapping|PostMapping|PutMapping|DeleteMapping|GetMapping)/i]'
+  - 'RouteHandler[method=~/(GET|POST|PUT|DELETE|PATCH)/i]'
+  - 'DBQuery[operation=~/(INSERT|UPDATE|DELETE|DROP|TRUNCATE)/i]'
+
+semantic_keywords:
+  - bank account
+  - ssn
+  - password reset
+  - user creation
+  - system config
+  - payment
+  - transfer
+  - admin panel
+  - sensitive data
+  - pii
+  - financial
+  - export
+  - import
+  - debug
+  - internal
+  - test
+  - backup
+  - deploy
+  - restart
+  - shutdown
+  - execute
+  - send_mail
+  - database
+  - migrate
+  - seed
+  - truncate
+
+file_context:
+  - controller
+  - service
+  - api_endpoint
+  - admin_module
+  - internal_api
+  - debug_endpoint
+  - system_controller
+  - backup_handler
+  - export_service
+  - config_controller
+
+sensitive_operations:
+  - create_user
+  - delete_user
+  - update_config
+  - reset_password
+  - transfer_funds
+  - withdraw
+  - export_data
+  - import_data
+  - execute_command
+  - send_notification
+  - deploy_application
+  - restart_service
+  - shutdown_system
+  - backup_database
+  - modify_permissions
+  - create_admin
+  - delete_record
+
+logic_query_keywords_generic:
+  critical_ops:
+    - create
+    - delete
+    - update
+    - remove
+    - reset
+    - transfer
+    - withdraw
+    - admin
+    - config
+    - export
+    - import
+    - execute
+    - deploy
+    - backup
+    - restore
+    - shutdown
+  auth_checks:
+    - authenticate
+    - authorize
+    - isAuthenticated
+    - is_authenticated
+    - hasPermission
+    - checkAuth
+
+sanitizers:
+  - '函数被 @PreAuthorize/@Secured/@AuthenticationRequired/@RequiresAuthentication 保护'
+  - 位于已配置全局认证中间件的路由组内（如 Spring Security filter chain / Shiro authc）
+  - 认证状态从 HttpSession/JWT Claims/OAuth2 Principal 实时获取
+  - 该功能经安全评审确认为公开匿名访问（如公开 API 文档、健康检查）
+  - security_filter_chain 显示全局 authenticated 且路径不在 permitAll 白名单
+  - 调试/测试端点仅在开发环境可用，生产环境已移除或限制
+  - 所有通信通道（HTTP/WS/GraphQL/gRPC）均实施统一认证

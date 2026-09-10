@@ -1,0 +1,454 @@
+{
+  "skill_id": "cwe_840_business_logic_error",
+  "source_cwe": ["CWE-840"],
+  "related_cwes": [
+    {"cwe": "CWE-841", "reason": "workflow_bypass - 工作流绕过是业务逻辑错误的子类型：跳过流程步骤违反业务不变量"},
+    {"cwe": "CWE-863", "reason": "incorrect_authorization - 授权逻辑错误可导致业务规则被违反（如用户自提管理员）"},
+    {"cwe": "CWE-472", "reason": "external_control_of_state - 客户端可控的状态参数使业务规则可被绕过"},
+    {"cwe": "CWE-20", "reason": "improper_input_validation - 业务字段（price/qty/status）未经验证即被信任"},
+    {"cwe": "CWE-367", "reason": "race_condition - 竞态条件可使业务不变量在并发下被违反（如超卖）"},
+    {"cwe": "CWE-269", "reason": "improper_privilege_management - 权限管理缺陷导致业务角色规则被违反"}
+  ],
+  "priority": "P0",
+  "role": "business_rule_and_domain_invariant_specialist",
+  "differentiation_from_sast": [
+    "传统 SAST 关注「危险函数+污点」，业务逻辑错误在于「代码按设计执行但业务规则被违背」。",
+    "本模板强制从领域不变量出发：价格≥0、库存不超卖、优惠券不可叠加、角色不可自提、状态机合法转移。",
+    "客户端提交的 price/quantity/status/discount 若被服务端直接信任，属于逻辑漏洞而非注入；须服务端独立重算与校验。"
+  ],
+  "trigger_condition": {
+    "ast_patterns": [
+      "Assignment[target=~/(price|amount|total|quantity|discount|balance|status|role)/i][source=~/(request|param|body|json)/i]",
+      "BinaryExpr[op=+|-|*][operand_from_user=true][no_server_recompute=true]",
+      "StateUpdate[field=status][value_from_client=true]",
+      "FunctionDef[name=~/(checkout|applyDiscount|processRefund|transfer|withdraw|calculateTotal|processOrder|redeemCoupon|updateBalance)/i]"
+    ],
+    "semantic_keywords": [
+      "price", "amount", "quantity", "total", "discount", "coupon", "balance",
+      "negative", "overflow", "free", "zero", "hidden", "status", "role",
+      "isAdmin", "premium", "trial", "credit", "refund", "transfer limit",
+      "stacking", "quota", "rate_limit", "daily_limit", "per_transaction",
+      "inventory", "stock", "conservation", "idempotent",
+      "subscription", "tier", "downgrade", "upgrade"
+    ],
+    "file_context": [
+      "controller", "service", "checkout", "order", "payment",
+      "cart", "billing", "pricing_engine", "discount_service",
+      "refund_handler", "transfer_service", "coupon_service",
+      "quota_manager", "subscription_service"
+    ],
+    "operation_triggers": {
+      "description": "涉及金融计算、库存管理、优惠券/折扣、转账限额的业务端点是 CWE-840 的核心攻击面",
+      "sensitive_operations": [
+        "calculate_total", "apply_discount", "process_refund",
+        "transfer_funds", "withdraw", "redeem_coupon",
+        "update_balance", "process_order", "checkout",
+        "update_subscription", "upgrade_tier", "downgrade_tier"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Post|Put)Mapping.*/(checkout|payment|refund|transfer|withdraw|coupon|discount|order|cart|balance)",
+          "@RequestMapping.*/(checkout|payment|order|billing|subscription)"
+        ],
+        "python": [
+          "@app\\.(post|put).*/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "@router\\.(post|put).*/(checkout|payment|order|billing)"
+        ],
+        "go": [
+          "\\.(POST|PUT)\\(.*/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "r\\.(POST|PUT)"
+        ],
+        "javascript": [
+          "router\\.(post|put).*/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "app\\.(post|put)"
+        ],
+        "php": [
+          "Route::(post|put).*/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "@Route.*methods.*(?:POST|PUT).*/(checkout|payment)"
+        ],
+        "dotnet": [
+          "\\[Http(Post|Put)\\].*/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "\\[Authorize\\].*/(checkout|payment|order)"
+        ],
+        "ruby": [
+          "(post|put)\\s+\"/(checkout|payment|refund|transfer|withdraw|coupon|discount)",
+          "resources\\s+:(orders|payments|coupons|subscriptions)"
+        ],
+        "rust": [
+          "\\.route.*/(checkout|payment|refund|transfer|withdraw).*method.*(?:POST|PUT)",
+          "\\.post\\(.*/(checkout|payment|order)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "client_controlled_fields": [
+        "price", "amount", "quantity", "total", "discount",
+        "balance", "status", "role", "isAdmin", "coupon",
+        "credit", "step", "tier"
+      ],
+      "request_bindings": [
+        "@RequestParam", "@RequestBody", "@PathVariable",
+        "getParameter", "request.get"
+      ],
+      "server_authority_ops": [
+        "calculateTotal", "recalculate", "validatePrice",
+        "getPriceFromCatalog", "checkInventory", "assertRole",
+        "enforceLimit", "applyDiscount", "validateCoupon"
+      ],
+      "dangerous_trust": [
+        "setPrice", "setAmount", "setTotal", "setStatus",
+        "setRole", "grantRole", "applyDiscount", "setBalance"
+      ],
+      "invariant_keywords": [
+        "non_negative", "inventory_limit", "conservation_of_value",
+        "single_use_coupon", "max_discount", "daily_limit"
+      ]
+    },
+    "python": {
+      "client_controlled_fields": [
+        "price", "amount", "quantity", "total", "discount",
+        "status", "role", "balance", "credit"
+      ],
+      "request_bindings": [
+        "request.form", "request.args", "request.json", "request.values"
+      ],
+      "server_authority_ops": [
+        "calculate_total", "validate_price", "check_inventory",
+        "apply_discount", "validate_coupon"
+      ],
+      "dangerous_trust": [
+        "update(price=", "status=", "role=", "balance="
+      ]
+    },
+    "php": {
+      "client_controlled_fields": [
+        "price", "amount", "quantity", "total", "discount",
+        "status", "role", "balance"
+      ],
+      "request_bindings": [
+        "$request->input", "$request->all()",
+        "$_POST", "$_REQUEST"
+      ],
+      "server_authority_ops": [
+        "calculateTotal", "validatePrice", "checkStock",
+        "applyDiscount", "validateCoupon"
+      ],
+      "dangerous_trust": [
+        "setPrice", "setAmount", "setStatus", "applyDiscount"
+      ]
+    },
+    "go": {
+      "client_controlled_fields": [
+        "Price", "Amount", "Quantity", "Total", "Discount",
+        "Status", "Balance"
+      ],
+      "request_bindings": [
+        "c.PostForm", "c.BindJSON", "ShouldBindJSON", "json.Decode"
+      ],
+      "server_authority_ops": [
+        "CalculateTotal", "ValidatePrice", "CheckStock",
+        "ApplyDiscount", "ValidateCoupon"
+      ],
+      "dangerous_trust": [
+        "SetPrice", "SetAmount", "SetStatus", "SetBalance"
+      ]
+    },
+    "javascript": {
+      "client_controlled_fields": [
+        "price", "amount", "qty", "total", "discount",
+        "status", "role", "balance", "credit"
+      ],
+      "request_bindings": [
+        "req.body", "req.query", "req.params"
+      ],
+      "server_authority_ops": [
+        "calculateTotal", "validatePrice", "checkStock",
+        "applyDiscount", "validateCoupon"
+      ],
+      "dangerous_trust": [
+        "price:", "total:", "status:", "role:", "balance:"
+      ]
+    },
+    "generic": {
+      "client_controlled_fields": [
+        "price", "amount", "quantity", "total", "discount",
+        "status", "role", "balance", "credit", "tier"
+      ],
+      "invariants": [
+        "non_negative", "inventory_limit", "role_not_self_granted",
+        "state_machine", "single_use_coupon", "conservation_of_value",
+        "daily_limit", "per_transaction_limit"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表业务逻辑中的高风险反模式",
+    "client_computed_financial": {
+      "description": "金融计算值（价格/总额/折扣）直接来自客户端",
+      "java": [
+        "setTotal.*request\\.getParameter",
+        "setPrice.*@RequestParam",
+        "total.*=.*@RequestBody.*total",
+        "order\\.setTotal.*req\\."
+      ],
+      "python": [
+        "order\\.total\\s*=\\s*request",
+        "price\\s*=\\s*request\\.json.*price",
+        "amount\\s*=\\s*request\\.form.*amount"
+      ],
+      "javascript": [
+        "order\\.total\\s*=\\s*req\\.body",
+        "price\\s*=\\s*req\\.body\\.price",
+        "amount\\s*=\\s*req\\.body\\.amount"
+      ],
+      "generic": [
+        "total.*from.*request",
+        "price.*from.*client",
+        "amount.*from.*body"
+      ]
+    },
+    "discount_stacking": {
+      "description": "多个折扣可叠加使用而无互斥检查",
+      "java": [
+        "applyDiscount.*for.*coupon.*without.*mutualExclusion",
+        "for.*coupon.*discounted.*multiply.*without.*check"
+      ],
+      "generic": [
+        "multiple.*discount.*without.*exclusivity",
+        "stack.*coupon.*without.*check",
+        "apply.*all.*discounts"
+      ]
+    },
+    "negative_value_abuse": {
+      "description": "允许负数数量/价格导致反向支付或无限积分",
+      "java": [
+        "quantity.*request.*without.*>.*0.*check",
+        "amount.*request.*without.*>=.*0.*check",
+        "price.*request.*without.*positive.*check"
+      ],
+      "generic": [
+        "negative.*quantity.*accepted",
+        "negative.*price.*accepted",
+        "negative.*amount.*accepted"
+      ]
+    },
+    "limit_slicing": {
+      "description": "仅有单笔限额而无日/月累计限额",
+      "java": [
+        "PER_TRANSACTION_LIMIT.*without.*DAILY_LIMIT",
+        "checkLimit.*amount.*without.*dailyTotal"
+      ],
+      "generic": [
+        "per.*transaction.*limit.*without.*daily",
+        "single.*limit.*without.*cumulative",
+        "per.*request.*limit.*without.*total"
+      ]
+    },
+    "refund_excess": {
+      "description": "退款金额可超过实际支付金额",
+      "java": [
+        "refund.*amount.*without.*totalRefunded.*compareTo.*totalPaid",
+        "refund.*without.*check.*total.*captured"
+      ],
+      "generic": [
+        "refund.*without.*check.*total.*paid",
+        "refund.*amount.*exceeds.*original",
+        "multiple.*refund.*without.*coordination"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "server_side_recompute": {
+      "description": "服务端是否从权威数据源独立重算金融值",
+      "java": [
+        "pricingEngine\\.calculate",
+        "getPriceFromCatalog",
+        "calculateTotal.*items",
+        "BigDecimal.*multiply.*quantity",
+        "discountEngine\\.apply"
+      ],
+      "python": [
+        "calculate_total",
+        "get_price_from_catalog",
+        "pricing_engine",
+        "recalculate"
+      ],
+      "javascript": [
+        "calculateTotal",
+        "getPriceFromCatalog",
+        "pricingEngine",
+        "recalculate"
+      ],
+      "generic": [
+        "server.*side.*compute",
+        "recalculate.*from.*catalog",
+        "independent.*price.*verification"
+      ]
+    },
+    "invariant_assertions": {
+      "description": "是否存在业务不变量的显式断言",
+      "java": [
+        "assertPricePositive",
+        "assertStockAvailable",
+        "assertValidTransition",
+        "assert.*balance.*>=.*0",
+        "assert.*total.*>=.*0",
+        "assert.*quantity.*>.*0"
+      ],
+      "python": [
+        "assert.*balance.*>=.*0",
+        "assert.*total.*>=.*0",
+        "validate_invariant",
+        "check_business_rule"
+      ],
+      "generic": [
+        "assert.*non_negative",
+        "validate.*invariant",
+        "check.*business.*rule",
+        "enforce.*constraint"
+      ]
+    },
+    "coupon_single_use": {
+      "description": "优惠券/折扣码是否有单次使用控制",
+      "java": [
+        "coupon\\.isUsed\\(\\)",
+        "coupon\\.setUsed\\(true\\)",
+        "@Column.*unique.*coupon",
+        "couponRepo\\.existsByCode",
+        "idempotencyKey.*coupon"
+      ],
+      "python": [
+        "coupon\\.used",
+        "coupon\\.is_used",
+        "unique=True.*coupon",
+        "coupon_used_check"
+      ],
+      "generic": [
+        "single.*use.*coupon",
+        "coupon.*already.*used",
+        "idempotent.*discount"
+      ]
+    },
+    "conservation_check": {
+      "description": "金融交易是否有价值守恒校验",
+      "java": [
+        "totalRefunded.*add.*amount.*compareTo.*totalPaid",
+        "sumByOrderId.*totalCaptured",
+        "conservation.*check",
+        "balance.*==.*credits.*-.*debits"
+      ],
+      "generic": [
+        "refund.*<=.*paid",
+        "total.*credits.*==.*total.*debits",
+        "conservation.*of.*value"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【提取业务不变量】该接口保护什么业务规则？(例：订单总额=单价×数量、余额不可为负、优惠券单次使用、用户不可自授 admin、退款≤实付、库存不超卖、日累计限额)。",
+    "Step 2: 【识别信任边界】哪些决策值来自客户端 request/body/hidden field？服务端是否从权威源（数据库目录价、库存表、角色表）重新读取？对照 anti_patterns.client_computed_financial。",
+    "Step 3: 【重算 vs 透传】total/price/discount 是服务端计算还是直接采用客户端提交？若采用客户端值，是否有独立校验其与服务端状态一致？对照 control_detection_patterns.server_side_recompute。",
+    "Step 4: 【边界与组合】负数量/负价格、超大整数、多优惠券叠加、跳过最低消费、退款大于实付、并发下单超库存等组合攻击。对照 anti_patterns.discount_stacking、negative_value_abuse、refund_excess。",
+    "Step 5: 【限额切片攻击】仅有单笔限额而无日/月累计限额？攻击者可通过多次小额操作绕过限额。对照 anti_patterns.limit_slicing。",
+    "Step 6: 【不变量断言】代码中是否有显式的业务不变量断言（assert/validate/enforce）。对照 control_detection_patterns.invariant_assertions。",
+    "Step 7: 【与注入区分】若漏洞本质是「信任了不该信任的 business field」而非拼接 SQL/命令 → CWE-840；修复应是服务端重算与不变量断言，不仅是参数化查询。",
+    "Step 8: 【与 CWE-841 区分】840 是「规则算错/信任错字段」，841 是「跳过流程步骤」。若同时存在两种缺陷，分别报告。",
+    "Step 9: 【九项确认标准】缺一不得 confirmed：(1)金融值服务端重算 (2)不变量有断言 (3)无负值滥用 (4)优惠券单次使用 (5)退款≤实付 (6)累计限额存在 (7)折扣不可叠加 (8)与注入可区分 (9)并发安全"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/checkout\")\npublic Order checkout(@RequestBody CheckoutRequest req) {\n    Order o = new Order();\n    o.setTotal(req.getTotal());\n    o.setPrice(req.getPrice());\n    repo.save(o);\n    return paymentService.charge(o.getTotal());\n}",
+        "vulnerability_analysis": "订单金额完全由客户端提交（req.getTotal()、req.getPrice()），攻击者传 total=0.01 即可低价结账。无 SQL 注入，属于典型 CWE-840 业务逻辑错误。缺少服务端重算和不变量断言。",
+        "fix_pattern": "Product p = catalog.getById(itemId); BigDecimal line = p.getPrice().multiply(qty); order.setTotal(lines.sum()); 拒绝客户端 total/price 字段。添加 assert order.getTotal().compareTo(BigDecimal.ZERO) > 0;"
+      },
+      {
+        "language": "java",
+        "code_snippet": "public BigDecimal applyDiscount(List<String> couponCodes, BigDecimal amount) {\n    BigDecimal discounted = amount;\n    for (String code : couponCodes) {\n        discounted = discounted.multiply(getDiscountRate(code));\n    }\n    return discounted;\n}",
+        "vulnerability_analysis": "折扣循环叠加无互斥检查。攻击者可提交多个不兼容的折扣码（如 50%+30%+20%），导致最终价格远低于预期。缺少折扣类别互斥检查和最大折扣限制。",
+        "fix_pattern": "if (couponCodes.size() > 1) { check categories are same; } return couponCodes.stream().map(code -> calculateDiscount(code, amount)).min(Comparator.naturalOrder()).orElse(amount); // 取最优折扣"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.post(\"/refund\")\nasync def process_refund(order_id: int, amount: float):\n    await Refund.create(order_id=order_id, amount=amount)\n    await PaymentGateway.refund(order_id, amount)\n    return {\"status\": \"refunded\"}",
+        "vulnerability_analysis": "退款处理未检查累计退款是否超过订单实付金额。攻击者可通过多次退款请求（或并发请求）获得超过原始支付的退款。缺少退款总额校验和幂等性控制。",
+        "fix_pattern": "total_refunded = await Refund.filter(order_id=order_id).annotate(total=Sum('amount')); if total_refunded + amount > order.total_paid: raise HTTPException(400, 'Refund exceeds paid amount')"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.post('/api/transfer', async (req, res) => {\n    const { from, to, amount } = req.body;\n    if (amount > PER_TRANSACTION_LIMIT) {\n        return res.status(400).json({error: 'Limit exceeded'});\n    }\n    await transfer(from, to, amount);\n    res.json({status: 'ok'});\n});",
+        "vulnerability_analysis": "仅有单笔转账限额（PER_TRANSACTION_LIMIT），无日累计限额。攻击者可发送 100 次 $99 的转账来绕过 $100 的限额。这是典型的'限额切片'攻击。",
+        "fix_pattern": "const dailyTotal = await getDailyTransferTotal(from); if (dailyTotal + amount > DAILY_LIMIT) return res.status(400).json({error: 'Daily limit exceeded'}); // 同时保留单笔限额"
+      },
+      {
+        "language": "java",
+        "code_snippet": "if (\"admin\".equals(request.getParameter(\"role\")))\n    user.setRole(ADMIN);",
+        "vulnerability_analysis": "角色由请求参数决定，用户可自提管理员。非认证绕过（CWE-287）而是业务规则未强制执行（CWE-840/863）。业务不变量'用户不可自授角色'被违反。",
+        "fix_pattern": "角色变更仅允许已授权管理员调用，且 role 来自服务端策略而非 request 参数。"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func PurchaseHandler(c *gin.Context) {\n    var req struct {\n        ItemID   int     `json:\"item_id\"`\n        Quantity int     `json:\"quantity\"`\n    }\n    c.ShouldBindJSON(&req)\n    total := getPrice(req.ItemID) * float64(req.Quantity)\n    charge(total)\n}",
+        "vulnerability_analysis": "Quantity 来自客户端且未验证正数约束。攻击者可传入 quantity=-100 导致 total 为负数，服务端向用户退款而非扣款。缺少数量正数校验和总额非负断言。",
+        "fix_pattern": "if req.Quantity <= 0 { c.JSON(400, gin.H{\"error\": \"invalid quantity\"}); return }; total := getPrice(req.ItemID) * float64(req.Quantity); if total <= 0 { c.JSON(400, gin.H{\"error\": \"invalid total\"}); return }"
+      }
+    ],
+    "mitigation_rules": [
+      "所有金额/数量/状态变更由服务端根据权威数据源计算，客户端字段仅作展示或 id 引用。",
+      "对业务不变量编写显式断言（assertPricePositive、assertStockAvailable、assertValidTransition）。",
+      "敏感字段使用服务端签名 token 或加密状态 blob，防止客户端篡改 workflow 状态。",
+      "与 CWE-841 区分：840 是「规则算错/信任错字段」，841 是「跳过流程步骤」。",
+      "折扣/优惠券实施互斥检查和单次使用控制，防止叠加滥用。",
+      "金融操作实施累计限额（日/月），不仅依赖单笔限额。",
+      "退款必须校验累计退款 ≤ 实付金额，且所有退款路径共享统一账本。"
+    ],
+    "refutation_checklist": [
+      "金额/数量是否由服务端根据产品目录与库存重新计算，客户端 total/price 被忽略或仅作校验参考？",
+      "是否存在完整的领域层校验（Validator/Policy）且在 Controller 之前强制执行？",
+      "是否使用了经审计的支付网关回调验签，不以客户端回调参数作为唯一结算依据？",
+      "优惠券/折扣是否有互斥检查和单次使用控制？",
+      "退款是否校验了累计退款 ≤ 实付金额？",
+      "是否有累计限额（日/月）而非仅有单笔限额？",
+      "数量/金额是否有正数校验（防止负值滥用）？",
+      "并发操作（如同时使用优惠券+下单）是否有原子性保证？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "trace_client_controlled_business_fields", "desc": "追踪 price/qty/status/role 等字段从 HTTP 到持久化的赋值链。对照 anti_patterns.client_computed_financial。"},
+    {"name": "find_server_recompute_logic", "desc": "检查是否存在从目录/库存/策略表独立重算的逻辑。对照 control_detection_patterns.server_side_recompute。"},
+    {"name": "evaluate_domain_invariants", "desc": "对照业务不变量清单逐项验证代码是否强制执行。对照 control_detection_patterns.invariant_assertions。"},
+    {"name": "check_discount_stacking", "desc": "检查多个折扣/优惠券是否可叠加使用。对照 anti_patterns.discount_stacking 和 control_detection_patterns.coupon_single_use。"},
+    {"name": "check_negative_abuse", "desc": "检查数量/金额是否允许负值。对照 anti_patterns.negative_value_abuse。"},
+    {"name": "check_limit_slicing", "desc": "检查是否有累计限额（日/月）防止限额切片攻击。对照 anti_patterns.limit_slicing。"},
+    {"name": "check_refund_conservation", "desc": "检查退款是否校验累计退款 ≤ 实付金额。对照 anti_patterns.refund_excess 和 control_detection_patterns.conservation_check。"}
+  ],
+  "sanitizers": [
+    "金额/数量由服务端根据产品目录与库存重新计算，客户端 total/price 被忽略或仅作校验参考",
+    "状态/角色变更仅通过受控管理接口且经服务端策略引擎判定",
+    "存在完整的领域层校验（Validator/Policy）且在 Controller 之前强制执行",
+    "使用了经审计的支付网关回调验签，不以客户端回调参数作为唯一结算依据",
+    "折扣/优惠券有互斥检查和单次使用控制",
+    "退款有累计退款 ≤ 实付金额的守恒校验",
+    "有累计限额（日/月）防止限额切片攻击",
+    "数量/金额有正数校验防止负值滥用"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-840",
+    "violated_invariant": "string (被违背的业务不变量，如 '订单总额=单价×数量' 或 '退款≤实付')",
+    "trusted_client_field": "string (被错误信任的字段，如 'req.body.total' 或 'req.body.quantity')",
+    "logic_error_type": "array — 业务逻辑错误类型 (如 ['client_computed_financial', 'discount_stacking', 'negative_abuse', 'limit_slicing', 'refund_excess', 'role_self_grant'])",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['client_computed_financial.java', 'discount_stacking.java'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['server_side_recompute', 'invariant_assertions', 'coupon_single_use'])",
+    "business_impact": "string (0元购/透支/提权/超卖/限额绕过等)",
+    "logic_poc": "string (篡改业务字段的 HTTP 步骤)",
+    "fix_code_hint": "string (服务端重算/断言代码方向)",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

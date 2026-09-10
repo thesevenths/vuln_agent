@@ -1,0 +1,73 @@
+# CWE-915 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(update|edit|create|register|save|profile|settings)/i]'
+  - 'Parameter[annotation=~/(ModelAttribute|RequestBody|RequestParam)/i]'
+  - 'Call[name=~/(populate_obj|copyProperties|assign|fill|bind|hydrate|marshal)/i]'
+
+semantic_keywords:
+  - mass assignment
+  - bind
+  - model
+  - entity
+  - role
+  - admin
+  - is_admin
+  - status
+  - balance
+  - whitelist
+  - blacklist
+  - DTO
+  - fillable
+  - guarded
+  - strong_parameters
+
+file_context:
+  - controller
+  - api_endpoint
+  - form_handler
+  - model
+  - dto
+  - serializer
+  - resource
+
+sensitive_operations:
+  - update_profile
+  - create_user
+  - edit_settings
+  - save_entity
+  - bind_form
+  - deserialize_json
+
+logic_query_keywords_generic:
+  binding_ops:
+    - bind
+    - assign
+    - map
+    - hydrate
+    - fill
+    - mass_assign
+    - deserialize
+  entity_risk:
+    - role
+    - admin
+    - privilege
+    - status
+    - balance
+  protections:
+    - whitelist
+    - blacklist
+    - guarded
+    - fillable
+    - dto
+    - readonly
+
+sanitizers:
+  - 使用了严格的 DTO/VO/Form Object 接收请求参数，物理隔离了数据库实体的敏感字段
+  - '框架层配置了全局或局部的字段绑定白名单/黑名单（如 Spring @InitBinder setDisallowedFields, Rails Strong Parameters）'
+  - 'ORM 实体类的敏感字段被标记为只读、忽略反序列化或不可更新（如 @JsonIgnore, updatable=false, @Transient）'
+  - 'Django ModelForm 显式定义了 fields 白名单元组，未使用 ''__all__'''
+  - Laravel Model 配置了严格的 $guarded 数组，或使用了受控的 $fillable 数组
+  - 'Go 结构体的敏感字段使用了 json:"-" 标签阻止反序列化'
+  - JavaScript/Node.js 使用 _.pick() 白名单或 Joi/Zod schema 严格验证请求体字段
+  - '.NET 使用了 [BindNever] 或 ViewModel 模式隔离了 Entity 的敏感属性'

@@ -1,0 +1,45 @@
+# CWE-384 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(login|signin|authenticate|auth|sso_callback|oauth)/i]'
+  - 'ClassDef[name=~/(Auth|Login|Security|Session|Token)/i]'
+  - 'Annotation[name=~/(PostMapping|RequestMapping).*(login|auth|signin)/i]'
+
+semantic_keywords:
+  - login
+  - session
+  - session_id
+  - jsessionid
+  - phpsessid
+  - regenerate
+  - invalidate
+  - authenticate
+  - session fixation
+
+file_context:
+  - auth_controller
+  - login_service
+  - session_manager
+  - security_config
+  - middleware
+
+logic_query_keywords_generic:
+  auth_endpoints:
+    - login
+    - signin
+    - auth
+    - verify
+  session_ops:
+    - session_id
+    - regenerate
+    - invalidate
+    - renew
+    - rotate
+    - destroy
+
+sanitizers:
+  - 框架默认开启了 Session Fixation Protection（如 Spring Security 默认配置，未使用 .none()）
+  - 登录成功后显式调用了 session.invalidate() 并创建新 Session，或调用了 request.changeSessionId() / session_regenerate_id()
+  - 纯无状态 API（每次请求均使用独立的 JWT/Bearer Token，不依赖服务端 Session 状态），且不存在认证前后的状态混淆
+  - 使用了安全的 SSO 网关或 IdP 统一处理会话，应用层仅作为 RP 且正确处理了回调会话轮换
+  - Flask-Login / Django 等框架的内置 login 函数已自动接管并处理了 Session 轮换

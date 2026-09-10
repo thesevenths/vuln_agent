@@ -1,0 +1,81 @@
+# Python 安全控制检测模式
+# 识别框架级安全装饰器、中间件、配置
+
+# Django 安全控制
+django:
+  auth_decorators:
+    - "login_required"
+    - "permission_required"
+    - "user_passes_test"
+    - "staff_member_required"
+  class_based_auth:
+    - "LoginRequiredMixin"
+    - "PermissionRequiredMixin"
+    - "UserPassesTestMixin"
+  drf_permissions:
+    - "IsAuthenticated"
+    - "IsAdminUser"
+    - "IsAuthenticatedOrReadOnly"
+    - "DjangoModelPermissions"
+    - "permission_classes"
+  middleware:
+    - "AuthenticationMiddleware"
+    - "SessionMiddleware"
+    - "SecurityMiddleware"
+  settings:
+    - "AUTHENTICATION_BACKENDS"
+    - "SESSION_ENGINE"
+    - "SESSION_COOKIE_AGE"
+    - "SESSION_COOKIE_HTTPONLY"
+    - "SESSION_COOKIE_SECURE"
+    - "CSRF_COOKIE_HTTPONLY"
+    - "SECURE_BROWSER_XSS_FILTER"
+    - "SECURE_CONTENT_TYPE_NOSNIFF"
+
+# Flask 安全控制
+flask:
+  auth_decorators:
+    - "login_required"
+    - "requires_auth"
+    - "auth_required"
+    - "roles_required"
+    - "roles_accepted"
+  extensions:
+    - "flask_login"
+    - "flask_security"
+    - "flask_jwt_extended"
+    - "flask_principal"
+  code_patterns:
+    - "current_user"
+    - "is_authenticated"
+    - "check_password_hash"
+    - "generate_password_hash"
+    - "@login_required"
+    - "session"
+
+# FastAPI 安全控制
+fastapi:
+  dependencies:
+    - "Depends(get_current_user)"
+    - "Depends(oauth2_scheme)"
+    - "HTTPBearer"
+    - "OAuth2PasswordBearer"
+    - "APIKeyHeader"
+    - "Security"
+  security_schemes:
+    - "HTTPAuthorizationCredentials"
+    - "SecurityScopes"
+
+# 通用编程式安全检查
+programmatic_checks:
+  authentication:
+    - "is_authenticated"
+    - "check_password"
+    - "verify_token"
+    - "authenticate"
+  authorization:
+    - "has_perm"
+    - "has_permission"
+    - "is_staff"
+    - "is_superuser"
+    - "check_permissions"

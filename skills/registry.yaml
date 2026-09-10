@@ -1,0 +1,345 @@
+# skills/registry.yaml — 统一注册表（替代 registry.json）
+# version 2: 支持 CWE 索引 + 语言配置 + Pipeline 注册
+
+version: 2
+
+# ── CWE -> Skill 目录映射 + Joern 主查询映射 ──────────────────────────────
+cwe_index:
+  # ── Authorization ──
+  "862":
+    category: authorization
+    path: authorization/cwe_862/
+    primary_queries: [sensitive_operations, admin_ops_no_auth]
+    companions: ["863", "285", "284", "306"]
+    priority: P0
+
+  "863":
+    category: authorization
+    path: authorization/cwe_863/
+    primary_queries: [incorrect_authz_source]
+    companions: ["862", "285", "284"]
+    priority: P0
+
+  "287":
+    category: authorization
+    path: authorization/cwe_287/
+    primary_queries: [auth_weakness, jwt_endpoints, jwt_weakness]
+    companions: ["384", "613", "640", "306", "307", "798"]
+    priority: P0
+
+  "306":
+    category: authorization
+    path: authorization/cwe_306/
+    primary_queries: [public_endpoints]
+    companions: ["862", "287", "307"]
+    priority: P0
+
+  "352":
+    category: authorization
+    path: authorization/cwe_352/
+    primary_queries: [csrf_gap]
+    companions: []
+    priority: P0
+
+  "836":
+    category: authorization
+    path: authorization/cwe_836/
+    primary_queries: [client_hash_auth]
+    companions: []
+    priority: P1
+
+  "285":
+    category: authorization
+    path: authorization/cwe_285/
+    primary_queries: [business_authz_gap]
+    companions: ["862", "863", "639"]
+    priority: P0
+
+  "284":
+    category: authorization
+    path: authorization/cwe_284/
+    primary_queries: [cors_config]
+    companions: ["862", "863"]
+    priority: P2
+
+  # ── Business Logic ──
+  "639":
+    category: business_logic
+    path: business_logic/cwe_639/
+    primary_queries: [idor_candidates, idor_path_variable, idor_profile]
+    companions: ["285"]
+    priority: P0
+
+  "840":
+    category: business_logic
+    path: business_logic/cwe_840/
+    primary_queries: [business_logic_risk]
+    companions: []
+    priority: P0
+
+  "841":
+    category: business_logic
+    path: business_logic/cwe_841/
+    primary_queries: [workflow_bypass]
+    companions: []
+    priority: P0
+
+  "915":
+    category: business_logic
+    path: business_logic/cwe_915/
+    primary_queries: [mass_assignment_risk]
+    companions: ["269"]
+    priority: P0
+
+  "362":
+    category: business_logic
+    path: business_logic/cwe_362/
+    primary_queries: [race_condition_risk, toctou_risk]
+    companions: ["367"]
+    priority: P0
+
+  "367":
+    category: business_logic
+    path: business_logic/cwe_367/
+    primary_queries: [toctou_risk]
+    companions: ["362"]
+    priority: P1
+
+  "269":
+    category: business_logic
+    path: business_logic/cwe_269/
+    primary_queries: [privilege_escalation, sensitive_operations]
+    companions: ["915"]
+    priority: P0
+
+  "276":
+    category: business_logic
+    path: business_logic/cwe_276/
+    primary_queries: [incorrect_permissions, file_ops_risk]
+    companions: []
+    priority: P0
+
+  "307":
+    category: business_logic
+    path: business_logic/cwe_307/
+    primary_queries: [brute_force_risk, auth_weakness]
+    companions: ["287", "521", "306"]
+    priority: P0
+
+  "384":
+    category: business_logic
+    path: business_logic/cwe_384/
+    primary_queries: [session_fixation_risk, auth_weakness]
+    companions: ["287", "613"]
+    priority: P0
+
+  "521":
+    category: business_logic
+    path: business_logic/cwe_521/
+    primary_queries: [weak_password_requirements]
+    companions: ["307"]
+    priority: P0
+
+  "610":
+    category: business_logic
+    path: business_logic/cwe_610/
+    primary_queries: [payment_tampering, business_logic_risk]
+    companions: []
+    priority: P0
+
+  "613":
+    category: business_logic
+    path: business_logic/cwe_613/
+    primary_queries: [session_expiration_risk, jwt_weakness]
+    companions: ["384", "287"]
+    priority: P0
+
+  "640":
+    category: business_logic
+    path: business_logic/cwe_640/
+    primary_queries: [password_recovery_weakness]
+    companions: ["287"]
+    priority: P0
+
+  "899":
+    category: business_logic
+    path: business_logic/cwe_899/
+    primary_queries: [sensitive_operations, incorrect_authz_source, business_authz_gap]
+    companions: []
+    priority: P0
+
+  # ── Injection ──
+  "89":
+    category: injection
+    path: injection/cwe_89/
+    primary_queries: [sqli_risk]
+    companions: []
+    priority: P2
+
+  "79":
+    category: injection
+    path: injection/cwe_79/
+    primary_queries: [xss_output_risk]
+    companions: []
+    priority: P2
+
+  "78":
+    category: injection
+    path: injection/cwe_78/
+    primary_queries: [cmd_exec_risk]
+    companions: []
+    priority: P2
+
+  "611":
+    category: injection
+    path: injection/cwe_611/
+    primary_queries: [xxe_risk]
+    companions: []
+    priority: P2
+
+  "502":
+    category: injection
+    path: injection/cwe_502/
+    primary_queries: [deserialization_risk]
+    companions: []
+    priority: P2
+
+  "22":
+    category: injection
+    path: injection/cwe_22/
+    primary_queries: [file_ops_risk]
+    companions: []
+    priority: P2
+
+  "918":
+    category: injection
+    path: injection/cwe_918/
+    primary_queries: [ssrf_risk]
+    companions: []
+    priority: P2
+
+  "200":
+    category: injection
+    path: injection/cwe_200/
+    primary_queries: [info_leak_candidates, info_leak_response, mass_data_exposure]
+    companions: []
+    priority: P2
+
+  "798":
+    category: injection
+    path: injection/cwe_798/
+    primary_queries: [hardcoded_credentials_v2]
+    companions: ["287"]
+    priority: P2
+
+  "341":
+    category: injection
+    path: injection/cwe_341/
+    primary_queries: [jwt_weakness, jwt_endpoints]
+    companions: []
+    priority: P2
+
+  "330":
+    category: injection
+    path: injection/cwe_330/
+    primary_queries: [jwt_weakness]
+    companions: []
+    priority: P2
+
+# ── 语言 -> 框架信号 -> 加载哪些语言 skill ─────────────────────────────────
+language_profiles:
+  java:
+    framework_signals:
+      spring_security: ["SpringSecurity", "spring-security-config", "spring-boot-starter-security"]
+      shiro: ["org.apache.shiro", "shiro-spring", "shiro-web"]
+      jaxrs: ["javax.ws.rs", "jakarta.ws.rs", "jersey", "resteasy"]
+    always_load: [auth_controls, source_patterns, endpoint_discovery, cwe_patterns]
+    conditional_load:
+      spring_security: [spring_security]
+      shiro: [shiro_security]
+
+  python:
+    framework_signals:
+      django: ["django", "djangorestframework"]
+      flask: ["flask", "flask-login", "flask-jwt"]
+      fastapi: ["fastapi"]
+    always_load: [auth_controls, source_patterns, endpoint_discovery, cwe_patterns]
+    conditional_load:
+      django: [django_permissions]
+      flask: [flask_auth]
+
+# ── Pipeline skill 注册（从 registry.json 迁移） ──────────────────────────
+pipelines:
+  - skill_id: source_0day_pipeline
+    file: pipelines/source_0day_pipeline.yaml
+    enabled: true
+
+  - skill_id: binary_0day_direct
+    file: pipelines/binary_0day_direct.yaml
+    enabled: true
+
+  - skill_id: reachability_exploitability
+    file: pipelines/reachability_exploitability.yaml
+    enabled: true
+
+  - skill_id: version_identification
+    file: pipelines/version_identification.yaml
+    enabled: true
+
+  - skill_id: poc_generation_validation
+    file: pipelines/poc_generation_validation.yaml
+    enabled: true
+
+  - skill_id: java_attack_surface
+    file: pipelines/java_attack_surface.yaml
+    enabled: true
+
+  - skill_id: java_web_audit_pipeline
+    file: pipelines/java_web_audit_pipeline.yaml
+    enabled: true
+
+  - skill_id: logic_vuln_audit_pipeline
+    file: pipelines/logic_vuln_audit_pipeline.yaml
+    enabled: true
+
+  - skill_id: web_pentest_whitebox_pipeline
+    file: pipelines/web_pentest_whitebox_pipeline.yaml
+    enabled: false
+    comment: "借鉴 Shannon 五阶段；启用前需 base_url + 授权"
+
+  - skill_id: expert_cpp_buffer_overflow
+    file: pipelines/expert_cpp_buffer_overflow.yaml
+    enabled: true
+
+  - skill_id: expert_cpp_uaf_double_free
+    file: pipelines/expert_cpp_uaf_double_free.yaml
+    enabled: true
+
+  - skill_id: expert_cpp_integer_overflow
+    file: pipelines/expert_cpp_integer_overflow.yaml
+    enabled: true
+
+  - skill_id: expert_cpp_memory_leak
+    file: pipelines/expert_cpp_memory_leak.yaml
+    enabled: true
+
+  - skill_id: expert_java_sql_injection
+    file: pipelines/expert_java_sql_injection.yaml
+    enabled: true
+
+  - skill_id: expert_java_injection_suite
+    file: pipelines/expert_java_injection_suite.yaml
+    enabled: true
+
+  - skill_id: expert_java_deserialization
+    file: pipelines/expert_java_deserialization.yaml
+    enabled: true
+
+  - skill_id: expert_java_auth_bypass
+    file: pipelines/expert_java_auth_bypass.yaml
+    enabled: true
+
+  - skill_id: cve_pattern_scan
+    file: pipelines/cve_pattern_scan.yaml
+    enabled: false
+    comment: "CVE 知识库 DB 就绪后启用"

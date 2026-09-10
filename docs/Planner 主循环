@@ -1,0 +1,43 @@
+flowchart TB
+    START["planner.run 开始"]
+    START --> SEED["seed context / ensure CPG 路径 / audit run_started"]
+    SEED --> IDX["_rebuild_project_file_index<br/>_live_file_index 完整 all_paths<br/>metadata 仅存 to_dict 摘要"]
+    IDX --> AVL["metadata.available_source_files<br/>flat_list_for_prompt 100 条给 LLM"]
+    AVL --> LO{"detect_logic_only_intent?"}
+    LO -->|是| MODE["metadata.audit_mode = logic_only<br/>禁止污点 scan / 污点 Skill"]
+    LO -->|否| STEP
+    MODE --> STEP{"step 1..max_steps"}
+
+    STEP --> PLAN["_plan_next_step<br/>LLM 读 state_snapshot + 历史<br/>输出 next_action 或 done"]
+    PLAN --> AUD1["audit: plan_generated"]
+
+    PLAN --> DONE{"done?"}
+    DONE -->|是| FG["_prepare_finish_gate<br/>检查 blocker"]
+    FG --> BLOCK{"被拦?"}
+    BLOCK -->|是| FORCE["_forced_action_after_finish_block<br/>注入 L2 读 / 增量 scan / logic 重试"]
+    FORCE --> EXEC
+    BLOCK -->|否| END["写报告 + audit run_finished"]
+
+    DONE -->|否| GATE["_check_planner_action_gate<br/>未读 L2 / 未收敛 flow 等"]
+    GATE --> LO2{"logic_only?"}
+    LO2 -->|是| BLOCK_TAINT["拒绝 run_source_scan / run_taint_queries<br/>等污点类工具"]
+    LO2 -->|否| EXEC
+    BLOCK_TAINT --> EXEC["_execute_action(tool_name)"]
+    EXEC --> AUD2["audit: action_executed"]
+    AUD2 --> INGEST["更新 state<br/>flows / report / metadata / ambiguous / logic_*"]
+    INGEST --> STEP
+
+    subgraph file_gate [FileTool 路径门控]
+        direction TB
+        FG2["_resolve_planner_read_path<br/>仅 resolve_l2_path 经 project_file_index"]
+        FG2 --> MISS{"非 glob 且解析失败?"}
+        MISS -->|是| REJ["path_not_in_index<br/>日志: 索引拒绝"]
+        MISS -->|否| DISK["join local_source_path 读盘"]
+        DISK --> NF{"文件不存在?"}
+        NF -->|是| DNF["日志: 索引已解析但磁盘不存在"]
+        NF -->|否| OK[read_file 成功]
+        FG2 -.->|无 direct_fs / sanitize 绕过| REJ
+    end
+
+    EXEC -.->|FileTool.read_file| file_gate
+    FORCE -.->|_build_forced_l2_read_action| file_gate

@@ -1,0 +1,87 @@
+# CWE-639 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别资源访问操作】当前代码是否执行了针对特定用户/实体资源的读写操作？（如查询发票、读取档案、修改订单、下载文件）。同时识别通过资源 ID 访问的所有端点。'
+  - 'Step 1: 【追溯资源标识符来源】用于定位资源的 key/id 参数是否直接或间接来自外部输入？（URL param, body field, cookie, header）。记录所有外部可控的资源标识符。'
+  - 'Step 2: 【检查所有权绑定逻辑】在执行资源访问前，是否存在将当前会话用户身份与目标资源标识符进行关联校验的逻辑？对照 anti_patterns.direct_id_query 和 control_detection_patterns.ownership_binding_in_query。安全模式：WHERE id = @id AND owner_id = @current_user_id；漏洞模式：WHERE id = @id（仅依赖外部传入的 id）。'
+  - 'Step 3: 【评估前端限制的可靠性】即使前端有下拉框/列表限制，服务端是否独立验证了资源归属？（前端限制 ≠ 安全控制）。对照 anti_patterns.front_end_only_restriction。'
+  - 'Step 4: 【评估 ID 可预测性】资源 ID 是否为可预测的连续整数（auto_increment），攻击者可枚举 ID 访问他人资源。对照 anti_patterns.predictable_ids 和 control_detection_patterns.unguessable_ids。'
+  - 'Step 5: 【检查框架级隔离】是否使用了框架级的数据隔离机制（Hibernate @Filter、EF Core Global Query Filter、Django Manager 过滤）。对照 control_detection_patterns.framework_data_isolation。'
+  - 'Step 6: 【评估多租户隔离】在多租户系统中，查询是否同时包含租户 ID 过滤，防止跨租户访问。'
+  - 'Step 7: 【确认绕过路径】攻击者能否通过修改 key 值访问其他用户的同类资源？若可 → 确认为 CWE-639。'
+  - 'Step 8: 【八项确认标准】缺一不得 confirmed：(1)资源 ID 来自外部输入 (2)查询无所有权绑定 (3)无前端唯一限制 (4)ID 可预测或枚举 (5)无框架级数据隔离 (6)多租户有隔离 (7)无签名 ID 验证 (8)服务端可被绕过'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: '@GetMapping("/api/invoices/{id}")
+public Invoice getInvoice(@PathVariable Long id) {
+    return invoiceRepo.findById(id).orElseThrow();
+}'
+      vulnerability_analysis: '发票查询仅依赖客户端传入的 id，未绑定当前用户身份。攻击者可遍历 /api/invoices/1, /api/invoices/2, ... 访问所有用户的发票。即使使用了参数化查询防 SQL 注入，仍为 IDOR 水平越权。'
+      fix_pattern: '@GetMapping("/api/invoices/{id}") public Invoice getInvoice(@PathVariable Long id, @AuthenticationPrincipal User user) { Invoice inv = invoiceRepo.findById(id).orElseThrow(); if (!inv.getUserId().equals(user.getId())) throw new AccessDeniedException(); return inv; }'
+    - code_snippet: '@app.get("/api/documents/{doc_id}")
+async def get_document(doc_id: int, current_user: User = Depends(get_current_user)):
+    doc = await Document.filter(id=doc_id).first()
+    if not doc:
+        raise HTTPException(404)
+    return doc.dict()'
+      vulnerability_analysis: 文档查询仅按 doc_id 过滤，未绑定 current_user.id。任何已认证用户可通过修改 doc_id 访问他人文档。缺少所有权校验。
+      fix_pattern: 'doc = await Document.filter(id=doc_id, user_id=current_user.id).first(); if not doc: raise HTTPException(404)'
+    - code_snippet: 'app.get(''/api/orders/:orderId'', authMiddleware, async (req, res) => {
+    const order = await Order.findByPk(req.params.orderId);
+    if (!order) return res.status(404).json({error: ''Not found''});
+    res.json(order);
+});'
+      vulnerability_analysis: 虽然有 authMiddleware 验证了用户身份，但 Order.findByPk 仅按 orderId 查询，未绑定 req.user.id。已认证用户可遍历 orderId 访问他人订单（水平越权）。
+      fix_pattern: 'const order = await Order.findOne({ where: { id: req.params.orderId, userId: req.user.id } }); if (!order) return res.status(404).json({error: ''Not found''});'
+    - code_snippet: 'func GetProfile(c *gin.Context) {
+    id := c.Param("id")
+    var profile Profile
+    db.First(&profile, id)
+    c.JSON(200, profile)
+}'
+      vulnerability_analysis: Profile 查询仅按 id 过滤，未绑定当前用户。攻击者可遍历 id 获取所有用户 Profile。Go 无框架级数据隔离，完全依赖开发者手动添加所有权检查。
+      fix_pattern: 'userID := c.GetUint("userID"); db.Where("id = ? AND user_id = ?", id, userID).First(&profile); if profile.ID == 0 { c.JSON(404, gin.H{"error": "not found"}); return }'
+    - code_snippet: 'public function show($id)
+{
+    $invoice = Invoice::findOrFail($id);
+    return response()->json($invoice);
+}'
+      vulnerability_analysis: 'Invoice::findOrFail($id) 仅按 id 查询，未绑定当前认证用户。任何已登录用户可通过修改 $id 访问他人发票。Laravel 的 Eloquent 默认不执行所有权校验。'
+      fix_pattern: '$invoice = Invoice::where(''id'', $id)->where(''user_id'', auth()->id())->firstOrFail(); return response()->json($invoice);'
+    - code_snippet: '[HttpGet("{id}")]
+public async Task<IActionResult> GetOrder(int id)
+{
+    var order = await _context.Orders.FindAsync(id);
+    if (order == null) return NotFound();
+    return Ok(order);
+}'
+      vulnerability_analysis: FindAsync(id) 仅按 id 查询，未绑定当前用户。任何已认证用户可通过修改 id 访问他人订单。EF Core 默认不执行所有权校验。
+      fix_pattern: 'var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value; var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId); if (order == null) return NotFound();'
+  mitigation_rules:
+    - 每次数据访问都必须验证当前用户对该记录拥有足够权限（所有权绑定查询）。
+    - 资源查找 key 不应由用户直接控制；若必须使用，需配合数字签名或加密防篡改。
+    - 实施 Default Deny：未明确验证所有权的资源访问一律拒绝。
+    - 避免使用顺序/可预测的 ID 作为资源标识符；改用 UUID 或 HMAC 签名 ID。
+    - 在多租户系统中，所有查询必须包含租户 ID 过滤条件。
+    - '使用框架级数据隔离机制（如 Hibernate @Filter、EF Core Global Query Filter）减少遗漏。'
+
+anti_patterns:
+  - description
+  - direct_id_query
+  - predictable_ids
+  - front_end_only_restriction
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-639
+  idor_type: 'array — IDOR 类型 (如 [''horizontal'', ''vertical_via_flag'', ''session_hijack_via_predictable_id'', ''cross_tenant''])'
+  uncontrolled_key_source: 'string (指出具体哪个参数来自外部且未被所有权校验，如 ''req.params.orderId'' 或 ''@PathVariable Long id'')'
+  missing_ownership_check: string (描述应添加但未添加的所有权校验逻辑)
+  anti_pattern_hit: 'array — 命中的反向模式 (如 [''direct_id_query.java'', ''predictable_ids.java''])'
+  control_missing: 'array — 缺失的安全控制 (如 [''ownership_binding_in_query'', ''framework_data_isolation'', ''unguessable_ids''])'
+  reasoning_trace: string (必须引用查询条件分析作为推理依据)
+  business_impact: 'string (从 common_consequences 映射: 水平越权/数据泄露/跨租户访问)'
+  risk_level: HIGH
+  remediation: 'string (结合 potential_mitigations 生成，强调''服务端所有权绑定'')'

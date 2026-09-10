@@ -1,0 +1,57 @@
+# 防幻觉规则
+# 禁止 LLM 编造不存在的代码、文件、CVE、配置
+
+anti_hallucination:
+  philosophy: >
+    LLM 在漏洞分析中最危险的错误是"幻觉"——编造不存在的文件路径、代码行、CVE 编号、
+    安全配置或方法调用。这些编造会导致误报甚至误导人工审计。
+    以下规则为硬性约束，违反即判定分析无效。
+
+  hard_rules:
+    no_fabricated_paths:
+      rule: "禁止编造不存在的文件路径"
+      enforcement: >
+        所有引用的文件路径必须来自「可用文件列表」或 Joern 查询结果中的 file= 字段。
+        missing_L2_reads 中的路径也必须来自可用文件列表，不得编造。
+      violation_example: "输入中无 SecurityConfig.java 但报告中引用了它"
+
+    no_fabricated_code:
+      rule: "禁止编造代码片段"
+      enforcement: >
+        引用的代码必须有来源：Joern 输出（code=）、原始源码读取（_read_original_source）、
+        或 prompt 中已注入的上下文。不得凭记忆或推测生成代码。
+
+    no_fabricated_cve:
+      rule: "禁止编造 CVE 编号"
+      enforcement: >
+        CWE 编号可基于漏洞类型推断（如 SQL 注入 → CWE-89）；
+        CVE 编号必须来自组件扫描结果或已知公开 CVE，不确定时写"待确认"。
+
+    no_fabricated_config:
+      rule: "禁止编造安全配置"
+      enforcement: >
+        不得声称存在 SecurityFilterChain / Shiro 配置 / application.yml 安全项，
+        除非已通过 FileTool 或 Joern 查询实际读取到该配置内容。
+
+    no_assumption_without_evidence:
+      rule: "禁止无证据的推断性断言"
+      enforcement: >
+        不得使用"可能""似乎""大概率"作为判定依据。
+        每项判定必须有 [文件名:行号] 或调用链节点证据。
+        输入无行号时写"待确认"并说明缺什么数据。
+
+  evidence_requirements:
+    code_reference: "每个漏洞声明必须引用具体 [文件:行号]"
+    call_chain: "调用链每个节点注明文件+行号"
+    config_claim: "声称存在/不存在安全配置时，必须已读取对应文件"
+    version_claim: "版本声明必须来自 pom.xml / build.gradle / requirements.txt 实际内容"
+
+  source_quality_note:
+    original_file: "基于原始源文件分析（最高可信度）"
+    joern_reconstructed: "基于 Joern 重建的代码分析（可能有信息丢失）"
+    no_source: "无源码证据，仅基于查询元数据（最低可信度，需 L2 补证）"
+
+  applicable_to:
+    - "所有 CWE skill 的 LLM 分析"
+    - "SCA 可达性分析（sca_core_principles）"
+    - "反证阶段（refutation）的复核"

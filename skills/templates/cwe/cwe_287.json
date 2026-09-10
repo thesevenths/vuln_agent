@@ -1,0 +1,743 @@
+{
+  "skill_id": "cwe_287_improper_authentication",
+  "source_cwe": ["CWE-287"],
+  "related_cwes": [
+    {"cwe": "CWE-306", "reason": "missing_auth_for_critical_function - 认证不当与缺少认证常共现：认证机制存在缺陷等同于关键功能无认证"},
+    {"cwe": "CWE-384", "reason": "session_fixation - 会话固定是 CWE-287 的典型攻击向量：登录后未重新生成 Session ID"},
+    {"cwe": "CWE-613", "reason": "insufficient_session_expiration - 会话过期不足使认证令牌长期有效，放大认证缺陷窗口"},
+    {"cwe": "CWE-640", "reason": "weak_password_reset - 弱密码重置机制（可预测 token、无过期）是认证不当的补充攻击面"},
+    {"cwe": "CWE-798", "reason": "hardcoded_credentials - 硬编码凭据直接导致认证可被绕过"},
+    {"cwe": "CWE-307", "reason": "brute_force_gap - 缺少登录频率限制使暴力破解成为可能，是 CWE-287 的高频利用路径"},
+    {"cwe": "CWE-521", "reason": "weak_password_requirements - 弱密码策略（无复杂度/长度要求）降低认证强度"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - 认证缺陷常与授权缺失组合：未认证即可访问需鉴权资源"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(login|authenticate|signin|verify|doLogin|attemptLogin|handleAuth|authCallback|resetPassword|changePassword)/i]",
+      "ClassDef[name=~/(AuthController|LoginController|SecurityController|TokenController|PasswordController|SessionManager|AuthFilter|AuthenticationFilter)/i]",
+      "Call[name=~/(authenticate|login|verify|parseClaims|setSigningKey|createToken|generateToken|validateToken|checkPassword|matches)/i]",
+      "Comparison[operator=='=='][operand~=/password|token|secret|otp|pin|code/i]",
+      "JWT[verify_signature=false]",
+      "Annotation[name=~/(PostMapping|RequestMapping).*(login|auth|signin|token|password|reset)/i]"
+    ],
+    "semantic_keywords": [
+      "login", "authenticate", "password", "token", "jwt", "session", "rememberMe",
+      "bypass", "hardcoded", "default credential", "weak comparison", "otp",
+      "mfa", "2fa", "two_factor", "verification_code", "pin", "captcha",
+      "brute_force", "lockout", "rate_limit", "max_attempts",
+      "session_fixation", "session_regenerate", "invalidate",
+      "none_algorithm", "empty_secret", "weak_secret", "expired_token"
+    ],
+    "file_context": [
+      "auth_controller", "login_handler", "security_config", "token_service",
+      "auth_filter", "session_manager", "password_service", "user_service",
+      "credential_validator", "mfa_handler", "otp_service", "reset_password"
+    ],
+    "operation_triggers": {
+      "description": "认证入口点和凭据管理端点是 CWE-287 的核心攻击面，必须逐一验证认证逻辑完整性",
+      "sensitive_operations": [
+        "login", "logout", "register", "reset_password", "change_password",
+        "verify_token", "refresh_token", "invalidate_session",
+        "enable_mfa", "disable_mfa", "verify_otp",
+        "forgot_password", "confirm_email", "unlock_account"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Post|Get|Put)Mapping.*/(login|auth|signin|token|password|reset|session|otp|mfa)",
+          "@RequestMapping.*/(login|auth|signin|token|password)"
+        ],
+        "python": [
+          "@app\\.route.*/(login|auth|signin|token|password|reset|otp)",
+          "@router\\.(post|get|put).*/(login|auth|signin|token|password)",
+          "@api_view.*\\[.*(?:POST|GET)"
+        ],
+        "go": [
+          "\\.(POST|GET|PUT)\\(.*/(login|auth|signin|token|password|reset|otp)",
+          "r\\.(POST|GET)"
+        ],
+        "javascript": [
+          "router\\.(post|get|put).*/(login|auth|signin|token|password|reset|otp)",
+          "@(Post|Get|Put)\\(.*/(login|auth|signin|token|password)",
+          "app\\.(post|get|put)"
+        ],
+        "php": [
+          "Route::(post|get|put).*/(login|auth|signin|token|password|reset|otp)",
+          "@Route.*methods.*(?:POST|GET).*/(login|auth|password)"
+        ],
+        "dotnet": [
+          "\\[Http(Post|Get|Put)\\].*/(login|auth|signin|token|password|reset|otp)",
+          "\\[AllowAnonymous\\].*/(login|auth|reset)"
+        ],
+        "ruby": [
+          "(post|get|put)\\s+\"/(login|auth|signin|token|password|reset|otp)",
+          "devise.*:sessions|:passwords|:registrations"
+        ],
+        "rust": [
+          "\\.route.*/(login|auth|signin|token|password|reset).*method.*(?:POST|GET)",
+          "\\.post\\(.*/(login|auth|token)",
+          "\\.get\\(.*/(login|auth|token)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "spring_auth_ops": [
+        "authenticate", "attemptAuthentication", "doLogin", "login",
+        "successfulAuthentication", "unsuccessfulAuthentication",
+        "AuthenticationManager", "AuthenticationProvider", "UserDetailsService",
+        "DaoAuthenticationProvider", "loadUserByUsername"
+      ],
+      "shiro_auth_ops": [
+        "SecurityUtils.getSubject", "Subject.login", "UsernamePasswordToken",
+        "rememberMe", "filterChainDefinitions", "authc", "anon",
+        "DefaultSecurityManager", "AuthenticatingRealm"
+      ],
+      "jwt_ops": [
+        "parseClaims", "setSigningKey", "Jwts.parser", "Jwts.builder",
+        "verify", "JWT.decode", "getClaims", "getSubject",
+        "setExpiration", "setIssuedAt", "SignatureAlgorithm",
+        "none", "HS256", "RS256", "MAC"
+      ],
+      "session_ops": [
+        "HttpSession", "session.getAttribute", "session.setAttribute",
+        "session.invalidate", "request.getSession", "session.getId",
+        "SecurityContextHolder", "SecurityContext"
+      ],
+      "password_ops": [
+        "PasswordEncoder", "BCryptPasswordEncoder", "passwordEncoder.matches",
+        "passwordEncoder.encode", "password.equals", "password.compareTo",
+        "checkPassword", "verifyPassword"
+      ],
+      "weak_patterns": [
+        "equals(", "==", "compareTo", "none", "permitAll", "anonymous",
+        "rememberMe", "hardcoded", "default_password", "admin123"
+      ],
+      "config_files": [
+        "application.properties", "application.yml",
+        "SecurityConfig.java", "WebSecurityConfig.java", "ShiroConfig.java",
+        "JwtUtils.java", "TokenProvider.java"
+      ]
+    },
+    "python": {
+      "django_auth_ops": [
+        "authenticate", "login", "logout", "AUTHENTICATION_BACKENDS",
+        "User.objects.create_user", "check_password", "make_password",
+        "SESSION_ENGINE", "SESSION_COOKIE_AGE", "LOGIN_URL"
+      ],
+      "flask_auth_ops": [
+        "login_user", "logout_user", "login_required", "current_user",
+        "check_password_hash", "generate_password_hash",
+        "session", "flask_login", "flask_security"
+      ],
+      "fastapi_auth_ops": [
+        "OAuth2PasswordBearer", "Depends(get_current_user)",
+        "create_access_token", "verify_token", "decode_token",
+        "HTTPBearer", "APIKeyHeader"
+      ],
+      "password_ops": [
+        "bcrypt", "argon2", "hashlib", "sha256", "md5",
+        "check_password_hash", "generate_password_hash",
+        "werkzeug.security", "passlib"
+      ],
+      "weak_patterns": [
+        "password.*==", "password.*is.*not.*None",
+        "md5", "sha1", "sha256.*without.*salt",
+        "default_password", "admin123", "test123"
+      ],
+      "config_files": [
+        "settings.py", "config.py", "app.py", ".env",
+        "auth.py", "security.py", "tokens.py"
+      ]
+    },
+    "php": {
+      "laravel_auth_ops": [
+        "Auth::attempt", "Auth::login", "Auth::logout", "Auth::check",
+        "Hash::make", "Hash::check", "bcrypt",
+        "Password::reset", "PasswordBroker", " Sanctum", "Passport"
+      ],
+      "symfony_auth_ops": [
+        "UserPasswordEncoderInterface", "Security::getUser",
+        "LoginFormAuthenticator", "AbstractFormLoginAuthenticator",
+        "GuardAuthenticatorInterface"
+      ],
+      "native_auth_ops": [
+        "password_hash", "password_verify", "md5", "sha1",
+        "session_start", "session_regenerate_id",
+        "$_SESSION", "setcookie"
+      ],
+      "weak_patterns": [
+        "md5(", "sha1(", "password.*==", "strcmp",
+        "$_COOKIE.*role", "session_id.*predictable"
+      ],
+      "config_files": [
+        "config/auth.php", "config/session.php", "config/hashing.php",
+        "routes/web.php", "routes/api.php"
+      ]
+    },
+    "go": {
+      "auth_ops": [
+        "jwt.Parse", "jwt.NewWithClaims", "jwt.MapClaims",
+        "bcrypt.CompareHashAndPassword", "bcrypt.GenerateFromPassword",
+        "session.Get", "session.Save", "sessions.Store",
+        "gorilla/sessions", "gin-sessions"
+      ],
+      "weak_patterns": [
+        "hmac.*[]byte(\"secret\")", "password.*==",
+        "jwt.*Without.*Verification", "ParseUnverified",
+        "md5", "sha1"
+      ],
+      "config_files": [
+        "config.yaml", "config.json", ".env",
+        "auth.go", "middleware.go", "jwt.go"
+      ]
+    },
+    "javascript": {
+      "express_auth_ops": [
+        "passport.authenticate", "passport.use", "passport.serializeUser",
+        "express-session", "req.session", "req.isAuthenticated",
+        "jsonwebtoken", "jwt.sign", "jwt.verify", "jwt.decode",
+        "bcrypt.compare", "bcrypt.hash", "bcrypt.compareSync"
+      ],
+      "nestjs_auth_ops": [
+        "AuthGuard", "JwtAuthGuard", "LocalAuthGuard",
+        "PassportStrategy", "validate", "@UseGuards",
+        "JwtService", "sign", "verify"
+      ],
+      "weak_patterns": [
+        "jwt.decode.*without.*verify", "algorithm.*none",
+        "password.*===", "md5(", "crypto.createHash('md5')",
+        "secret.*=.*'secret'", "secret.*=.*'key'"
+      ],
+      "config_files": [
+        "app.js", "server.js", ".env",
+        "auth.js", "passport.js", "jwt.js",
+        "auth.module.ts", "auth.service.ts"
+      ]
+    },
+    "dotnet": {
+      "auth_ops": [
+        "SignInManager", "UserManager", "PasswordHasher",
+        "HttpContext.SignInAsync", "ClaimsPrincipal",
+        "JwtSecurityToken", "TokenValidationParameters",
+        "AddAuthentication", "AddJwtBearer", "AddCookie"
+      ],
+      "weak_patterns": [
+        "ValidateIssuerSigningKey.*false", "ValidateLifetime.*false",
+        "password.*==", "MD5", "SHA1.*without.*salt"
+      ],
+      "config_files": [
+        "appsettings.json", "Startup.cs", "Program.cs",
+        "AuthController.cs", "TokenService.cs"
+      ]
+    },
+    "ruby": {
+      "auth_ops": [
+        "devise", "warden", "authenticate_user!",
+        "has_secure_password", "bcrypt", "BCrypt::Password",
+        "session", "reset_session", "current_user"
+      ],
+      "weak_patterns": [
+        "Digest::MD5", "Digest::SHA1", "password.*==",
+        "skip_before_action.*authenticate"
+      ],
+      "config_files": [
+        "config/initializers/devise.rb", "config/initializers/session_store.rb",
+        "app/models/user.rb"
+      ]
+    },
+    "rust": {
+      "auth_ops": [
+        "jsonwebtoken", "decode", "encode", "Validation",
+        "bcrypt", "verify", "hash",
+        "actix_session", "tower_sessions"
+      ],
+      "weak_patterns": [
+        "danger_unsafe_unverified", "Validation.*insecure_disable_signature_validation",
+        "md5", "sha1"
+      ],
+      "config_files": [
+        "Cargo.toml", "config.toml", ".env", "auth.rs"
+      ]
+    },
+    "generic": {
+      "auth_entry": ["login", "authenticate", "signin", "verify", "auth", "token", "session"],
+      "weak_patterns": ["==", "equals", "none", "allow_anonymous", "skip_auth", "hardcoded", "default"],
+      "token_ops": ["jwt", "decode", "verify", "parse", "session", "sign", "encode"],
+      "password_ops": ["bcrypt", "argon2", "scrypt", "hash", "salt", "pbkdf2"]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表认证机制中的高风险反模式",
+    "weak_password_comparison": {
+      "description": "密码使用明文比较而非安全哈希验证",
+      "java": [
+        "password\\.equals\\(",
+        "password\\.compareTo\\(",
+        "password\\s*==\\s*",
+        "password\\.equalsIgnoreCase\\(",
+        "userPassword\\.equals\\(inputPassword\\)",
+        "without.*PasswordEncoder.*matches"
+      ],
+      "python": [
+        "password\\s*==\\s*",
+        "user\\.password\\s*==",
+        "if.*password.*==.*input",
+        "md5\\(password\\)",
+        "sha256\\(password\\).*without.*salt"
+      ],
+      "php": [
+        "password\\s*==\\s*",
+        "strcmp\\(\\$password.*\\$input",
+        "md5\\(\\$password\\)",
+        "sha1\\(\\$password\\)",
+        "without.*password_verify"
+      ],
+      "go": [
+        "password\\s*==\\s*",
+        "[]byte\\(password\\).*==",
+        "without.*bcrypt\\.Compare"
+      ],
+      "javascript": [
+        "password\\s*===?\\s*",
+        "user\\.password\\s*===?\\s*req\\.body",
+        "crypto\\.createHash\\('md5'\\).*password",
+        "without.*bcrypt\\.compare"
+      ],
+      "dotnet": [
+        "Password\\s*==\\s*",
+        "password\\.Equals\\(",
+        "without.*PasswordHasher.*Verify"
+      ],
+      "ruby": [
+        "password\\s*==\\s*",
+        "Digest::MD5.*password",
+        "without.*has_secure_password"
+      ],
+      "rust": [
+        "password\\s*==\\s*",
+        "without.*bcrypt.*verify"
+      ]
+    },
+    "session_fixation": {
+      "description": "登录成功后未重新生成 Session ID，允许会话固定攻击",
+      "java": [
+        "session\\.setAttribute.*without.*invalidate",
+        "login.*session.*without.*getId.*change",
+        "authenticate.*session.*without.*regenerate",
+        "successfulAuthentication.*without.*session\\.invalidate"
+      ],
+      "python": [
+        "login_user.*without.*session.*regenerate",
+        "flask_login.*without.*session\\.new",
+        "session\\[.user.\\]\\s*=.*without.*session\\.modified"
+      ],
+      "php": [
+        "session_start.*login.*without.*session_regenerate_id",
+        "$_SESSION.*=.*without.*session_regenerate_id"
+      ],
+      "javascript": [
+        "req\\.session\\.user.*=.*without.*req\\.session\\.regenerate",
+        "login.*session.*without.*regenerate"
+      ],
+      "generic": [
+        "login.*session.*without.*regenerate",
+        "authenticate.*without.*new_session_id",
+        "session.*reuse.*after.*login"
+      ]
+    },
+    "hardcoded_credentials": {
+      "description": "代码中存在硬编码的凭据或默认密码",
+      "java": [
+        "password.*=.*\"[^\"]{3,}\"",
+        "secret.*=.*\"[^\"]{3,}\"",
+        "apiKey.*=.*\"[^\"]{3,}\"",
+        "default.*password.*=.*\"",
+        "admin.*password.*=.*\"",
+        "\"admin123\"", "\"password123\"", "\"test123\""
+      ],
+      "python": [
+        "password\\s*=\\s*['\"][^'\"]{3,}['\"]",
+        "secret\\s*=\\s*['\"][^'\"]{3,}['\"]",
+        "default_password.*=",
+        "admin.*password.*="
+      ],
+      "php": [
+        "\\$password\\s*=\\s*['\"][^'\"]{3,}['\"]",
+        "\\$secret\\s*=\\s*['\"][^'\"]{3,}['\"]",
+        "default.*password.*=>"
+      ],
+      "go": [
+        "password\\s*:=\\s*\"[^\"]{3,}\"",
+        "secret\\s*:=\\s*\"[^\"]{3,}\"",
+        "[]byte\\(\"secret\"\\)"
+      ],
+      "javascript": [
+        "password\\s*[:=]\\s*['\"][^'\"]{3,}['\"]",
+        "secret\\s*[:=]\\s*['\"][^'\"]{3,}['\"]",
+        "const.*SECRET.*=.*['\"][^'\"]{3,}['\"]"
+      ],
+      "generic": [
+        "hardcoded.*password", "default.*credential",
+        "admin.*123", "root.*password"
+      ]
+    },
+    "brute_force_gap": {
+      "description": "登录接口缺少暴力破解防护（频率限制、账户锁定、验证码）",
+      "java": [
+        "login.*without.*rateLimit",
+        "authenticate.*without.*lockout",
+        "without.*maxAttempts",
+        "without.*captcha",
+        "without.*AccountLock"
+      ],
+      "python": [
+        "login.*without.*limiter",
+        "authenticate.*without.*rate_limit",
+        "without.*slowapi",
+        "without.*celery.*lockout"
+      ],
+      "php": [
+        "login.*without.*throttle",
+        "Auth::attempt.*without.*RateLimiter"
+      ],
+      "javascript": [
+        "login.*without.*rateLimit",
+        "authenticate.*without.*express-rate-limit",
+        "without.*brute.*force.*protection"
+      ],
+      "generic": [
+        "login.*without.*rate_limit",
+        "auth.*without.*lockout",
+        "signin.*without.*throttle"
+      ]
+    },
+    "jwt_weakness": {
+      "description": "JWT 实现存在安全弱点（none 算法、弱密钥、缺少过期校验）",
+      "java": [
+        "SignatureAlgorithm.*NONE",
+        "setSigningKey.*\"secret\"",
+        "setSigningKey.*\\[\\]byte",
+        "without.*setExpiration",
+        "Jwts\\.parser.*without.*setSigningKey"
+      ],
+      "python": [
+        "jwt\\.decode.*algorithms.*none",
+        "jwt\\.decode.*verify.*False",
+        "jwt\\.encode.*secret.*=",
+        "without.*exp.*payload"
+      ],
+      "javascript": [
+        "jwt\\.decode.*without.*verify",
+        "algorithm.*none",
+        "secret.*=.*['\"]secret['\"]",
+        "jwt\\.sign.*without.*expiresIn"
+      ],
+      "generic": [
+        "alg.*none", "empty.*secret", "weak.*key",
+        "without.*expiration", "without.*expiry"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "password_strength_check": {
+      "description": "密码是否通过安全哈希和强度验证",
+      "java": [
+        "PasswordEncoder.*matches",
+        "BCryptPasswordEncoder",
+        "passwordPolicy.*isStrong",
+        "passwordValidator.*validate",
+        "PasswordValidation.*check"
+      ],
+      "python": [
+        "bcrypt\\.checkpw",
+        "argon2.*verify",
+        "check_password_hash",
+        "passlib.*verify",
+        "django.*check_password"
+      ],
+      "php": [
+        "password_verify",
+        "Hash::check",
+        "password_hash.*PASSWORD_BCRYPT",
+        "Hash::make"
+      ],
+      "go": [
+        "bcrypt\\.CompareHashAndPassword",
+        "bcrypt\\.GenerateFromPassword",
+        "argon2.*Compare"
+      ],
+      "javascript": [
+        "bcrypt\\.compare",
+        "bcrypt\\.compareSync",
+        "argon2\\.verify",
+        "crypto\\.pbkdf2Sync"
+      ],
+      "dotnet": [
+        "PasswordHasher.*VerifyHashedPassword",
+        "BCrypt\\.Verify",
+        "userManager\\.CheckPasswordAsync"
+      ],
+      "ruby": [
+        "BCrypt::Password.*==",
+        "has_secure_password",
+        "authenticate"
+      ],
+      "rust": [
+        "bcrypt::verify",
+        "argon2::verify_encoded"
+      ]
+    },
+    "session_regeneration": {
+      "description": "登录后是否重新生成 Session ID",
+      "java": [
+        "session\\.invalidate",
+        "request\\.getSession\\(true\\)",
+        "sessionRegenerateId",
+        "changeSessionId"
+      ],
+      "python": [
+        "session\\.regenerate",
+        "flask.*session.*new",
+        "rotate_token"
+      ],
+      "php": [
+        "session_regenerate_id\\(true\\)",
+        "session_regenerate_id\\(\\)"
+      ],
+      "javascript": [
+        "req\\.session\\.regenerate",
+        "session\\.regenerate\\(",
+        "req\\.sessionID.*=.*new"
+      ],
+      "dotnet": [
+        "HttpContext\\.Session\\.Set",
+        "SignInAsync.*new.*ClaimsPrincipal"
+      ],
+      "ruby": [
+        "reset_session",
+        "session\\.delete"
+      ],
+      "generic": [
+        "regenerate.*session",
+        "new.*session.*id",
+        "rotate.*session"
+      ]
+    },
+    "rate_limiting": {
+      "description": "登录接口是否有频率限制和账户锁定",
+      "java": [
+        "rateLimiter.*checkLimit",
+        "RateLimiter.*login",
+        "maxAttempts",
+        "accountLock",
+        "lockoutDuration",
+        "Bucket4j",
+        "Resilience4j.*RateLimiter"
+      ],
+      "python": [
+        "@limiter\\.limit",
+        "slowapi.*Limiter",
+        "rate_limit",
+        "throttle",
+        "django_ratelimit",
+        "is_account_locked"
+      ],
+      "php": [
+        "throttle.*middleware",
+        "RateLimiter",
+        "throttle:.*login",
+        "attempt.*lockout"
+      ],
+      "javascript": [
+        "express-rate-limit",
+        "rateLimit",
+        "brute.*force",
+        "expressBrute",
+        "rateLimiter.*login"
+      ],
+      "dotnet": [
+        "RateLimiting",
+        "ThrottlePolicy",
+        "maxAttempts",
+        "lockoutOptions"
+      ],
+      "ruby": [
+        "rack-attack",
+        "throttle",
+        "rate_limit",
+        "lockable"
+      ],
+      "generic": [
+        "rate.*limit",
+        "throttle",
+        "lockout",
+        "max.*attempt",
+        "brute.*force.*protect"
+      ]
+    },
+    "token_validation": {
+      "description": "JWT/Token 校验是否完整（签名、过期、算法）",
+      "java": [
+        "setSigningKey.*Key",
+        "Jwts\\.parserBuilder.*setSigningKey",
+        "TokenValidationParameters",
+        "ValidateIssuerSigningKey.*true",
+        "ValidateLifetime.*true",
+        "requireExpiration"
+      ],
+      "python": [
+        "jwt\\.decode.*key.*algorithms",
+        "jwt\\.decode.*verify.*True",
+        "options.*verify_exp.*True",
+        "SECRET_KEY.*len.*>=.*32"
+      ],
+      "javascript": [
+        "jwt\\.verify\\(.*secret",
+        "algorithms.*HS256",
+        "jwt\\.verify.*clockTolerance",
+        "expiresIn"
+      ],
+      "go": [
+        "jwt\\.Parse.*KeyFunc",
+        "SigningMethod.*HMAC",
+        "jwt\\.Valid"
+      ],
+      "dotnet": [
+        "ValidateIssuerSigningKey.*true",
+        "ValidateLifetime.*true",
+        "ValidateIssuer.*true",
+        "ValidateAudience.*true"
+      ],
+      "generic": [
+        "verify.*signature",
+        "check.*expiration",
+        "validate.*algorithm",
+        "reject.*none.*algorithm"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别认证入口】定位登录、token 校验、session 建立、密码重置等认证端点或函数。同时识别认证过滤器/中间件的配置。",
+    "Step 1: 【检查凭据比较方式】密码是否使用安全哈希比较（bcrypt/argon2/scrypt），而非明文 equals/==。命中 anti_patterns.weak_password_comparison 则直接标记 High 候选。",
+    "Step 2: 【检查硬编码凭据】代码中是否存在硬编码的密码、密钥或默认凭据。命中 anti_patterns.hardcoded_credentials 则标记。",
+    "Step 3: 【评估 JWT/Token 安全性】验证 JWT 签名算法（拒绝 none）、密钥强度、过期时间校验、issuer/audience 验证。对照 anti_patterns.jwt_weakness 和 control_detection_patterns.token_validation。",
+    "Step 4: 【检查会话固定防御】登录成功后是否重新生成 Session ID。对照 anti_patterns.session_fixation 和 control_detection_patterns.session_regeneration。",
+    "Step 5: 【评估暴力破解防护】登录接口是否有频率限制、账户锁定、验证码等防护。对照 anti_patterns.brute_force_gap 和 control_detection_patterns.rate_limiting。",
+    "Step 6: 【检查认证失败处理】认证失败时是否 fail-closed（返回 401 且不创建 session），是否存在异常路径默认放行。",
+    "Step 7: 【检查密码策略】注册时是否验证密码强度（长度、复杂度、常见密码检查）。",
+    "Step 8: 【检查 MFA 可绕过性】如果存在多因素认证，是否可通过 API 直接调用跳过 MFA 步骤。",
+    "Step 9: 【组件扫描联动】若规则库命中 auth_bypass 类 CVE（组件名+版本来自扫描结果）：优先核查该组件已知绕过 URL/配置，再分析自定义认证代码。",
+    "Step 10: 【九项确认标准】缺一不得 confirmed：(1)密码使用安全哈希 (2)无硬编码凭据 (3)JWT 完整校验 (4)会话固定防御 (5)暴力破解防护 (6)认证失败 fail-closed (7)密码策略充分 (8)MFA 不可绕过 (9)组件无已知 auth_bypass CVE"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "if (password.equals(\"admin123\")) {\n    session.setAuthenticated(true);\n}",
+        "vulnerability_analysis": "硬编码凭据与明文 equals 比较。攻击者可直接使用已知密码 'admin123' 绕过认证。同时无密码强度策略、无暴力破解防护、无会话固定防御。",
+        "fix_pattern": "1. 使用 PasswordEncoder.matches() 进行安全哈希比较；2. 移除硬编码密码，从安全存储读取；3. 添加账户锁定和频率限制；4. 登录后 session.invalidate() + request.getSession(true)。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/login\")\npublic String login(HttpSession session, @RequestBody LoginRequest req) {\n    if (authService.authenticate(req)) {\n        session.setAttribute(\"user\", req.getUsername());\n        return \"success\";\n    }\n    return \"failed\";\n}",
+        "vulnerability_analysis": "登录成功后未调用 session.invalidate() 重新生成 Session ID，存在会话固定攻击风险。攻击者可预先设置 Session ID，诱使受害者在该 Session 上登录，从而劫持已认证的会话。",
+        "fix_pattern": "request.getSession().invalidate(); HttpSession newSession = request.getSession(true); newSession.setAttribute(\"user\", req.getUsername());"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.post(\"/login\")\nasync def login(credentials: Credentials):\n    user = await User.get_or_none(username=credentials.username)\n    if user and user.password == credentials.password:\n        return {\"token\": create_token(user)}\n    raise HTTPException(401, \"Invalid credentials\")",
+        "vulnerability_analysis": "密码使用明文 == 比较而非 bcrypt/argon2 哈希验证。同时无登录频率限制（可暴力破解）、无账户锁定。数据库中的密码若为明文存储则双重风险。",
+        "fix_pattern": "1. 使用 bcrypt.checkpw() 或 passlib.hash.verify()；2. 添加 slowapi 频率限制 @limiter.limit('5/minute')；3. 实现账户锁定机制 is_account_locked()。"
+      },
+      {
+        "language": "python",
+        "code_snippet": "import jwt\ntoken = jwt.decode(token, key='secret', algorithms=['HS256', 'none'])",
+        "vulnerability_analysis": "JWT 解码接受 'none' 算法。攻击者可构造 alg=none 的 token 并移除签名，服务端仍会接受。密钥 'secret' 过短（<32字符），可被暴力破解。",
+        "fix_pattern": "jwt.decode(token, key=SECRET_KEY, algorithms=['HS256'])  # 拒绝 none；使用 os.urandom(32).hex() 生成强密钥。"
+      },
+      {
+        "language": "php",
+        "code_snippet": "<?php\nsession_start();\nif ($_POST['username'] === 'admin' && $_POST['password'] === 'admin123') {\n    $_SESSION['authenticated'] = true;\n    $_SESSION['user'] = 'admin';\n    header('Location: /dashboard');\n}",
+        "vulnerability_analysis": "硬编码管理员凭据 + 明文比较 + 会话固定（无 session_regenerate_id）。攻击者可：1) 直接使用已知凭据登录；2) 预先设置 PHPSESSID 进行会话固定攻击。",
+        "fix_pattern": "1. 从数据库查询用户并使用 password_verify() 比较；2. 登录成功后 session_regenerate_id(true)；3. 添加 throttle 中间件限制登录频率。"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "const jwt = require('jsonwebtoken');\napp.post('/login', (req, res) => {\n    if (req.body.password === users[req.body.username].password) {\n        const token = jwt.sign({user: req.body.username}, 'secret');\n        res.json({token});\n    }\n});",
+        "vulnerability_analysis": "明文密码比较 + JWT 使用弱密钥 'secret' 签名 + token 无过期时间。攻击者可暴力破解弱密钥后伪造任意 token。",
+        "fix_pattern": "1. bcrypt.compare() 替代明文比较；2. 使用 crypto.randomBytes(32) 生成强密钥；3. jwt.sign 添加 expiresIn: '1h'。"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func LoginHandler(w http.ResponseWriter, r *http.Request) {\n    var creds Credentials\n    json.NewDecoder(r.Body).Decode(&creds)\n    if creds.Password == storedPassword {\n        token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)\n        tokenString, _ := token.SignedString([]byte(\"secret\"))\n        w.Write([]byte(tokenString))\n    }\n}",
+        "vulnerability_analysis": "明文密码比较 + JWT 弱签名密钥。Go 没有框架级认证保护，完全依赖开发者实现。无登录频率限制。",
+        "fix_pattern": "1. bcrypt.CompareHashAndPassword() 替代明文比较；2. 使用 crypto/rand 生成强密钥；3. 添加 rate limit 中间件。"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "[HttpPost(\"login\")]\npublic IActionResult Login([FromBody] LoginModel model)\n{\n    if (model.Password == _config[\"AdminPassword\"])\n    {\n        var token = GenerateJwtToken(model.Username);\n        return Ok(new { token });\n    }\n    return Unauthorized();\n}",
+        "vulnerability_analysis": "密码从配置读取并明文比较。若 AdminPassword 在 appsettings.json 中硬编码，则凭据可从源码/配置泄露获取。无账户锁定机制。",
+        "fix_pattern": "1. 使用 UserManager.CheckPasswordAsync()；2. 凭据从 Secret Manager/Azure Key Vault 获取；3. 配置 LockoutOptions.MaxFailedAttempts。"
+      }
+    ],
+    "mitigation_rules": [
+      "使用框架标准认证过滤器且全局默认 deny，避免自定义认证逻辑。",
+      "密码必须使用 bcrypt/argon2/scrypt 等自适应哈希算法存储，禁止明文或 MD5/SHA 系列直接哈希。",
+      "JWT 必须完整校验签名（拒绝 none/弱密钥）、过期时间（exp）、发行者（iss）和受众（aud）。",
+      "登录成功后必须重新生成 Session ID（session.invalidate + new session），防止会话固定。",
+      "登录接口必须实施频率限制（如 5次/分钟）、账户锁定（如 5次失败锁定30分钟）和验证码。",
+      "认证失败统一返回 401，不创建 session，不泄露具体失败原因（用户名不存在 vs 密码错误）。",
+      "组件层 auth_bypass CVE 须与配置/代码证据闭合，不能仅凭版本号 confirmed。"
+    ],
+    "refutation_checklist": [
+      "密码是否使用 bcrypt/argon2 等自适应哈希且恒定时间比较（非 equals/==）？",
+      "JWT 是否拒绝 none 算法、使用强密钥（≥256位）、校验 exp/iss/aud？",
+      "登录成功后是否调用 session.invalidate() / session_regenerate_id() 重新生成 Session ID？",
+      "登录接口是否有频率限制（≤10次/分钟）和账户锁定机制？",
+      "是否存在硬编码的密码、API Key 或默认凭据？",
+      "认证失败是否 fail-closed（返回 401 且不创建 session/返回 token）？",
+      "认证逻辑是否由外部 IdP（如 Auth0, Okta, Keycloak）统一处理，应用层仅验证 token？",
+      "MFA/2FA 是否可被绕过（如直接调用跳过 MFA 步骤的 API）？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "identify_auth_entry_points", "desc": "识别登录、token 校验、session 建立、密码重置等认证入口端点和过滤器配置。"},
+    {"name": "check_password_comparison", "desc": "检查密码是使用安全哈希比较（bcrypt/argon2）还是明文 equals/== 比较。对照 anti_patterns.weak_password_comparison。"},
+    {"name": "detect_hardcoded_credentials", "desc": "扫描代码中的硬编码密码、密钥和默认凭据。对照 anti_patterns.hardcoded_credentials。"},
+    {"name": "analyze_jwt_security", "desc": "验证 JWT 签名算法、密钥强度、过期校验和 issuer/audience 验证。对照 anti_patterns.jwt_weakness 和 control_detection_patterns.token_validation。"},
+    {"name": "check_session_fixation", "desc": "验证登录后是否重新生成 Session ID。对照 anti_patterns.session_fixation 和 control_detection_patterns.session_regeneration。"},
+    {"name": "evaluate_brute_force_protection", "desc": "检查登录接口的频率限制、账户锁定和验证码。对照 anti_patterns.brute_force_gap 和 control_detection_patterns.rate_limiting。"},
+    {"name": "trace_auth_failure_path", "desc": "追踪认证失败时的处理路径，验证是否 fail-closed（不创建 session、不泄露信息）。"},
+    {"name": "check_password_policy", "desc": "检查注册/修改密码时是否验证密码强度（长度≥8、复杂度、常见密码黑名单）。"},
+    {"name": "check_mfa_bypass", "desc": "检查 MFA/2FA 流程是否可通过直接调用 API 跳过。"},
+    {"name": "check_component_cve", "desc": "关联组件扫描结果，检查已知 auth_bypass CVE 与当前配置/代码的匹配度。"}
+  ],
+  "sanitizers": [
+    "使用框架标准认证过滤器（Spring Security / Shiro / Django Auth / Passport）且全局默认 deny",
+    "密码使用 bcrypt/argon2/scrypt 等自适应哈希且恒定时间比较",
+    "JWT 完整校验签名（拒绝 none）、exp、iss、aud，密钥强度≥256位",
+    "登录成功后 session.invalidate() + request.getSession(true) 重新生成 Session ID",
+    "登录接口有频率限制（≤10次/分钟）+ 账户锁定（5次失败锁定30分钟）+ 验证码",
+    "认证失败统一返回 401 且不创建 session、不泄露失败原因",
+    "认证由外部 IdP（如 Auth0, Okta, Keycloak）统一处理，应用层仅验证 token",
+    "MFA/2FA 与服务端认证流程强绑定，不可被 API 直接调用跳过"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-287",
+    "auth_bypass_type": "array — 认证缺陷类型 (如 ['hardcoded_credential', 'weak_password_comparison', 'session_fixation', 'jwt_none_algorithm', 'brute_force_gap', 'mfa_bypass'])",
+    "auth_bypass_vector": "string (具体绕过路径，如 '使用已知密码 admin123 直接登录' 或 '构造 alg=none JWT 绕过签名验证')",
+    "tainted_credential_param": "string (指出具体哪个凭据参数存在安全问题)",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['weak_password_comparison.java', 'session_fixation.java', 'hardcoded_credentials.python'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['password_strength_check', 'session_regeneration', 'rate_limiting', 'token_validation'])",
+    "component_cve_match": "string (若命中组件 CVE，指出具体 CVE 编号和匹配条件)",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "CRITICAL",
+    "remediation": "string"
+  }
+}

@@ -1,0 +1,38 @@
+flowchart TB
+    subgraph entry [入口链]
+        MAIN[main / planner] --> SS[JoernTool.run_source_scan]
+        SS --> CFG[configure_project]
+        CFG --> RFS[JoernVulnScannerHTTP.run_full_scan]
+    end
+
+    RFS --> CPG[ensure_cpg_loaded]
+    CPG --> RTQ[run_taint_queries]
+    RTQ --> QM["_run_query_map(java_queries)"]
+    RTQ --> REFL{language=java?}
+    REFL -->|是| JRQ[run_java_reflection_queries]
+
+    QM --> IA[iterative_analyze]
+    JRQ --> IA
+
+    IA --> VF[过滤有效 flow 文本]
+    VF --> PER[每个 vuln_type × 每条 flow chunk]
+
+    PER --> ASF["_analyze_single_taint_flow"]
+
+    subgraph single [单 flow 流水线]
+        ASF --> M1[flow merge / guard 缓存剪枝]
+        M1 --> CTX[_extract_code_context]
+        CTX --> HB["_run_hard_backtrace<br/>固定 Joern caller 链"]
+        HB --> EXP["LLM sufficiency + follow_up Joern<br/>最多 max_iters"]
+        EXP --> PRI["主分析 LLM<br/>VERDICT_AND_POC_POLICY"]
+        PRI --> REF["_run_refutation_check<br/>独立第二遍反证 LLM"]
+        REF --> APP[_apply_refutation_to_analysis]
+        APP --> L2[pending_l2_reads / flow_findings_index]
+    end
+
+    note1["queries 每条需 import io.shiftleft.semanticcpg.language._"]
+    QM -.-> note1
+
+    L2 --> RPT[Markdown report]
+    L2 --> AMB[ambiguous_flows]
+    RPT --> BACK[返回 planner → state.last_report]

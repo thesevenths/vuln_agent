@@ -1,0 +1,74 @@
+# 攻击链构建方法论
+# 将孤立的漏洞发现串联为完整攻击路径，评估真实业务影响
+
+attack_chain_construction:
+  philosophy: >
+    单个漏洞可能影响有限，但多个漏洞组合形成的攻击链往往造成更严重的后果。
+    例如：公开端点 + IDOR + 信息泄露 = 完整数据泄露链。
+    攻击链构建的目标是将孤立 finding 串联为端到端的攻击叙事。
+
+  chain_building_steps:
+    step_1_identify_entry_point:
+      description: "确定攻击入口（通常是公开端点或低权限可达端点）"
+      sources:
+        - "public_endpoints 查询结果"
+        - "auth_guards 显示 permitAll 的路径"
+        - "认证接口（/login, /register, /reset-password）"
+
+    step_2_map_intermediate_hops:
+      description: "从入口到最终目标的中间跳"
+      hop_types:
+        - type: "信息收集"
+          example: "通过未授权 API 获取用户 ID 列表"
+        - type: "权限提升"
+          example: "利用 Mass Assignment 修改自身 role 字段"
+        - type: "横向移动"
+          example: "利用 IDOR 访问他人资源获取敏感信息"
+        - type: "保护绕过"
+          example: "利用 CSRF 绕过认证执行状态变更"
+
+    step_3_define_terminal_impact:
+      description: "攻击链最终造成的业务影响"
+      impact_categories:
+        - "数据泄露（敏感信息/PII/财务数据）"
+        - "未授权操作（创建/修改/删除资源）"
+        - "权限提升（低权限 → 管理员）"
+        - "业务规则违背（0 元购/薅羊毛/刷单）"
+        - "拒绝服务（资源耗尽/数据损坏）"
+
+  chain_patterns:
+    auth_bypass_to_data_exposure:
+      description: "认证绕过 → 敏感数据访问"
+      example: "缺少认证 → 直接访问管理 API → 导出用户数据库"
+    idor_to_privilege_escalation:
+      description: "IDOR → 权限提升"
+      example: "IDOR 读取管理员配置 → 获取 JWT secret → 伪造管理员 token"
+    csrf_to_state_change:
+      description: "CSRF → 状态变更"
+      example: "CSRF 绕过 → 以受害者身份执行转账/改密"
+    mass_assignment_to_admin:
+      description: "Mass Assignment → 管理员提权"
+      example: "注册接口提交 role=admin → 直接获得管理员权限"
+    info_leak_to_targeted_attack:
+      description: "信息泄露 → 定向攻击"
+      example: "错误信息泄露内部路径 → 构造精确的 SSRF payload"
+
+  output_format:
+    chain_description: "攻击链的自然语言描述"
+    steps:
+      - step_number: "整数"
+        action: "攻击者执行的操作"
+        vulnerability_used: "利用的漏洞（CWE + finding 引用）"
+        evidence: "代码/行号证据"
+    final_impact: "最终业务影响"
+    severity: "CRITICAL | HIGH | MEDIUM"
+
+  applicable_cwes:
+    - cwe: CWE-862
+      scope: "作为攻击链中的保护缺失环节"
+    - cwe: CWE-639
+      scope: "作为横向移动的关键跳"
+    - cwe: CWE-352
+      scope: "作为状态变更的绕过手段"
+    - cwe: CWE-915
+      scope: "作为权限提升的直接路径"

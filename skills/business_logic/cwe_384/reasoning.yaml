@@ -1,0 +1,36 @@
+# CWE-384 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别认证入口】定位处理用户登录、身份验证成功、SSO回调的函数或路由。'
+  - 'Step 1: 【追踪会话生命周期】检查在身份验证*之前*，系统是否已经为匿名用户分配了 Session ID（如浏览商品时）。'
+  - 'Step 2: 【检查登录后会话轮换】在密码校验成功、用户身份确立的*瞬间及之后*，代码是否调用了会话销毁（invalidate）或会话 ID 重新生成（regenerate/renew）的机制。'
+  - 'Step 3: 【评估框架默认行为】检查使用的 Web 框架或安全组件（如 Spring Security, Shiro）的会话管理配置，确认是否被开发者错误地禁用了防固定策略（如配置为 none）。'
+  - 'Step 4: 【检查跨域与Token场景】在单点登录（SSO）或 OAuth2 回调中，是否在建立本地会话时重新生成了 Session ID；若使用 JWT，检查是否颁发了新 Token 并废弃临时状态。'
+  - 'Step 5: 【评估攻击面】检查 Session ID 是否可以通过 URL 参数、Cookie 设置或 XSS 轻易被攻击者预设并传递给受害者。'
+  - 'Step 6: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public String login(String user, String pwd, HttpServletRequest req) { if (check(user, pwd)) { req.getSession().setAttribute("user", user); return "home"; } return "login"; }'
+      vulnerability_analysis: 登录成功后直接将用户信息绑定到现有的 Session 中，未调用 req.changeSessionId() 或 session.invalidate()。若攻击者提前将已知的 JSESSIONID 发送给受害者，受害者登录后攻击者即可使用该 ID 接管账户。
+      fix_pattern: 'if (check(user, pwd)) { HttpSession session = req.getSession(false); if (session != null) session.invalidate(); HttpSession newSession = req.getSession(true); newSession.setAttribute("user", user); }'
+    - code_snippet: http.sessionManagement().sessionFixation().none();
+      vulnerability_analysis: 在 Spring Security 配置中显式调用了 .none()，禁用了框架默认的会话固定保护策略（migrateSession 或 changeSessionId），导致应用层直接暴露于会话固定攻击之下。
+      fix_pattern: 移除 .none() 配置，使用 Spring Security 默认的 sessionFixation().migrateSession() (Servlet 3.0 以下) 或 changeSessionId() (Servlet 3.1+)。
+  mitigation_rules:
+    - 身份验证成功后，必须立即使旧 Session 失效并生成新的 Session ID (Session Regeneration)。
+    - 依赖成熟安全框架的默认会话固定保护机制，切勿随意关闭或覆盖。
+    - 禁止通过 URL 参数传递 Session ID，强制使用 Secure/HttpOnly Cookie。
+    - 对于无状态 Token (JWT)，确保登录成功后签发新的 Token，不与认证前的临时状态混用。
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-384
+  session_management_type: 'enum[''cookie_based_session'', ''jwt_token'', ''custom_token'', ''server_side_session'']'
+  missing_regeneration_point: string (指出应在何处添加会话轮换/重新生成逻辑)
+  framework_config_flaw: 'string (若存在框架配置缺陷，如''Spring Security 禁用了 sessionFixation 保护'')'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: HIGH
+  remediation: string

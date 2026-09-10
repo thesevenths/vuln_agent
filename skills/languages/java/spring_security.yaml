@@ -1,0 +1,91 @@
+# Spring Security 权限模型
+# 框架特化检测模式（仅在识别到 Spring Security 依赖时加载）
+
+# 权限配置模式
+config_models:
+  web_security_adapter:
+    patterns:
+      - "WebSecurityConfigurerAdapter"
+      - "configure(HttpSecurity http)"
+      - "configure(WebSecurity web)"
+    risk: "旧版配置方式，注意 override 是否正确"
+
+  security_filter_chain:
+    patterns:
+      - "SecurityFilterChain"
+      - "HttpSecurity"
+      - "authorizeHttpRequests"
+      - "requestMatchers"
+    risk: "新版推荐方式，检查 matcher 覆盖范围"
+
+# URL 授权规则
+url_authorization:
+  permit_all_risk:
+    patterns:
+      - "permitAll()"
+      - ".permitAll"
+    check: "确认 permitAll 的路径是否合理（登录/注册/静态资源）"
+
+  authenticated_rules:
+    patterns:
+      - "authenticated()"
+      - ".authenticated"
+    check: "确认需要认证的路径是否完整覆盖敏感接口"
+
+  role_based:
+    patterns:
+      - "hasRole"
+      - "hasAnyRole"
+      - "hasAuthority"
+      - "hasAnyAuthority"
+    check: "角色/权限名称是否与业务模型匹配"
+
+# 方法安全
+method_security:
+  enable_annotation:
+    - "@EnableMethodSecurity"
+    - "@EnableGlobalMethodSecurity"
+  annotations:
+    - "@PreAuthorize"
+    - "@PostAuthorize"
+    - "@PreFilter"
+    - "@PostFilter"
+    - "@Secured"
+  risk: "方法安全注解与 URL 授权可能不一致，导致绕过"
+
+# Session 管理
+session_management:
+  patterns:
+    - "sessionManagement()"
+    - "sessionFixation()"
+    - "maximumSessions()"
+    - "sessionCreationPolicy"
+    - "Stateless"
+    - "IF_REQUIRED"
+  risk: "Session 固定/并发控制缺失"
+
+# CORS 配置
+cors:
+  patterns:
+    - "CorsConfiguration"
+    - "addAllowedOrigin"
+    - "setAllowedOrigins"
+    - "@CrossOrigin"
+    - "CorsFilter"
+  risk_patterns:
+    - "allowedOrigins('*')"
+    - "addAllowedOrigin('*')"
+    - "AllowCredentials=true with wildcard origin"
+
+# 密码编码
+password_encoding:
+  strong:
+    - "BCryptPasswordEncoder"
+    - "Pbkdf2PasswordEncoder"
+    - "SCryptPasswordEncoder"
+    - "Argon2PasswordEncoder"
+  weak:
+    - "NoOpPasswordEncoder"
+    - "MessageDigestPasswordEncoder"
+    - "StandardPasswordEncoder"
+  risk: "弱密码编码器使密码泄露后易被破解"

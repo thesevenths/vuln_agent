@@ -1,0 +1,44 @@
+# CWE-79 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(model\.addAttribute|modelAndView\.addObject|PrintWriter\.print|OutputStream\.write|HttpServletResponse\.getWriter)/i]'
+  - 'Call[name=~/(innerHTML|document\.write|outerHTML|insertAdjacentHTML)/i]'
+  - 'Annotation[name=~/(ResponseBody|Controller)/i]'
+
+semantic_keywords:
+  - user input
+  - display
+  - render
+  - output
+  - HTML
+  - template
+  - Thymeleaf
+  - JSP
+  - Freemarker
+  - response.write
+
+file_context:
+  - controller
+  - template
+  - view
+  - handler
+
+logic_query_keywords_generic:
+  output_sinks:
+    - innerHTML
+    - document.write
+    - echo
+    - print
+    - render
+  safe_patterns:
+    - textContent
+    - createElement
+    - DOMPurify
+    - htmlspecialchars
+    - escapeHtml
+
+sanitizers:
+  - '使用框架自动转义（th:text、<c:out>、React/Vue 自动转义）'
+  - 手动调用 HtmlUtils.htmlEscape / ESAPI.encoder().encodeForHTML()
+  - 输出到非HTML上下文（JSON API）且设置了正确的 Content-Type
+  - 设置了严格的 Content-Security-Policy Header

@@ -1,0 +1,35 @@
+# CWE-285 检测模式
+
+ast_patterns:
+  - 'FunctionCall[name=~/(get|fetch|update|delete)/i][args.count > 0]'
+  - 'DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i]'
+
+semantic_keywords:
+  - medical record
+  - patient
+  - doctor
+  - private message
+  - financial transaction
+  - order ownership
+  - tenant isolation
+
+logic_query_keywords_generic:
+  business_ops:
+    - get
+    - fetch
+    - update
+    - delete
+    - order
+    - transfer
+  ownership_check:
+    - owner
+    - belongs_to
+    - is_owner
+    - tenant
+    - get_owner
+
+sanitizers:
+  - 存在明确的业务级资源所有权校验(如 WHERE patient_id = ? AND doctor_id = ?)
+  - 使用了 ABAC 策略引擎且策略包含资源属性与主体属性的绑定关系
+  - 该资源在安全设计文档中明确定义为全局公开且经评审确认
+  - 敏感操作前有二次业务确认机制(如主管审批、MFA)且覆盖所有路径

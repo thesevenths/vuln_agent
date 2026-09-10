@@ -1,0 +1,11 @@
+# CWE-330 Skill 元数据
+# 从 templates/cwe/cwe_330.json 迁移
+
+skill_id: cwe_330_insufficient_randomness
+source_cwe: CWE-330
+priority: P1
+
+related_cwes:
+  - CWE-338
+  - CWE-341
+  - CWE-798

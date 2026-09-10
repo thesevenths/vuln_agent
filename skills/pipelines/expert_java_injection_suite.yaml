@@ -1,0 +1,125 @@
+# Pipeline: expert_java_injection_suite
+# Java 注入套件专家分析（命令注入+SSRF+路径穿越）
+
+skill_id: expert_java_injection_suite
+name: Java 注入套件专家分析（命令注入+SSRF+路径穿越）
+summary: 定向扫描 command_injection/ssrf/path_traversal → 读取 handler → 输入校验检查(并行) → 框架防护检查 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - command_injection
+  - 命令注入
+  - CWE-78
+  - ssrf
+  - SSRF
+  - CWE-918
+  - 服务端请求伪造
+  - path_traversal
+  - 路径穿越
+  - CWE-22
+  - 目录遍历
+completion_hints:
+  - 命令注入须区分 shell 模式 vs 参数数组模式
+  - SSRF 须检查内网地址校验和协议限制
+  - 路径穿越须检查 normalize/canonical 处理和 .. 过滤
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: targeted_scan
+    expert_guidance:
+      analysis_focus: 准备 Java 注入类漏洞分析上下文
+      expert_rules:
+        - 命令注入/SSRF/路径穿越的共同特征：用户输入进入系统调用/URL构造/文件操作
+        - 三者的关键区别在于 sink 类型不同，但分析方法论一致
+
+  - node_id: targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: [command_injection, ssrf, path_traversal]
+      language: java
+    success_next: read_handler_code
+    failure_next: read_handler_code
+    expert_guidance:
+      analysis_focus: 扫描三类注入漏洞的 flow
+      expert_rules:
+        - 命令注入：ProcessBuilder/exec 调用链
+        - SSRF：URL/HttpURLConnection/RestTemplate/WebClient
+        - 路径穿越：File/Path/Files 操作
+
+  - node_id: read_handler_code
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*Controller*.java'
+      limit: 20
+    success_next: check_input_validation
+    failure_next: check_input_validation
+    expert_guidance:
+      analysis_focus: 读取接收用户输入的 handler/controller 代码
+      required_evidence:
+        - 用户输入参数到 sink 的完整调用链
+        - 是否有中间转换/编码/过滤
+
+  - node_id: check_input_validation
+    tool_name: null
+    success_next: check_framework_protection
+    failure_next: check_framework_protection
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/pom.xml'
+          limit: 10
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Security*.java'
+          limit: 15
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/application*.yml'
+          limit: 10
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Filter*.java'
+          limit: 15
+    expert_guidance:
+      analysis_focus: 检查输入校验和框架防护
+      refutation_checklist:
+        - '命令注入：是否使用参数数组(String[])而非 shell 字符串拼接'
+        - SSRF：是否有内网 IP 黑名单（127.0.0.1/10.0.0.0/172.16-31/192.168）
+        - SSRF：是否限制协议（仅允许 http/https）
+        - 路径穿越：是否调用 Path.normalize() 或 File.getCanonicalPath()
+        - 路径穿越：是否过滤 .. 和 ../
+        - 是否有全局输入校验 Filter/Interceptor
+      false_positive_patterns:
+        - '命令注入：使用 ProcessBuilder(List<String>) 参数数组模式'
+        - SSRF：有完整的内网 IP 黑名单 + 协议白名单
+        - 路径穿越：使用 Path.normalize().startsWith(baseDir) 校验
+        - 路径穿越：文件名来自 UUID/数据库 ID 而非用户输入
+
+  - node_id: check_framework_protection
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*Config*.java'
+      limit: 15
+    success_next: verify
+    failure_next: verify
+    expert_guidance:
+      analysis_focus: 检查框架级防护配置
+      expert_rules:
+        - 检查 Spring Security 是否对相关端点做了权限控制
+        - 检查是否配置了 CSP/X-Frame-Options 等安全头
+        - 检查 nginx/网关层是否有路径过滤
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定注入类漏洞是否成立
+      expert_rules:
+        - 判定为真实漏洞须满足：(1) 有 sink (2) 输入可控 (3) 无有效校验/防护
+        - 命令注入：标注是 shell 模式（高危）还是参数模式（安全）
+        - SSRF：标注可达的内网范围和协议
+        - 路径穿越：标注可访问的目录范围
+

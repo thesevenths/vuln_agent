@@ -1,0 +1,10 @@
+# 输出字段定义（所有 CWE 共享）
+
+output_schema_extensions:
+  confirmation_checklist: object — 六项标准各自 true/false + 一句证据
+  affected_entry: string — HTTP 方法+路径或 RPC 入口
+  user_controllable_input: string — 可控参数/ID/状态字段
+  auth_requirement: string — 应有鉴权 vs 实际缺失点
+  burp_raw_request: string — 完整原始请求；未 confirmed 可空
+  evidence_file_lines: "array — [{file, line, snippet}]"
+  component_scan_context: object | null — 组件扫描联动结论（见 component_scan_handoff）

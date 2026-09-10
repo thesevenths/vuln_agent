@@ -1,0 +1,62 @@
+{
+  "skill_id": "cwe_836_client_side_hash_auth",
+  "source_cwe": ["CWE-836"],
+  "related_cwes": ["CWE-1390", "CWE-602", "CWE-328"],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionCall[name=~/(login|auth|signin|verify)/i]",
+      "BinaryExpr[operator=='=='][left.type~=/hash|digest/i]"
+    ],
+    "semantic_keywords": [
+      "clientHash", "frontendHash", "preHashedPassword", 
+      "passwordHash", "md5(password)", "sha256(password)"
+    ],
+    "file_context": ["controller", "api", "auth_service", "middleware"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "auth_entry": ["login", "authenticate", "signin", "verify", "doLogin"],
+      "hash_patterns": ["md5", "sha256", "sha1", "digest", "hash", "MessageDigest", "bcrypt"]
+    },
+    "generic": {
+      "auth_entry": ["login", "authenticate", "signin", "verify"],
+      "hash_patterns": ["md5", "sha256", "sha1", "hash", "digest", "bcrypt", "hashlib"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 定位认证入口函数，识别参与比对的【密码字段】来源。",
+    "Step 2: 追踪该字段的赋值链：它是在【服务端】从请求体获取后哈希的，还是直接接收了客户端传来的【已哈希值】？",
+    "Step 3: 检查前端代码/接口文档：是否存在 JS 端 hash() 调用后再发送的请求？",
+    "Step 4: 判断服务端是否对接收到的值进行了【二次哈希】或直接做了【字符串等值比较】。",
+    "Step 5: 若服务端直接比较客户端哈希 → 确认为 CWE-836；若服务端重新哈希后再比较 → 安全。"
+  ],
+  "tool_calls": [
+    {"name": "trace_variable_origin", "desc": "回溯认证参数从 HTTP Request 到比较点的完整赋值链"},
+    {"name": "get_frontend_code_snippet", "desc": "获取对应 API 的前端调用代码，检查是否有预哈希逻辑"},
+    {"name": "analyze_comparison_logic", "desc": "分析密码比较语句的左右操作数类型和来源"}
+  ],
+  "sanitizers": [
+    "服务端接收到密码后，执行了 bcrypt/argon2/scrypt 等慢哈希再与存储值比较",
+    "使用了 OAuth2/OIDC 等标准协议，密码不在应用层直接处理",
+    "客户端哈希仅用于防窥探，服务端仍对原始密码进行二次验证（需双重确认）",
+    "使用了硬件令牌/FIDO2 等非密码认证机制"
+  ],
+  "false_positive_indicators": [
+    "变量名含 'hash' 但实际是 Session Token / CSRF Token 的比较",
+    "哈希用于数据完整性校验（如文件下载），而非身份认证",
+    "测试/调试代码中的硬编码哈希比较（非生产路径）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-836",
+    "attack_scenario": "string (描述攻击者如何重放哈希绕过认证)",
+    "evidence": {
+      "client_side_hash_source": "string (前端哈希代码位置或接口特征)",
+      "server_comparison_type": "string (direct_string_compare / re_hash_then_compare)"
+    },
+    "remediation": "string (明确指示：移除前端哈希，改为传输明文密码+HTTPS，服务端使用 bcrypt/argon2 哈希后比较)",
+    "risk_level": "HIGH (等效于明文密码传输)"
+  }
+}

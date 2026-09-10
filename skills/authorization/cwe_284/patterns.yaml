@@ -1,0 +1,42 @@
+# CWE-284 检测模式
+
+ast_patterns:
+  - 'FunctionCall[name=~/(raise|drop|elevate|lower|switch|impersonate)/i][args=~/(privilege|role|token|user)/i]'
+  - 'HeaderSet[name=''Access-Control-Allow-Origin''][value.source~=/request|input|param/i]'
+  - 'TryCatch[body.contains_privilege_operation=true]'
+
+semantic_keywords:
+  - cors
+  - cross-origin
+  - withCredentials
+  - dynamic origin
+  - privilege escalation
+  - exception handling
+  - finally block
+  - trust boundary
+  - compartmentalization
+
+file_context:
+  - middleware
+  - security_filter
+  - cors_config
+  - admin_utility
+
+logic_query_keywords_generic:
+  cors_keywords:
+    - CORS
+    - Access-Control
+    - allowedOrigins
+    - cross-origin
+  privilege_ops:
+    - elevate
+    - switch
+    - impersonate
+    - grant
+    - revoke
+
+sanitizers:
+  - '特权操作使用语言级资源管理(如 Python context manager, Java try-with-resources, Rust Drop trait)'
+  - CORS Origin 经过服务端硬编码白名单校验，非直接反射
+  - 存在全局异常处理器确保特权状态在异常时自动清理
+  - 该功能在设计文档中明确定义为公开访问且经安全评审确认

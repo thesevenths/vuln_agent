@@ -1,0 +1,82 @@
+# CWE-639 检测模式
+
+ast_patterns:
+  - 'DBQuery[operation=~/(SELECT|UPDATE|DELETE)/i][params.count >= 1]'
+  - 'FileRead[path.source~=/param|request|input/i]'
+  - 'APIHandler[method=~/(GET|PUT|DELETE)/i][path_params.count > 0]'
+  - 'FunctionDef[name=~/(getById|findById|findOne|deleteById|updateById|getRecord|fetchRecord|downloadFile)/i]'
+  - 'Call[name=~/(findById|getById|findOne|getReferenceById|findBySlug|deleteById|updateById)/i]'
+  - 'Annotation[name=~/(GetMapping|PostMapping|PutMapping|DeleteMapping|PathVariable|PathParam)/i]'
+
+semantic_keywords:
+  - user_id
+  - account_id
+  - order_id
+  - invoice_id
+  - profile_id
+  - document_id
+  - record_id
+  - owner_id
+  - tenant_id
+  - findById
+  - getById
+  - findOne
+  - deleteById
+  - resource_key
+  - object_id
+  - entity_id
+  - horizontal
+  - idor
+  - insecure_direct_object_reference
+
+file_context:
+  - controller
+  - api_endpoint
+  - service_method
+  - repository
+  - resource_handler
+  - file_controller
+  - document_service
+  - invoice_controller
+  - profile_handler
+
+sensitive_operations:
+  - get_order
+  - get_invoice
+  - get_profile
+  - get_document
+  - update_record
+  - delete_record
+  - download_file
+  - get_account
+  - get_user
+  - get_message
+  - get_transaction
+
+logic_query_keywords_generic:
+  resource_keys:
+    - findById
+    - getById
+    - findOne
+    - get(
+    - filter
+    - WHERE id
+    - 'SELECT.*WHERE'
+  ownership_fields:
+    - user_id
+    - owner_id
+    - tenant_id
+    - account_id
+    - customer_id
+    - author_id
+    - created_by
+
+sanitizers:
+  - 查询条件显式包含当前用户 ID/租户 ID 的等值绑定（如 AND user_id = ?）
+  - '使用了框架级数据隔离机制（如 Hibernate @Filter, EF Core Global Query Filter）'
+  - 资源 ID 为不可猜测的 UUID 且服务端验证了其签发合法性
+  - 该资源在设计文档中明确定义为公开共享且经安全评审确认
+  - 多租户场景下查询同时包含租户 ID 过滤
+  - 文件下载接口验证了文件归属且防止路径遍历
+  - GraphQL/API 的关联查询也实施了所有权绑定
+  - 批量导出/列表接口也包含所有权过滤

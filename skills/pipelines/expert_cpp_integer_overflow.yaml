@@ -1,0 +1,99 @@
+# Pipeline: expert_cpp_integer_overflow
+# C/C++ 整数溢出专家分析
+
+skill_id: expert_cpp_integer_overflow
+name: C/C++ 整数溢出专家分析
+summary: 定向扫描 integer_overflow → 追溯 size 来源 → 溢出路径检查 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - integer_overflow
+  - 整数溢出
+  - integer underflow
+  - CWE-190
+  - CWE-191
+  - size overflow
+  - alloc overflow
+completion_hints:
+  - 必须追溯 size/len 参数的来源（是否来自用户输入）
+  - 必须检查乘法/加法运算后是否有溢出检查
+  - 'malloc(size * count) 模式须检查是否应使用 calloc'
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: targeted_scan
+    expert_guidance:
+      analysis_focus: 准备整数溢出分析上下文
+      expert_rules:
+        - 整数溢出的危害路径：用户输入 → 算术运算(溢出) → 分配/拷贝长度 → 缓冲区溢出
+        - '重点关注 size * count、len + offset、size << shift 等模式'
+
+  - node_id: targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: [cpp_integer_overflow, cpp_unsafe_alloc]
+    success_next: trace_size_source
+    failure_next: trace_size_source
+    expert_guidance:
+      analysis_focus: 扫描整数溢出和不安全分配相关查询
+      expert_rules:
+        - cpp_integer_overflow 查找 malloc/calloc/memcpy 参数中的算术运算
+        - cpp_unsafe_alloc 查找用户可控 size 参数直接传入分配函数
+
+  - node_id: trace_size_source
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*.c'
+      limit: 30
+    success_next: check_overflow_path
+    failure_next: check_overflow_path
+    expert_guidance:
+      analysis_focus: 追溯 size/len 参数的来源链
+      required_evidence:
+        - size 参数的完整来源链（从函数参数到最终使用）
+        - 是否经过类型转换（如 int → size_t 可能截断）
+        - 运算操作数和结果的数据类型
+      expert_rules:
+        - 读取 sink 所在函数体，追溯 size 参数从哪来
+        - 检查是否存在隐式类型转换（如 uint16_t → uint32_t 的安全提升 vs uint64_t → uint32_t 的截断）
+
+  - node_id: check_overflow_path
+    tool_name: null
+    success_next: verify
+    failure_next: verify
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*.h'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/CMakeLists.txt'
+          limit: 5
+    expert_guidance:
+      analysis_focus: 检查算术运算后是否有溢出检查
+      refutation_checklist:
+        - '是否有 if (size > SIZE_MAX / count) 类溢出检查'
+        - '是否使用 calloc(count, size) 替代 malloc(count * size)'
+        - 是否有 __builtin_mul_overflow / checked_mul 等安全运算
+        - 运算结果是否赋给更大类型（如 uint32_t → uint64_t）
+      false_positive_patterns:
+        - size 参数是编译期常量或 enum 值
+        - '运算前已有 if (a > MAX / b) 类守卫'
+        - '使用 calloc 替代 malloc(size * count)'
+        - 结果类型大于操作数类型（无截断风险）
+        - size 来自 sizeof() 返回值（恒正且有限）
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定整数溢出是否导致可利用漏洞
+      expert_rules:
+        - 判定为真实漏洞须满足：(1) size 可控 (2) 运算可溢出 (3) 溢出后用于分配/拷贝 (4) 无溢出检查
+        - 若溢出仅导致 DoS（分配失败返回 NULL），风险等级标为「中」
+        - 若溢出后可导致堆溢出（小分配 → 大拷贝），风险等级标为「高」
+

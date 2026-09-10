@@ -1,0 +1,50 @@
+# Pipeline: binary_0day_direct
+# 二进制0-day直挖
+
+skill_id: binary_0day_direct
+name: 二进制0-day直挖
+summary: 不做版本识别，直接走深扫+补证+PoC收口
+min_score_to_activate: 0.22
+start_node_id: set_context
+trigger_keywords:
+  - 二进制
+  - 0day
+  - 0-day
+  - 逆向
+  - checker
+  - 误报
+  - 可利用性
+completion_hints:
+  - 先给可利用性优先级，再补关键证据
+  - 明确高风险链条与可复现条件
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: source_scan
+
+  - node_id: source_scan
+    tool_name: JoernTool.run_source_scan
+    success_next: glob_security
+
+  - node_id: glob_security
+    tool_name: null
+    success_next: read_context
+    failure_next: read_context
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*Security*.java'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/application*.yml'
+          limit: 20
+
+  - node_id: read_context
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/application*.yml'
+      limit: 20
+    completion_signal: binary_context_reviewed
+

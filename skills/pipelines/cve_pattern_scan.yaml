@@ -1,0 +1,116 @@
+# Pipeline: cve_pattern_scan
+# CVE 知识驱动模式匹配扫描
+
+skill_id: cve_pattern_scan
+name: CVE 知识驱动模式匹配扫描
+summary: 从 CVE 数据库提取已知漏洞模式，生成定向 Joern 查询，结合已知 sink 函数进行模式匹配分析
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - cve
+  - cwe
+  - 知识库
+  - 模式匹配
+  - 已知漏洞
+completion_hints:
+  - 完成 CVE 知识驱动的漏洞模式匹配扫描
+  - 将已知漏洞 sink 模式与当前代码进行对比分析
+collab_skill_ids:
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: query_cve_db
+    expert_guidance:
+      analysis_focus: 设置分析上下文，准备 CVE 知识驱动扫描
+
+  - node_id: query_cve_db
+    tool_name: DBTool.get_cve_patterns
+    arguments:
+      component: '<from_context>'
+      cwe_id: '<from_context>'
+    success_next: generate_targeted_queries
+    failure_next: fallback_to_full_scan
+    expert_guidance:
+      analysis_focus: 从 CVE 数据库查询当前组件或 CWE 的已知漏洞模式
+      expert_rules:
+        - 查询结果中的 common_sinks 是历史 CVE 中出现频率最高的 sink 函数
+        - common_components 表示历史上最常受影响的组件
+
+  - node_id: generate_targeted_queries
+    tool_name: DBTool.query_cve_by_cwe
+    arguments:
+      cwe_id: '<from_previous_cwe>'
+      limit: 10
+    success_next: run_targeted_scan
+    expert_guidance:
+      analysis_focus: 基于 CWE 查询已知 CVE 案例，获取具体的漏洞函数名和调用链模式
+      required_evidence:
+        - 已知 CVE 中的漏洞函数名
+        - 已知 CVE 的调用链模式
+
+  - node_id: run_targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: []
+      language: '<from_context>'
+    success_next: analyze_with_cve_context
+    failure_next: report_empty
+    expert_guidance:
+      analysis_focus: 使用 CVE 知识库提取的查询类型执行定向 Joern 扫描
+      expert_rules:
+        - 定向扫描类型来自 CWE → Joern query type 映射
+        - 扫描结果将与已知 CVE sink 模式进行交叉比对
+
+  - node_id: analyze_with_cve_context
+    tool_name: FileTool.read_file
+    arguments:
+      path: '<from_scan_result>'
+      start_line: 1
+      end_line: 150
+    success_next: verify
+    expert_guidance:
+      analysis_focus: 将 Joern 扫描结果与 CVE 知识库中的已知漏洞模式进行交叉比对
+      required_evidence:
+        - sink 函数完整方法体
+        - source → sink 的数据流路径
+        - 与已知 CVE 的相似性分析
+      false_positive_patterns:
+        - 已有边界检查或长度校验
+        - 使用安全 API 替代
+        - 输入已被上层过滤或限制
+      expert_rules:
+        - 重点检查 CVE 知识库中的高频 sink 函数是否在扫描结果中出现
+        - 对比已知 CVE 的调用链模式与当前代码的相似度
+
+  - node_id: verify
+    tool_name: FileTool.read_file
+    arguments:
+      path: '<caller_or_guard_context>'
+      start_line: 1
+      end_line: 100
+    success_next: report
+    expert_guidance:
+      analysis_focus: 反证验证：排除误报，确认与已知 CVE 模式匹配的代码确实是漏洞
+      refutation_checklist:
+        - 检查所有 return 路径是否都有适当的安全处理
+        - 检查是否有 lock/mutex 保护
+        - 检查配置宏/编译选项是否启用防护
+        - 对比已知 CVE 的修复补丁，检查当前代码是否已应用类似修复
+
+  - node_id: report
+    tool_name: FileTool.write_report
+    completion_signal: cve_pattern_scan_complete
+    expert_guidance:
+      analysis_focus: 生成最终分析报告，包含 CVE 知识库参考和交叉比对结果
+
+  - node_id: fallback_to_full_scan
+    tool_name: JoernTool.run_source_scan
+    success_next: report
+    expert_guidance:
+      analysis_focus: CVE 数据库无匹配结果，回退到全量扫描
+
+  - node_id: report_empty
+    tool_name: FileTool.write_report
+    completion_signal: cve_pattern_scan_no_findings
+

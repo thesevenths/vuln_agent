@@ -1,0 +1,11 @@
+# PoC 生成规范
+
+burp_poc_requirements:
+  format: Burp Suite → Copy to file 原始请求包，或等价 curl -v
+  safe_boundary: 禁止破坏性 payload；仅改鉴权相关参数、资源 ID、业务状态字段
+  required_fields:
+    - affected_entry
+    - user_controllable_input
+    - auth_requirement
+    - burp_raw_request
+    - evidence_file_lines

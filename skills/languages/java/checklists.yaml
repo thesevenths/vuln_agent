@@ -1,0 +1,52 @@
+# Java 安全审计检查清单
+# 按漏洞类别组织，供 LLM 分析时参考
+
+# ── 授权类 ──
+authorization:
+  - "所有写操作（POST/PUT/DELETE）是否有权限校验？"
+  - "管理接口（/admin/**）是否有独立的角色限制？"
+  - "SecurityFilterChain / Shiro 过滤器链是否覆盖所有敏感路径？"
+  - "方法级注解（@PreAuthorize）与 URL 规则是否一致？"
+  - "是否存在仅检查登录但未检查角色/权限的情况？"
+  - "IDOR：用外部传入的资源 ID 查询时是否校验 owner/tenant？"
+
+# ── 认证类 ──
+authentication:
+  - "密码存储是否使用强哈希（BCrypt/Argon2）？"
+  - "JWT 密钥是否硬编码？算法是否为 none/HS256？"
+  - "登录接口是否有暴力破解防护（速率限制/验证码/账户锁定）？"
+  - "登录后是否重新生成 Session（防 Session 固定）？"
+  - "Remember Me 是否使用默认密钥？"
+  - "密码恢复流程是否有 IDOR / 弱 Token 风险？"
+
+# ── 业务逻辑类 ──
+business_logic:
+  - "订单金额/价格是否在服务端重新计算？"
+  - "多步骤流程（支付/审批）能否跳过中间步骤？"
+  - "批量赋值是否限制了可绑定字段？"
+  - "并发操作（扣款/库存）是否有原子保护？"
+  - "TOCTOU：检查与使用之间是否存在竞态窗口？"
+
+# ── 注入类 ──
+injection:
+  - "SQL 是否使用参数化查询 / PreparedStatement？"
+  - "用户输入是否拼接到命令执行 API？"
+  - "XML 解析器是否禁用外部实体？"
+  - "反序列化是否限制允许的类？"
+  - "文件路径是否经过规范化 + 白名单校验？"
+  - "SSRF：出站请求 URL 是否经过白名单校验？"
+
+# ── 信息泄露 ──
+information_exposure:
+  - "API 响应是否返回密码哈希/Token/内部 ID？"
+  - "异常栈是否暴露给客户端？"
+  - "日志中是否包含敏感数据？"
+  - "源码/配置中是否有硬编码凭据？"
+  - "CORS 是否允许任意 Origin + Credentials？"
+
+# ── 配置类 ──
+configuration:
+  - "application.yml/properties 中是否有明文密码？"
+  - "默认账户/密码是否已修改？"
+  - "调试/测试接口是否在 production profile 中关闭？"
+  - "Actuator / Swagger 等管理端点是否对外暴露？"

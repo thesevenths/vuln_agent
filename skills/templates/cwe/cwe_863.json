@@ -1,0 +1,499 @@
+{
+  "skill_id": "cwe_863_incorrect_authorization",
+  "source_cwe": ["CWE-863"],
+  "related_cwes": [
+    {"cwe": "CWE-285", "reason": "improper_authorization_general - CWE-863 是其在授权逻辑错误维度的具体化"},
+    {"cwe": "CWE-284", "reason": "improper_access_control - 访问控制机制存在但逻辑错误"},
+    {"cwe": "CWE-302", "reason": "authentication_bypass_by_assumed_immutable - 基于不可变属性（如 cookie 中的角色）的认证可被伪造"},
+    {"cwe": "CWE-613", "reason": "insufficient_session_expiration - 会话过期不足使过期的授权决策继续有效"},
+    {"cwe": "CWE-862", "reason": "missing_authorization - 授权不当与授权缺失常共现：有授权但逻辑错误 + 部分路径完全无授权"},
+    {"cwe": "CWE-269", "reason": "improper_privilege_management - 授权不当可导致权限管理缺陷：如仅校验登录状态未校验角色"}
+  ],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "IfStmt[condition.type~=/==|!=|in/i]",
+      "VariableAccess[name=~/(role|permission|auth|token|user_type|isAdmin|is_admin|access_level|privilege)/i]",
+      "CookieRead / HeaderRead / ParamRead",
+      "FunctionDef[name=~/(checkPermission|checkAuth|checkRole|hasAccess|isAuthorized|canAccess|authorize|validateAccess)/i]",
+      "Annotation[name=~/(PreAuthorize|Secured|RolesAllowed|RequiresPermissions|Authorize)/i]",
+      "Comparison[operand~=/role|permission|admin|user_type|access_level/i]"
+    ],
+    "semantic_keywords": [
+      "client-side check", "cookie role", "parameter-based auth",
+      "hardcoded permission", "trust boundary violation",
+      "role check", "admin check", "permission check", "access level",
+      "vertical privilege", "privilege escalation", "role escalation",
+      "incomplete check", "logic bypass", "auth bypass"
+    ],
+    "file_context": [
+      "controller", "middleware", "view_handler", "auth_filter",
+      "permission_service", "authorization_handler", "access_control",
+      "role_checker", "guard", "policy"
+    ],
+    "operation_triggers": {
+      "description": "授权决策点是 CWE-863 的核心攻击面，必须验证授权逻辑的正确性和完整性",
+      "sensitive_operations": [
+        "admin_operation", "data_access", "config_change",
+        "user_management", "role_change", "delete_operation",
+        "export_data", "system_config", "manage_permissions"
+      ],
+      "route_patterns": {
+        "java": [
+          "@(Get|Post|Put|Patch|Delete)Mapping.*/(admin|manage|config|setting|internal|private)",
+          "@RequestMapping.*/(admin|manage|user|role|permission)"
+        ],
+        "python": [
+          "@app\\.route.*/(admin|manage|config|setting|internal)",
+          "@router\\.(get|post|put|delete).*/(admin|manage|user|role)"
+        ],
+        "go": [
+          "\\.(GET|POST|PUT|DELETE)\\(.*/(admin|manage|config|setting|internal)",
+          "r\\.(GET|POST)"
+        ],
+        "javascript": [
+          "router\\.(get|post|put|delete).*/(admin|manage|config|setting|internal)",
+          "@(Get|Post|Put|Delete)\\(.*/(admin|manage|user)"
+        ],
+        "php": [
+          "Route::(get|post|put|delete).*/(admin|manage|config|setting|internal)",
+          "@Route.*methods.*(?:GET|POST).*/(admin|manage)"
+        ],
+        "dotnet": [
+          "\\[Http(Get|Post|Put|Delete)\\].*/(admin|manage|config|setting|internal)",
+          "\\[Authorize\\].*/(admin|manage|config)"
+        ],
+        "ruby": [
+          "(get|post|put|delete)\\s+\"/(admin|manage|config|setting|internal)",
+          "before_action.*:(authorize|check_permission|require_admin)"
+        ],
+        "rust": [
+          "\\.route.*/(admin|manage|config).*method.*(?:GET|POST|PUT|DELETE)",
+          "\\.get\\(.*/(admin|manage|config)"
+        ]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "authz_variables": [
+        "role", "permission", "auth", "token", "userType", "isAdmin",
+        "user_type", "accessLevel", "privilege", "authority",
+        "is_superuser", "is_staff", "group"
+      ],
+      "untrusted_sources": [
+        "cookie", "header", "parameter", "request.getParameter",
+        "@CookieValue", "@RequestHeader", "@HeaderParam", "@QueryParam",
+        "@RequestParam", "HttpServletRequest.getHeader",
+        "HttpServletRequest.getCookies"
+      ],
+      "authz_checks": [
+        "hasRole", "hasPermission", "isAuthorized", "checkPermission",
+        "@PreAuthorize", "@Secured", "@RolesAllowed",
+        "RequiresAuthentication", "RequiresPermissions", "RequiresRoles",
+        "subject.hasRole", "subject.isPermitted"
+      ],
+      "incomplete_patterns": [
+        "only.*check.*login.*not.*role",
+        "only.*check.*role.*not.*resource.*ownership",
+        "check.*admin.*not.*super_admin",
+        "role.*==.*ADMIN.*without.*resource.*check"
+      ]
+    },
+    "python": {
+      "authz_variables": [
+        "role", "permission", "is_admin", "is_superuser", "is_staff",
+        "user_type", "access_level", "privilege"
+      ],
+      "untrusted_sources": [
+        "request.cookies", "request.headers", "request.args",
+        "request.form", "request.get_json", "session"
+      ],
+      "authz_checks": [
+        "login_required", "permission_required", "roles_required",
+        "has_perm", "is_authenticated", "check_permissions",
+        "permission_classes", "IsAuthenticated", "IsAdminUser"
+      ]
+    },
+    "php": {
+      "authz_variables": [
+        "role", "is_admin", "permission", "user_type", "access_level",
+        "is_super_admin"
+      ],
+      "untrusted_sources": [
+        "$_COOKIE", "$_GET", "$_POST", "$_REQUEST",
+        "$request->header", "$request->cookie",
+        "$request->input"
+      ],
+      "authz_checks": [
+        "middleware.*auth", "middleware.*role", "Gate::allows",
+        "authorize", "can", "hasRole", "hasPermissionTo"
+      ]
+    },
+    "go": {
+      "authz_variables": [
+        "Role", "IsAdmin", "Permission", "UserType", "AccessLevel"
+      ],
+      "untrusted_sources": [
+        "c.Query", "c.Param", "c.GetHeader", "c.Cookie",
+        "r.Header.Get", "r.URL.Query"
+      ],
+      "authz_checks": [
+        "AuthRequired", "AdminRequired", "checkPermission",
+        "hasRole", "isAdmin", "casbin.Enforce"
+      ]
+    },
+    "javascript": {
+      "authz_variables": [
+        "role", "isAdmin", "is_admin", "permission", "userType",
+        "accessLevel", "privilege"
+      ],
+      "untrusted_sources": [
+        "req.body", "req.query", "req.params", "req.cookies",
+        "req.headers", "req.get"
+      ],
+      "authz_checks": [
+        "checkRole", "requireAdmin", "hasPermission",
+        "isAuthenticated", "authorize", "@Roles", "RolesGuard"
+      ]
+    },
+    "dotnet": {
+      "authz_variables": [
+        "Role", "IsAdmin", "Permission", "UserType", "AccessLevel"
+      ],
+      "untrusted_sources": [
+        "Request.Headers", "Request.Cookies", "Request.Query",
+        "[FromQuery]", "[FromHeader]", "[FromBody]"
+      ],
+      "authz_checks": [
+        "[Authorize]", "[Authorize(Roles", "IsInRoleAsync",
+        "HasClaim", "Policy.*Require", "ClaimsPrincipal"
+      ]
+    },
+    "ruby": {
+      "authz_variables": [
+        "role", "is_admin", "admin?", "permission", "user_type"
+      ],
+      "untrusted_sources": [
+        "params", "cookies", "session", "headers",
+        "request.headers"
+      ],
+      "authz_checks": [
+        "before_action.*:authenticate", "authorize!",
+        "can?", "has_role?", "current_user"
+      ]
+    },
+    "rust": {
+      "authz_variables": [
+        "role", "Role", "is_admin", "Permission", "UserType"
+      ],
+      "untrusted_sources": [
+        "Query", "Path", "Header", "Cookie",
+        "Json", "Form"
+      ],
+      "authz_checks": [
+        "#[authorize]", "AuthMiddleware",
+        "is_admin", "has_role", "check_permission"
+      ]
+    },
+    "generic": {
+      "authz_variables": ["role", "permission", "auth", "token", "user_type", "is_admin", "access_level"],
+      "untrusted_sources": ["cookie", "header", "parameter", "query", "body", "form"],
+      "authz_checks": ["check_auth", "has_role", "is_admin", "authorize", "permission"]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表授权逻辑中的高风险反模式",
+    "client_trusted_authorization": {
+      "description": "授权决策基于客户端可控的数据源（Cookie/Header/URL 参数）",
+      "java": [
+        "@CookieValue.*role",
+        "request\\.getHeader.*role",
+        "request\\.getParameter.*isAdmin",
+        "cookie.*role.*==.*admin",
+        "header.*permission.*==.*true"
+      ],
+      "python": [
+        "request\\.cookies.*role",
+        "request\\.headers.*role",
+        "request\\.args.*is_admin",
+        "cookie.*role.*==.*admin"
+      ],
+      "php": [
+        "\\$_COOKIE.*role",
+        "\\$_COOKIE.*is_admin",
+        "\\$_GET.*role",
+        "\\$_REQUEST.*permission"
+      ],
+      "go": [
+        "c\\.Cookie.*role",
+        "c\\.GetHeader.*role",
+        "r\\.Header\\.Get.*role"
+      ],
+      "javascript": [
+        "req\\.cookies\\.role",
+        "req\\.headers.*role",
+        "req\\.query.*isAdmin",
+        "cookie.*role.*===.*admin"
+      ],
+      "generic": [
+        "cookie.*role.*admin",
+        "header.*permission.*check",
+        "param.*is_admin.*true"
+      ]
+    },
+    "incomplete_authorization_check": {
+      "description": "授权检查存在但不完整（如仅校验登录状态不校验角色，或仅校验角色不校验资源归属）",
+      "java": [
+        "isAuthenticated.*without.*hasRole",
+        "login_required.*without.*permission_required",
+        "checkLogin.*without.*checkRole",
+        "authenticated.*without.*authorized"
+      ],
+      "python": [
+        "login_required.*without.*permission_required",
+        "is_authenticated.*without.*has_perm",
+        "current_user.*without.*role.*check"
+      ],
+      "generic": [
+        "check.*login.*not.*role",
+        "authenticated.*not.*authorized",
+        "role.*check.*not.*resource.*ownership"
+      ]
+    },
+    "hardcoded_permission_check": {
+      "description": "权限判断使用硬编码值或字符串比较，可能被绕过",
+      "java": [
+        "role\\.equals\\(\"admin\"\\)",
+        "permission.*==.*\"ADMIN\"",
+        "userType.*equals.*\"superuser\"",
+        "if.*\"admin\".*equals.*role"
+      ],
+      "python": [
+        "role\\s*==\\s*['\"]admin['\"]",
+        "user\\.role\\s*==\\s*['\"]admin['\"]",
+        "permission.*==.*['\"]admin['\"]"
+      ],
+      "generic": [
+        "role.*==.*admin",
+        "permission.*==.*granted",
+        "hardcoded.*admin.*check"
+      ]
+    },
+    "role_only_check": {
+      "description": "仅校验角色不校验资源归属（允许水平越权）",
+      "java": [
+        "hasRole.*without.*resource.*ownership",
+        "@PreAuthorize.*hasRole.*without.*resource.*check",
+        "checkRole.*without.*checkOwner"
+      ],
+      "generic": [
+        "role.*check.*without.*ownership",
+        "authorize.*role.*without.*resource",
+        "admin.*check.*without.*tenant.*check"
+      ]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "server_side_authorization": {
+      "description": "授权决策是否基于服务端可信状态（Session/Token/DB），而非客户端数据",
+      "java": [
+        "SecurityContextHolder.*getAuthentication",
+        "@AuthenticationPrincipal",
+        "session\\.getAttribute.*role",
+        "SecurityContext.*getPrincipal",
+        "Subject.*getPrincipal"
+      ],
+      "python": [
+        "current_user\\.role",
+        "session\\[.role.\\]",
+        "request\\.user\\.role",
+        "get_current_user.*role"
+      ],
+      "php": [
+        "Auth::user\\(\\)->role",
+        "session.*role",
+        "auth\\(\\)->user\\(\\)->role"
+      ],
+      "go": [
+        "c\\.Get\\(\"user\"\\)",
+        "c\\.Get\\(\"role\"\\)",
+        "session\\.Values\\[\"role\"\\]"
+      ],
+      "javascript": [
+        "req\\.user\\.role",
+        "req\\.session\\.role",
+        "ctx\\.state\\.user\\.role",
+        "decoded\\.role"
+      ],
+      "dotnet": [
+        "User\\.Identity",
+        "User\\.Claims",
+        "ClaimsPrincipal.*FindFirst",
+        "HttpContext\\.User"
+      ],
+      "ruby": [
+        "current_user\\.role",
+        "session\\[:role\\]",
+        "warden\\.user"
+      ],
+      "rust": [
+        "Identity",
+        "Claims",
+        "session.*role",
+        "extract.*from.*token"
+      ]
+    },
+    "complete_authorization_chain": {
+      "description": "授权检查是否完整（认证+角色+资源归属）",
+      "java": [
+        "hasRole.*&&.*resource.*getUserId.*equals.*principal",
+        "@PreAuthorize.*hasRole.*#.*\\.userId.*==.*authentication",
+        "checkRole.*&&.*checkOwnership"
+      ],
+      "python": [
+        "has_perm.*and.*resource\\.user_id.*==.*current_user\\.id",
+        "current_user\\.role.*in.*\\[.*\\].*and.*resource\\.owner"
+      ],
+      "generic": [
+        "role.*check.*&&.*ownership.*check",
+        "authenticated.*&&.*authorized.*&&.*owner"
+      ]
+    },
+    "framework_authorization": {
+      "description": "是否使用了成熟的授权框架",
+      "java": [
+        "@PreAuthorize", "@Secured", "@RolesAllowed",
+        "SpringSecurity", "Apache Shiro", "Keycloak",
+        "Casbin", "CasbinEnforcer"
+      ],
+      "python": [
+        "permission_required", "roles_required",
+        "django-guardian", "flask-principal", "flask-security"
+      ],
+      "php": [
+        "Gate::", "Policy", "Spatie\\\\Permission",
+        "middleware.*role", "can:"
+      ],
+      "javascript": [
+        "CASL", "casl", "AbilityBuilder",
+        "accesscontrol", "rbac", "RolesGuard"
+      ],
+      "dotnet": [
+        "AuthorizationPolicy", "IAuthorizationHandler",
+        "Policy.*Require", "ResourceBased"
+      ],
+      "ruby": [
+        "CanCanCan", "Pundit", "rolify",
+        "authorize!", "policy"
+      ],
+      "generic": [
+        "authorization.*framework",
+        "rbac.*enforcer",
+        "abac.*policy"
+      ]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【定位授权判断点】找到代码中用于决定资源访问权限的条件分支（if/switch/annotation），识别授权决策变量（role/permission/isAdmin/access_level）。",
+    "Step 1: 【追溯判断依据来源】该条件依赖的变量（如 $role, $isAdmin）是从哪里赋值的？追踪完整的数据流赋值链。",
+    "Step 2: 【评估数据可信度】若来自 Cookie/Header/URL 参数 → 高风险（客户端可控）；若来自 Session/Token 解析/DB 查询 → 相对可信；若为硬编码字符串 → 需检查是否覆盖所有路径。对照 anti_patterns.client_trusted_authorization 和 control_detection_patterns.server_side_authorization。",
+    "Step 3: 【检查授权完整性】授权检查是否仅验证登录状态而未验证角色？仅验证角色而未验证资源归属？对照 anti_patterns.incomplete_authorization_check 和 anti_patterns.role_only_check。",
+    "Step 4: 【检查绕过可能性】是否存在不经过该判断即可到达敏感操作的路径？（如 else 分支缺失、异常处理跳过校验、可选认证参数）。",
+    "Step 5: 【验证业务语义匹配】即使数据来源可信，判断逻辑是否符合业务预期？（如仅校验角色未校验资源归属 = 水平越权；仅校验登录未校验角色 = 垂直越权）。",
+    "Step 6: 【检查硬编码权限】权限判断是否使用硬编码值或简单字符串比较，可能被类型混淆或注入绕过。对照 anti_patterns.hardcoded_permission_check。",
+    "Step 7: 【检查多层校验】是否存在多层校验（角色+资源归属+租户隔离），单层失败是否导致整体拒绝。对照 control_detection_patterns.complete_authorization_chain。",
+    "Step 8: 【八项确认标准】缺一不得 confirmed：(1)授权数据来自服务端可信源 (2)授权检查完整（认证+角色+归属）(3)无绕过路径 (4)业务语义匹配 (5)无硬编码权限 (6)使用授权框架 (7)多层校验 (8)异常路径 fail-closed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "php",
+        "code_snippet": "$role = $_COOKIES['role'];\nif (!$role) {\n    $role = getRole('user');\n    setcookie('role', $role);\n}\nif ($role == 'Reader') {\n    DisplayMedicalHistory($_GET['patient_id']);\n}",
+        "vulnerability_analysis": "授权决策完全依赖客户端 Cookie。攻击者可直接设置 Cookie: role=Reader 绕过 getRole() 调用。即使有默认回退机制，Cookie 仍可被篡改为任意值。这是典型的'信任客户端输入作为授权依据'缺陷。",
+        "fix_pattern": "$role = $_SESSION['role']; // 从服务端 Session 获取，不可由客户端设置。同时验证当前用户对 patient_id 有访问权限。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@PostMapping(\"/admin/promote\")\npublic void promoteUser(@RequestBody PromoteRequest req) {\n    userService.setRole(req.getUserId(), \"ADMIN\");\n}",
+        "vulnerability_analysis": "管理接口无任何角色检查。任何已认证用户均可调用此接口将任意用户（包括自己）提升为管理员。仅有认证（登录）而无授权（角色校验），属于典型的垂直越权。",
+        "fix_pattern": "@PreAuthorize(\"hasRole('SUPER_ADMIN')\") public void promoteUser(..., @AuthenticationPrincipal User admin) { auditLog.record(admin.getId(), \"PROMOTE_USER\", req.getUserId()); }"
+      },
+      {
+        "language": "python",
+        "code_snippet": "@app.delete(\"/api/posts/{post_id}\")\nasync def delete_post(post_id: int, current_user: User = Depends(get_current_user)):\n    post = await Post.get(id=post_id)\n    if post.author_id == current_user.id:\n        await post.delete()\n    else:\n        raise HTTPException(403)",
+        "vulnerability_analysis": "仅校验帖子作者可删除，但未允许管理员/版主删除违规内容。这是不完整的授权检查——缺少管理员例外逻辑，属于授权逻辑缺陷（CWE-863）而非完全缺失（CWE-862）。",
+        "fix_pattern": "if post.author_id == current_user.id or current_user.role in ['admin', 'moderator']: await post.delete() else: raise HTTPException(403)"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.get('/admin/dashboard', (req, res) => {\n    const role = req.cookies.role || 'user';\n    if (role === 'admin') {\n        res.json(getAdminData());\n    } else {\n        res.status(403).json({error: 'Forbidden'});\n    }\n});",
+        "vulnerability_analysis": "角色从 Cookie 读取，攻击者可直接设置 Cookie: role=admin 获取管理员仪表板数据。授权决策完全依赖客户端可控的 Cookie 值。",
+        "fix_pattern": "const role = req.user.role; // 从 JWT/Session 中获取服务端验证的角色; 使用中间件: app.get('/admin/dashboard', authMiddleware, requireRole('admin'), ...)"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func AdminHandler(c *gin.Context) {\n    role := c.GetHeader(\"X-User-Role\")\n    if role == \"admin\" {\n        c.JSON(200, getAdminData())\n    } else {\n        c.JSON(403, gin.H{\"error\": \"forbidden\"})\n    }\n}",
+        "vulnerability_analysis": "角色从 HTTP Header 读取，攻击者可设置 X-User-Role: admin 绕过授权。Header 完全由客户端控制，不可作为授权依据。",
+        "fix_pattern": "role := c.GetString(\"role\") // 从 JWT 中间件注入的 context 获取; 使用中间件: r.GET(\"/admin\", AuthRequired(), AdminRequired(), AdminHandler)"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "[HttpGet(\"admin/settings\")]\npublic IActionResult GetSettings()\n{\n    var role = Request.Headers[\"X-Role\"].ToString();\n    if (role == \"Admin\")\n        return Ok(GetAdminSettings());\n    return Forbid();\n}",
+        "vulnerability_analysis": "角色从 HTTP Header X-Role 读取，攻击者可直接设置 X-Role: Admin 获取管理员设置。即使有 [Authorize] 在控制器级别，该方法使用客户端 Header 而非 Claims 做授权决策。",
+        "fix_pattern": "使用 [Authorize(Roles = \"Admin\")] 注解，或 var role = User.FindFirst(ClaimTypes.Role)?.Value; 从 Claims 获取服务端验证的角色。"
+      }
+    ],
+    "mitigation_rules": [
+      "授权决策必须基于服务端可信状态（Session/Token/DB），绝不使用客户端直接提交的权限标识（Cookie/Header/URL 参数）。",
+      "实施 Default Deny：未明确授权的请求一律拒绝，而非依赖前端隐藏或客户端标记。",
+      "区分通用资源访问控制与业务级授权（如医疗记录需同时校验角色+患者归属关系）。",
+      "使用成熟授权框架（Spring Security / Django Guardian / CASL / CanCanCan / Pundit）避免手写易错逻辑。",
+      "授权检查必须完整：认证（是否登录）+ 角色（是否有权限）+ 资源归属（是否为当前用户的资源）。",
+      "多层校验中任何一层失败都应导致整体拒绝（Defense in Depth）。"
+    ],
+    "refutation_checklist": [
+      "授权变量是否严格从服务端 Session/安全 Token 中解析，且 Session ID 不可预测？",
+      "是否使用了 @PreAuthorize/@Secured 等框架注解，且表达式引用了服务端上下文对象？",
+      "是否存在多层校验：既有角色校验，又有资源所有权校验（防水平越权）？",
+      "客户端提交的权限标识是否仅作为 UI 提示，服务端仍独立重新验证？",
+      "授权检查是否覆盖了所有到达敏感操作的路径（无绕过路径）？",
+      "异常处理路径是否也执行了授权检查（非 fail-open）？",
+      "授权逻辑是否使用了成熟的授权框架（而非自定义 if-else）？",
+      "多租户场景下是否同时校验了租户隔离（防跨租户访问）？"
+    ]
+  },
+  "tool_calls": [
+    {"name": "trace_variable_data_source", "desc": "回溯授权判断变量的完整赋值链，标记每个赋值点的可信度（客户端/服务端/硬编码）。"},
+    {"name": "find_unprotected_paths", "desc": "通过 CFG 分析，查找是否存在绕过当前授权判断即可到达敏感操作的执行路径。"},
+    {"name": "check_session_binding", "desc": "验证权限变量是否与当前 authenticated session 强绑定。"},
+    {"name": "check_authorization_completeness", "desc": "验证授权检查是否完整（认证+角色+资源归属），对照 anti_patterns.incomplete_authorization_check。"},
+    {"name": "detect_hardcoded_permissions", "desc": "检查权限判断是否使用硬编码值。对照 anti_patterns.hardcoded_permission_check。"},
+    {"name": "check_framework_usage", "desc": "验证是否使用了成熟的授权框架。对照 control_detection_patterns.framework_authorization。"},
+    {"name": "check_multi_layer_auth", "desc": "验证是否存在多层校验（角色+归属+租户）。对照 control_detection_patterns.complete_authorization_chain。"}
+  ],
+  "sanitizers": [
+    "授权变量严格从服务端 Session/安全 Token 中解析，且 Session ID 不可预测",
+    "使用了 @PreAuthorize/@Secured 等框架注解，且表达式引用了服务端上下文对象",
+    "存在多层校验：既有角色校验，又有资源所有权校验（防水平越权）",
+    "客户端提交的权限标识仅作为 UI 提示，服务端仍独立重新验证",
+    "授权检查覆盖了所有到达敏感操作的路径，无绕过路径",
+    "使用了成熟的授权框架（Spring Security / CASL / CanCanCan / Pundit / django-guardian）",
+    "多租户场景下同时校验了租户隔离",
+    "异常处理路径也执行了授权检查（fail-closed）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-863",
+    "flaw_type": "array — 授权缺陷类型 (如 ['client_trust', 'incomplete_check', 'logic_bypass', 'hardcoded_permission', 'role_only_no_ownership'])",
+    "untrusted_source": "string (指出具体哪个变量来自不可信源，如 '$_COOKIE[\"role\"]' 或 'req.headers[\"x-role\"]')",
+    "anti_pattern_hit": "array — 命中的反向模式 (如 ['client_trusted_authorization.php', 'incomplete_authorization_check.java'])",
+    "control_missing": "array — 缺失的安全控制 (如 ['server_side_authorization', 'complete_authorization_chain', 'framework_authorization'])",
+    "reasoning_trace": "string (必须包含对数据流可信度的分析推理)",
+    "business_impact": "string (从 common_consequences 映射: 垂直越权/水平越权/信息泄露)",
+    "risk_level": "CRITICAL",
+    "remediation": "string (结合 potential_mitigations 生成，强调'服务端重验'原则)"
+  }
+}

@@ -1,0 +1,20 @@
+# core/ — 通用方法论（与语言无关）
+# 所有文件始终加载，合并进每个 CWE skill 的 LLM prompt
+
+# 加载顺序（无依赖关系，按文件名排序）
+files:
+  # ── 原有结构化数据（合并进 CWE skill dict）──
+  - confirmation_criteria.yaml    # 六项确认标准 + 判定规则
+  - poc_requirements.yaml         # PoC 生成规范（Burp 格式）
+  - component_scan_handoff.yaml   # 组件扫描联动流程
+  - output_schema.yaml            # 输出字段定义
+
+  # ── 方法论参考文档（注入 LLM prompt 上下文）──
+  - control_driven_audit.yaml     # 控制驱动审计方法论
+  - endpoint_enumeration.yaml     # 端点枚举方法
+  - crud_consistency_check.yaml   # CRUD 权限一致性检查
+  - ownership_verification.yaml   # 资源归属校验方法（IDOR 检测核心）
+  - attack_chain_construction.yaml # 攻击链构建
+  - anti_hallucination.yaml       # 防幻觉规则
+  - false_positive_filter.yaml    # 误报过滤（反证流程）
+  - poc_generation.yaml           # PoC 生成方法论

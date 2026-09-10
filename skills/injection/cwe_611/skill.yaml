@@ -1,0 +1,10 @@
+# CWE-611 Skill 元数据
+# 从 templates/cwe/cwe_611.json 迁移
+
+skill_id: cwe_611_xml_external_entity
+source_cwe: CWE-611
+priority: P0
+
+related_cwes:
+  - CWE-827
+  - CWE-200

@@ -1,0 +1,22 @@
+# 逻辑扫描 vs 污点扫描：反证机制
+
+```mermaid
+flowchart LR
+    subgraph taint [污点 run_source_scan]
+        T1[主分析 LLM] --> T2["_run_refutation_check<br/>独立第二遍反证 LLM"]
+        T2 --> T3[_apply_refutation_to_analysis]
+    end
+
+    subgraph logic [逻辑 run_logic_scan]
+        L1[CWE sanitizers 写入 prompt] --> L2["主分析 LLM 一次<br/>输出 refutation_verdict + sanitizer_hit"]
+        L2 --> L3[apply_logic_verdict_gates]
+    end
+```
+
+| 维度 | 污点扫描 | 逻辑扫描 |
+|------|----------|----------|
+| 反证是否用 LLM | 是，**两轮**（主分析 + 独立反证） | 是，**一轮**（主分析内嵌反证字段） |
+| 反证 prompt | `refutation_check_prompt` | CWE `sanitizers` + `LOGIC_VERDICT_AND_POC_POLICY` |
+| 机读门禁 | 反证 LLM 规则 + L2 约束 | `apply_logic_verdict_gates` |
+| inconclusive 复核 | `re_refute_only` → 再跑反证 LLM | 重跑 `run_logic_scan`（无独立反证 LLM） |
+| LLM 检查点 | flow 级 `_flow_verdict_cache` 等 | `cpg_logic_llm.json` ckey；增量见 `docs/LLM检查点与路径索引` |

@@ -1,0 +1,56 @@
+# CWE-200 检测模式
+
+ast_patterns:
+  - 'Print/Log/Echo[args.contains_sensitive_keyword=true]'
+  - 'HttpResponse[body.contains_user_data=true]'
+  - 'ExceptionHandling[catch_block.prints_message=true]'
+  - 'ReturnStatement[type=~/(User|Account|Profile|Config)/i]'
+
+semantic_keywords:
+  - ssn
+  - social security
+  - credit card
+  - ccn
+  - password
+  - location
+  - debug
+  - stack trace
+  - config file
+  - internal path
+  - mvc version
+  - asp.net
+  - fine_location
+
+file_context:
+  - controller
+  - error_handler
+  - logger
+  - api_response
+  - jsp
+
+logic_query_keywords_generic:
+  sensitive_data_keywords:
+    - password
+    - secret
+    - token
+    - ssn
+    - credit_card
+    - email
+    - phone
+    - api_key
+  leak_channels:
+    - log
+    - logger
+    - error
+    - print
+    - echo
+    - console
+    - response
+
+sanitizers:
+  - 敏感数据经过脱敏处理(掩码/哈希/截断)后再输出
+  - 错误消息为通用模板，不包含内部路径、查询语句、配置信息
+  - Debug 功能仅在开发/测试环境启用，且生产环境有强制禁用机制
+  - API 响应使用 DTO/ViewModel 投影，仅包含前端所需字段
+  - 权限请求有明确的业务必要性文档且经安全评审确认
+  - 日志中的敏感数据已自动脱敏(如通过 Logback MaskingConverter)

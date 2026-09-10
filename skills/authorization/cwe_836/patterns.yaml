@@ -1,0 +1,40 @@
+# CWE-836 检测模式
+
+ast_patterns:
+  - 'FunctionCall[name=~/(login|auth|signin|verify)/i]'
+  - 'BinaryExpr[operator==''==''][left.type~=/hash|digest/i]'
+
+semantic_keywords:
+  - clientHash
+  - frontendHash
+  - preHashedPassword
+  - passwordHash
+  - md5(password)
+  - sha256(password)
+
+file_context:
+  - controller
+  - api
+  - auth_service
+  - middleware
+
+logic_query_keywords_generic:
+  auth_entry:
+    - login
+    - authenticate
+    - signin
+    - verify
+  hash_patterns:
+    - md5
+    - sha256
+    - sha1
+    - hash
+    - digest
+    - bcrypt
+    - hashlib
+
+sanitizers:
+  - 服务端接收到密码后，执行了 bcrypt/argon2/scrypt 等慢哈希再与存储值比较
+  - 使用了 OAuth2/OIDC 等标准协议，密码不在应用层直接处理
+  - 客户端哈希仅用于防窥探，服务端仍对原始密码进行二次验证（需双重确认）
+  - 使用了硬件令牌/FIDO2 等非密码认证机制

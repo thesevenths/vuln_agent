@@ -1,0 +1,77 @@
+{
+  "skill_id": "cwe_79_cross_site_scripting",
+  "source_cwe": ["CWE-79"],
+  "related_cwes": ["CWE-80", "CWE-83"],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "Call[name=~/(model\\.addAttribute|modelAndView\\.addObject|PrintWriter\\.print|OutputStream\\.write|HttpServletResponse\\.getWriter)/i]",
+      "Call[name=~/(innerHTML|document\\.write|outerHTML|insertAdjacentHTML)/i]",
+      "Annotation[name=~/(ResponseBody|Controller)/i]"
+    ],
+    "semantic_keywords": [
+      "user input", "display", "render", "output", "HTML", "template",
+      "Thymeleaf", "JSP", "Freemarker", "response.write"
+    ],
+    "file_context": ["controller", "template", "view", "handler"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "output_sinks": ["model.addAttribute", "addObject", "writer.print", "writer.write", "out.print", "response.getWriter", "th:text", "th:utext"],
+      "user_sources": ["@RequestParam", "@PathVariable", "request.getParameter", "request.getHeader", "@RequestBody"],
+      "safe_patterns": ["HtmlUtils.htmlEscape", "StringEscapeUtils", "ESAPI.encoder", "th:text (auto-escape)"]
+    },
+    "generic": {
+      "output_sinks": ["innerHTML", "document.write", "echo", "print", "render"],
+      "safe_patterns": ["textContent", "createElement", "DOMPurify", "htmlspecialchars", "escapeHtml"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别输出点】是否存在将数据渲染到HTML/页面的操作？",
+    "Step 2: 【追踪数据来源】输出数据是否包含用户可控内容？",
+    "   - @RequestParam / @PathVariable / request.getParameter",
+    "   - HTTP Header（User-Agent, Referer）",
+    "   - 数据库中用户写入的字段",
+    "Step 3: 【检查编码/转义】输出前是否进行了HTML编码？",
+    "   - ❌ 直接输出: writer.print(userInput)",
+    "   - ❌ 非转义输出: th:utext=\"${userInput}\"",
+    "   - ✅ 自动转义: th:text=\"${userInput}\" (Thymeleaf默认转义)",
+    "   - ✅ 手动转义: HtmlUtils.htmlEscape(userInput)",
+    "Step 4: 【确定XSS类型】",
+    "   - 反射型: 用户输入 → 直接响应（搜索结果、错误消息）",
+    "   - 存储型: 用户输入 → 数据库 → 其他用户页面（评论、个人资料）",
+    "   - DOM型: 前端JS直接使用用户输入（location.hash → innerHTML）",
+    "Step 5: 【评估影响】XSS可能窃取什么？（Session Cookie、CSRF Token、用户数据）"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "model.addAttribute(\"username\", request.getParameter(\"username\"));",
+        "vulnerability_analysis": "用户输入 username 直接传入模板。如果模板使用 th:utext 或 JSP ${username} 无转义输出，攻击者可注入 <script>alert(1)</script>。",
+        "fix_pattern": "使用 th:text（自动HTML转义）或手动调用 HtmlUtils.htmlEscape() 处理"
+      }
+    ],
+    "mitigation_rules": [
+      "所有用户输入在输出到HTML时必须经过HTML实体编码",
+      "Thymeleaf 使用 th:text（自动转义），禁止 th:utext 输出用户数据",
+      "JSP 使用 <c:out> 或 ${fn:escapeXml()} 代替 ${}",
+      "前端使用 textContent 代替 innerHTML，或使用 DOMPurify",
+      "设置 Content-Security-Policy Header 限制内联脚本执行"
+    ]
+  },
+  "sanitizers": [
+    "使用框架自动转义（th:text、<c:out>、React/Vue 自动转义）",
+    "手动调用 HtmlUtils.htmlEscape / ESAPI.encoder().encodeForHTML()",
+    "输出到非HTML上下文（JSON API）且设置了正确的 Content-Type",
+    "设置了严格的 Content-Security-Policy Header"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-79",
+    "xss_type": "enum['reflected', 'stored', 'dom']",
+    "output_context": "string (HTML body / attribute / JavaScript / URL)",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

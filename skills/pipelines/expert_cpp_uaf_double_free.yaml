@@ -1,0 +1,124 @@
+# Pipeline: expert_cpp_uaf_double_free
+# C/C++ UAF/Double-Free 专家分析
+
+skill_id: expert_cpp_uaf_double_free
+name: C/C++ UAF/Double-Free 专家分析
+summary: 定向扫描 UAF/DF → 向下追踪(free后) → NULL 赋值检查 → 锁保护检查 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - use_after_free
+  - double_free
+  - UAF
+  - 释放后使用
+  - 重复释放
+  - CWE-416
+  - CWE-415
+  - free 后使用
+  - ptr reuse
+completion_hints:
+  - UAF/Double-Free 的关键证据在 free 之后，不是之前
+  - 必须检查 free 后指针是否被置 NULL
+  - 必须检查是否存在分支使得 ptr 未被置 NULL 就被再次使用/释放
+  - 多线程场景须检查锁保护
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: targeted_scan
+    expert_guidance:
+      analysis_focus: 准备 UAF/Double-Free 分析上下文
+      expert_rules:
+        - UAF 本质：free(ptr) → ... → use(ptr) 且中间未置 NULL
+        - Double-Free 本质：free(ptr) → ... → free(ptr) 且中间未置 NULL
+        - 向上追溯 caller 对 UAF/DF 几乎无用，必须向下追踪
+
+  - node_id: targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: [cpp_use_after_free, cpp_double_free, cpp_custom_mem, cpp_concurrent_uaf_risk]
+    success_next: forward_trace
+    failure_next: forward_trace
+    expert_guidance:
+      analysis_focus: 扫描 UAF/Double-Free 相关 flow
+      expert_rules:
+        - 'cpp_use_after_free: 查找 free → identifier 引用链'
+        - 'cpp_double_free: 查找 free → free 链'
+        - 'cpp_concurrent_uaf_risk: 查找锁与 free 共现的方法'
+
+  - node_id: forward_trace
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*.c'
+      limit: 30
+    success_next: check_null_assignment
+    failure_next: check_null_assignment
+    expert_guidance:
+      analysis_focus: 向下追踪：获取包含 free 的完整方法体
+      required_evidence:
+        - free 调用后的所有代码（直到函数 return 或下一个 free）
+        - free 后是否紧接 ptr = NULL
+        - 是否存在 goto/branch 绕过 NULL 赋值
+      expert_rules:
+        - 用 FileTool.read_file 精读 free 所在函数的完整方法体
+        - 特别关注 free 与 return 之间的代码段
+        - 若有 goto cleanup，追踪 cleanup 标签处的代码
+
+  - node_id: check_null_assignment
+    tool_name: null
+    success_next: check_lock_protection
+    failure_next: check_lock_protection
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*.h'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/CMakeLists.txt'
+          limit: 5
+    expert_guidance:
+      analysis_focus: 检查 free 后指针是否被置 NULL
+      refutation_checklist:
+        - free(ptr) 后是否紧接 ptr = NULL 或 ptr = nullptr
+        - 是否所有退出路径（含 error path、goto cleanup）都做了 NULL 赋值
+        - 指针是否被传入其他函数后再 free（跨函数 UAF）
+        - 是否存在 RAII/smart pointer 管理（C++ 场景）
+      false_positive_patterns:
+        - free 后紧接 ptr = NULL（且无分支绕过）
+        - 使用 C++ smart pointer / RAII 管理
+        - 指针作用域在 free 后即结束（局部变量且不再被引用）
+        - goto cleanup 路径中统一做了 NULL 赋值
+
+  - node_id: check_lock_protection
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*.c'
+      limit: 10
+    success_next: verify
+    failure_next: verify
+    expert_guidance:
+      analysis_focus: 多线程场景下检查锁保护
+      required_evidence:
+        - free 和使用 ptr 的代码是否在同一把锁的保护范围内
+        - 是否存在 lock → free → unlock → ... → lock → use → unlock 的窗口
+      refutation_checklist:
+        - pthread_mutex_lock 是否覆盖了 free 和后续 use 的全部区间
+        - 是否存在无锁的读-写竞争（reader-writer race）
+        - 中断处理函数(ISR)中是否访问了被 free 的内存
+      expert_rules:
+        - 即使 free 后未置 NULL，若所有访问都在同一锁内，可能非漏洞
+        - 但 lock → free → unlock → lock → use → unlock 之间存在窗口期，仍为 UAF
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定 UAF/Double-Free 是否成立
+      expert_rules:
+        - 判定为真实 UAF 必须满足：(1) 有 free (2) free 后有 use (3) 中间未置 NULL (4) 无锁保护
+        - 判定为真实 Double-Free 必须满足：(1) 有两次 free (2) 中间未置 NULL (3) 无互斥保护
+        - 若存在分支使得某些路径置 NULL、某些不置，标注为「条件性 UAF」
+

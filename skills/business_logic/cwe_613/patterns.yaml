@@ -1,0 +1,91 @@
+# CWE-613 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(login|session|token|auth|expire|timeout|logout|invalidate|destroy_session)/i]'
+  - 'ClassDef[name=~/(SecurityConfig|SessionConfig|WebConfig|AuthConfig|TokenProvider|SessionManager|SessionMiddleware)/i]'
+  - 'Annotation[name=~/(SessionScope|EnableRedisHttpSession|SessionConfig|Bean|Configuration)/i]'
+
+semantic_keywords:
+  - session
+  - timeout
+  - expiration
+  - ttl
+  - max_age
+  - cookie
+  - jwt
+  - expire
+  - invalidate
+  - idle_timeout
+  - absolute_timeout
+  - refresh_token
+  - session_destroy
+  - regenerate
+  - maxInactiveInterval
+  - gc_maxlifetime
+  - cookie_lifetime
+
+file_context:
+  - security_config
+  - session_manager
+  - auth_middleware
+  - application_properties
+  - application_yml
+  - web_xml
+  - token_service
+  - settings_py
+  - config_php
+  - env
+  - docker_compose
+
+sensitive_operations:
+  - delete
+  - update
+  - create
+  - export
+  - batch
+  - bulk
+  - admin
+  - config
+  - payment
+  - transfer
+  - refund
+  - password_change
+  - role_change
+  - permission_change
+
+logic_query_keywords_generic:
+  session_ops:
+    - timeout
+    - expire
+    - max_age
+    - ttl
+    - invalidate
+    - lifetime
+    - blacklist
+    - revoke
+    - destroy
+    - regenerate
+    - flush
+    - clear
+    - idle
+    - absolute
+    - sliding
+  jwt_ops:
+    - exp
+    - expiresIn
+    - expires_in
+    - expires_at
+    - ExpirationTime
+    - lifetime
+    - refresh
+    - access_token
+    - id_token
+
+sanitizers:
+  - '框架或网关（如 Nginx, APISIX, IAM）已全局配置了严格的 Session/Token 生命周期与强制失效策略'
+  - 使用了短效 Access Token (如 15 分钟) 配合安全的 Refresh Token 轮换与撤销机制
+  - 系统属于无需保持长会话的无状态 API，且每次请求均独立鉴权（如 mTLS 或短期临时凭证）
+  - 高敏感系统已实施基于行为的动态会话终止或操作级步数认证（Step-up Auth）
+  - 纯内部测试环境且网络完全隔离，经安全评审确认可接受长会话风险
+  - 多环境配置中各环境均保持了相同或更高安全级别的会话超时策略
+  - 认证豁免路径仅包含无副作用的公开端点（登录页、注册页、健康检查），无写操作或敏感数据访问

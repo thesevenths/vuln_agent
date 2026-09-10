@@ -1,0 +1,179 @@
+flowchart TB
+    %% ========== 入口 ==========
+    subgraph L0["① main.py 入口"]
+        CLI["argparse: --mode / --project / --language ..."]
+        BOOT["JoernTool + DBTool → GraphBuilder → AgentPlannerExecutor + AgentState"]
+        MODES{"--mode?"}
+        CLI --> BOOT --> MODES
+        MODES -->|repl / agent / source_scan / reachability| AGT["run_agent_task → planner.run"]
+        MODES -->|generate-cve-skills| GEN["cve_skill_generator 旁路"]
+        MODES -->|repl: source_scan 命令| AGT
+        AGT --> LO{"detect_logic_only_intent?"}
+        LO -->|是| LO_MODE["audit_mode=logic_only"]
+        LO -->|否| RUN
+        LO_MODE --> RUN
+    end
+
+    %% ========== Planner ==========
+    subgraph L1["② AgentPlannerExecutor 主循环"]
+        RUN["planner.run: audit JSONL + scanner 回调桥接"]
+        IDX["run 开头 _rebuild_project_file_index<br/>_live_file_index + available_source_files"]
+        LOOP{"step ≤ max_steps"}
+        PLAN["LLM _plan_next_step → next_action 或 done"]
+        LO_GATE["logic_only: 拒绝污点 scan / 污点 Skill"]
+        FGATE["_prepare_finish_gate blocker?"]
+        FORCE["强制补救: FileTool / 增量 scan / logic 重试"]
+        EXEC["_execute_action"]
+        INGEST["写回 state: flows / report / metadata / ambiguous / logic_*"]
+        FIN["finish → merge 报告 → run_finished"]
+
+        RUN --> IDX --> LOOP
+        LOOP --> PLAN
+        PLAN -->|done| FGATE
+        FGATE -->|blocked| FORCE --> EXEC
+        FGATE -->|ok| FIN
+        PLAN -->|action| LO_GATE --> EXEC
+        EXEC --> INGEST --> LOOP
+    end
+
+    %% ========== 工具分发 ==========
+    subgraph L2["③ _execute_action 工具路由"]
+        T_ROUTER{"tool_name"}
+        SK["Skill.run → skill_engine DAG"]
+        CTX["set_context"]
+        CPG["JoernTool.ensure_cpg"]
+        FTS["FileTool read/glob/write_report<br/>read 须经 project_file_index"]
+        JSS["JoernTool.run_source_scan"]
+        JLS["JoernTool.run_logic_scan"]
+        JTS["JoernTool.run_taint_queries 仅 flows"]
+        JTG["JoernTool.run_targeted_scan"]
+        JEX["JoernTool.expand_flow_context"]
+        JAR["JavaAuditTool scan_routes / playbook"]
+        REACH["GraphBuilder.run_reachability → DB + LLM 报告"]
+        VER["VersionTool 版本识别"]
+    end
+
+    EXEC --> T_ROUTER
+    T_ROUTER --> SK & CTX & CPG & FTS & JSS & JLS & JTS & JTG & JEX & JAR & REACH & VER
+
+    %% ========== 公共下层 ==========
+    subgraph L3["④ 公共下层 tools.py → joern_vuln_scanner.py"]
+        CFG["configure_project + ensure_cpg_loaded"]
+        QMAP["_run_query_map: 批量 POST Joern + checkpoint + audit query_source"]
+        QP["queries.py: 污点 / 逻辑 / cpp_*<br/>均需 semanticcpg.language._ import"]
+        VAL["logic_query_validate 静态校验"]
+        QP --> VAL --> QMAP
+    end
+
+    CPG --> CFG
+    JSS & JLS & JTS & JTG --> CFG
+
+    %% ========== 污点主线 ==========
+    subgraph PIPE_A["⑤ 污点主线 run_source_scan → run_full_scan"]
+        direction TB
+        A1["run_taint_queries → _run_query_map queries_py_initial"]
+        A1R["java: + reflection_queries"]
+        A2["iterative_analyze: 过滤有效 flow"]
+        A3["每 vuln_type × 每 flow chunk"]
+        A4["_analyze_single_taint_flow"]
+        A4a["extract 代码上下文"]
+        A4b["硬回溯 _run_hard_backtrace"]
+        A4c["LLM 扩展 follow_up Joern max_iters"]
+        A4d["主分析 LLM VERDICT_AND_POC_POLICY"]
+        A4e["反证 LLM _run_refutation_check 独立第二遍"]
+        A4f["_apply_refutation_to_analysis"]
+        A5["产出: report + ambiguous_flows + pending_l2_reads + flow_findings_index"]
+
+        A1 --> A1R --> A2 --> A3 --> A4
+        A4 --> A4a --> A4b --> A4c --> A4d --> A4e --> A4f --> A5
+    end
+
+    JSS --> GSS["GraphBuilder.run_source_scan + triage"]
+    GSS --> A1
+    A1 -.-> QMAP
+
+    %% ========== 逻辑主线 ==========
+    subgraph PIPE_B["⑥ 逻辑主线 run_logic_scan"]
+        direction TB
+        B0["resolve_cwe_focus + max_candidates"]
+        B1["get_logic_queries → cwe_focus 可过滤 query"]
+        B2["_run_query_map queries_py_logic → cpg_logic.json"]
+        B3["_extract_logic_candidates 多 query 交叉 TAG"]
+        B4["_prioritize_logic_candidates P0→P1→P2 cap"]
+        B5["_load_cwe_skill_templates + cwe_logic_common"]
+        B5B["LLM cache: cpg_logic_llm.json<br/>ckey = type|file|line|caller"]
+        B5C{"缓存命中?"}
+        B5D["全量: ckey + input_fingerprint 一致"]
+        B5E["增量: 非 affected_types → 仅 ckey 有结论即复用<br/>affected_types → 强制重跑 LLM"]
+        B5B --> B5C
+        B5C --> B5D & B5E
+        B6["_analyze_logic_candidate 逐候选"]
+        B6a["dumpRaw 方法体 + caller 链 + planner L2"]
+        B6b["Joern LLM 扩展 敏感类型 LOGIC_SCAN_CONTEXT_EXPANSION"]
+        B6c["CWE sanitizers 反证条件 + 六标准"]
+        B6d["主分析 LLM 一轮 JSON refutation_verdict/sanitizer_hit"]
+        B6e["apply_logic_verdict_gates 机读门禁"]
+        B6f["缺 L2 → inconclusive"]
+        B7["logic_report + logic_findings + logic_inconclusive<br/>checkpoint 成功后保留"]
+
+        B0 --> B1 --> B2 --> B3 --> B4 --> B5 --> B5B --> B5C --> B6
+        B6 --> B6a --> B6b --> B6c --> B6d --> B6e --> B6f --> B7
+    end
+
+    JLS --> GLS["GraphBuilder.run_logic_scan"]
+    GLS --> B0
+    B2 -.-> QMAP
+
+    %% ========== 配置与模板 ==========
+    subgraph CFGS["配置 / 模板 只读注入"]
+        LS["logic_scan_settings: CATALOG P0-P2 L2_SENSITIVE expansion logic_only"]
+        MAP["_LOGIC_CWE_QUERY_MAP + _LOGIC_QUERY_AFFECTED_CANDIDATE_TYPES"]
+        PFI_CFG[project_file_index.py]
+        CWE["skills/templates/cwe/*.json + cwe_logic_common"]
+        PR["prompts.py + logic_verdict_gates.py"]
+    end
+
+    LS & MAP --> B3 & B4 & LO
+    PFI_CFG --> IDX
+    PFI_CFG --> READ
+    CWE & PR --> B6
+    PR --> A4d & A4e
+
+    %% ========== L2 闭环 ==========
+    subgraph L2LOOP["⑦ L2 / finish 闭环 回到 Planner"]
+        PEND["pending_l2_reads 污点"]
+        INC["logic_inconclusive"]
+        FAIL["logic_query_failures"]
+        READ["FileTool 读 SecurityConfig yml 等<br/>resolve_l2_path / path_not_in_index"]
+        PFI["project_file_index.py<br/>_live_file_index 完整路径<br/>metadata 仅摘要 sample"]
+        PFI --> READ
+        EXPAND["expand_flow_context<br/>污点 flow 或 logic _build_logic_flow_context"]
+        RESCAN_S["增量 run_source_scan / re_refute_only"]
+        RESCAN_L["增量 run_logic_scan<br/>Joern 补失败 query<br/>LLM 仅 affected_types"]
+
+        PEND --> READ
+        INC --> READ
+        INC --> EXPAND
+        READ --> RESCAN_S & RESCAN_L
+        EXPAND --> RESCAN_L
+        FAIL --> RESCAN_L
+    end
+
+    A5 --> INGEST
+    B7 --> INGEST
+    A5 --> PEND
+    B7 --> INC & FAIL
+    FTS --> READ
+    FORCE -.-> FTS & RESCAN_S & RESCAN_L
+    RESCAN_S & RESCAN_L -.-> EXEC
+    JEX --> EXPAND
+
+    %% ========== 反证机制对比 ==========
+    subgraph REFCMP["反证机制（勿混）"]
+        direction LR
+        R1["污点: 主 LLM + 独立反证 LLM"]
+        R2["逻辑: 主 LLM 内嵌 refutation_verdict + gates"]
+    end
+
+    A4e -.-> R1
+    B6d -.-> R2

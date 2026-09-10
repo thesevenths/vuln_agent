@@ -1,0 +1,1 @@
+BASE_TEMPLATE_PLACEHOLDER: planner user prompt template comes from prompts.py and runtime patches are appended.

@@ -1,0 +1,14 @@
+# 六项确认标准（所有 CWE 共享）
+# 缺一 → vulnerability_confirmed=false
+
+confirmation_criteria:
+  reachable: 存在真实 HTTP/RPC/消息入口，且候选方法在调用链上可达
+  controllable: 攻击者能控制的关键参数、路径、状态字段或配置项已标明
+  propagation: 从入口到敏感操作/错误配置的传播链已用代码或 Security 配置说明
+  exploitable: 无害 PoC 能证明越权、绕过或业务规则违背（非仅模式相似）
+  reproducible: 提供完整 HTTP 原始报文或等价 curl（逻辑漏洞可仅改 ID/参数/step）
+  impact: 具体业务后果（数据泄露、未授权操作、0 元购、提权等）
+
+verdict_rule: >
+  六项确认标准缺一 → vulnerability_confirmed=false 且 refutation_verdict=inconclusive
+  （或 rejected 若有反证）；禁止仅凭 Joern 标记或组件版本命中写 confirmed=true

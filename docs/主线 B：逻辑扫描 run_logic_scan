@@ -1,0 +1,67 @@
+flowchart TB
+    subgraph entry [入口链]
+        MAIN[main / planner] --> LS[JoernTool.run_logic_scan]
+        LS --> CFG[configure_project]
+        CFG --> RLS[JoernVulnScannerHTTP.run_logic_scan]
+    end
+
+    RLS --> CPG[ensure_cpg_loaded]
+    CPG --> CF[resolve_cwe_focus / max_candidates]
+    CF --> GQ["get_logic_queries(framework)<br/>cwe_focus 可过滤 query 子集"]
+    GQ --> INC{增量?}
+    INC -->|是| PART["只跑 incremental_query_names<br/>合并 cached_query_results<br/>合并 cached_findings → llm_by_key"]
+    INC -->|否| FULL[全量 logic query]
+    PART --> MAP["_run_query_map queries_py_logic<br/>checkpoint: cpg_logic.json"]
+    FULL --> MAP
+
+    MAP --> EXT["_extract_logic_candidates<br/>多 query 交叉 + TAG 解析"]
+    EXT --> PRI["_prioritize_logic_candidates<br/>P0 全量 → P1 cap → P2 cap → max_candidates"]
+    PRI --> CWE["_load_cwe_skill_templates<br/>+ merge cwe_logic_common"]
+
+    PRI --> CKQ[Joern query checkpoint 跳过已完成 query]
+    CWE --> CKL["加载 cpg_logic_llm.json → llm_by_key<br/>key = type|file|line|caller"]
+
+    CKL --> HIT{缓存命中?}
+    HIT -->|是| SKIP[跳过 _analyze_logic_candidate]
+    HIT -->|否| LOOP[进入 pending_llm]
+
+    subgraph cache_rules [LLM 缓存命中规则 混合]
+        direction TB
+        R1{"incremental_query_names?"}
+        R1 -->|否 全量| R2["ckey 在 llm_by_key 且<br/>input_fingerprint 一致"]
+        R1 -->|是 增量| R3{"candidate.type ∈ affected_types?"}
+        R3 -->|是 如 cmd_exec_risk| R4[强制不命中 → 必跑 LLM]
+        R3 -->|否 如 admin_no_auth idor| R5["ckey 在 llm_by_key 且有结论<br/>不比 fingerprint"]
+    end
+
+    CKL -.-> cache_rules
+    HIT -.-> cache_rules
+
+    LOOP --> GATHER["_gather_logic_llm_context<br/>method + caller + L2 + CWE 片段<br/>→ 计算 input_fingerprint"]
+
+    GATHER --> ANA["_analyze_logic_candidate"]
+
+    subgraph llm [单候选：一轮 LLM 内嵌反证，无独立反证 LLM]
+        ANA --> SRC["_fetch_method_source<br/>_fetch_caller_chain_source dumpRaw"]
+        SRC --> L2B[注入 security_filter_chain / planner L2]
+        L2B --> EXP{"类型 ∈ LOGIC_SCAN_CONTEXT_EXPANSION_TYPES?"}
+        EXP -->|是| JEX["_run_llm_context_expansion_loop<br/>Joern follow_up，无硬回溯"]
+        EXP -->|否| PR
+        JEX --> PR["CWE workflow + sanitizers 反证条件<br/>+ 六标准 + keywords"]
+        PR --> LLM["主分析 LLM 一次<br/>JSON: confirmed / refutation_verdict / sanitizer_hit / PoC"]
+        LLM --> GATE[apply_logic_verdict_gates 机读门禁]
+        GATE --> L2R["敏感类型缺 L2 且未 rejected → inconclusive"]
+    end
+
+    SKIP --> MERGE[汇总 findings]
+    L2R --> SAVE["写入 cpg_logic_llm.json<br/>含 input_fingerprint 保留不删"]
+    SAVE --> MERGE
+    MERGE --> DED[_dedupe_logic_findings]
+    DED --> RPT[logic_report + flow_findings_index]
+    RPT --> BACK["返回 planner<br/>logic_findings / logic_inconclusive<br/>last_logic_query_results / last_logic_findings"]
+
+    subgraph refute_cmp [与污点扫描反证对比]
+        direction LR
+        TAINT["污点: 主分析 LLM + _run_refutation_check 第二遍"]
+        LOGIC["逻辑: 同一轮 LLM 输出 refutation_verdict<br/>+ apply_logic_verdict_gates"]
+    end

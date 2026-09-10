@@ -1,0 +1,55 @@
+# CRUD 权限一致性检查
+# 同一资源的不同操作（增删改查）必须有一致的授权保护
+
+crud_consistency_check:
+  philosophy: >
+    很多项目对 GET（列表/详情）做了鉴权，但遗漏了 PUT/DELETE/PATCH 的同等保护。
+    CRUD 一致性检查的核心是：对同一 Controller 类中的资源操作，
+    比对各方法的授权保护状态，发现"部分方法有保护、部分方法无保护"的不一致。
+
+  detection_method:
+    step_1_class_protection_matrix:
+      description: >
+        _fetch_class_protection_matrix 查询同一 Controller 类中所有方法的安全注解状态，
+        生成保护矩阵。
+      output: "{method_full_name: {annotations: [...], is_guarded: bool}}"
+
+    step_2_crud_categorization:
+      description: "将方法按 CRUD 操作分类"
+      categories:
+        create: ["POST 端点", "save/create/add/register 方法"]
+        read: ["GET 端点", "list/get/query/detail 方法"]
+        update: ["PUT/PATCH 端点", "update/edit/modify 方法"]
+        delete: ["DELETE 端点", "delete/remove 方法"]
+
+    step_3_inconsistency_detection:
+      description: "比对同一资源的不同 CRUD 操作的保护状态"
+      rules:
+        - rule: "写操作无保护但读操作有保护"
+          severity: HIGH
+          example: "GET /api/users 有 @PreAuthorize 但 PUT /api/users/{id} 无保护"
+        - rule: "删除操作无保护"
+          severity: CRITICAL
+          example: "GET /api/orders 有鉴权但 DELETE /api/orders/{id} 无鉴权"
+        - rule: "创建操作无保护"
+          severity: MEDIUM
+          example: "POST /api/admin/roles 无鉴权（任何人可创建管理员角色）"
+
+  anti_patterns:
+    read_only_protected:
+      description: "仅保护读操作，写操作裸露"
+      risk: "攻击者可修改/删除数据但无法读取（仍造成破坏）"
+    admin_create_unprotected:
+      description: "管理员创建接口无保护"
+      risk: "低权限用户可自行创建管理员角色/权限"
+    delete_unprotected:
+      description: "删除操作无保护"
+      risk: "任何人可删除任意资源"
+
+  applicable_cwes:
+    - cwe: CWE-862
+      scope: "Missing Authorization — CRUD 中部分操作缺少授权"
+    - cwe: CWE-863
+      scope: "Incorrect Authorization — 不同操作的授权逻辑不一致"
+    - cwe: CWE-269
+      scope: "Improper Privilege Management — 创建操作无权限控制导致提权"

@@ -1,0 +1,73 @@
+{
+  "skill_id": "cwe_22_path_traversal",
+  "source_cwe": ["CWE-22"],
+  "related_cwes": ["CWE-23", "CWE-36", "CWE-73"],
+  "priority": "P0",
+  "trigger_condition": {
+    "ast_patterns": [
+      "Call[name=~/(File|FileInputStream|FileOutputStream|Files\\.|Paths\\.get|Path\\.resolve|getResourceAsStream|FileCopyUtils)/i]",
+      "Call[name=~/(new File|createTempFile|copy|move|write|readAllBytes)/i]",
+      "Param[name=~/(path|filename|filePath|file|dir|directory|location)/i]"
+    ],
+    "semantic_keywords": [
+      "file upload", "file download", "path", "directory", "traversal",
+      "../", "file read", "file write", "resource", "attachment"
+    ],
+    "file_context": ["controller", "upload_handler", "download_handler", "file_service"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "file_ops": ["FileInputStream", "FileOutputStream", "Files.copy", "Files.write", "Files.readAllBytes", "Paths.get", "Path.resolve", "new File", "FileCopyUtils", "IOUtils", "getResourceAsStream"],
+      "sanitize_calls": ["FilenameUtils.getName", "Paths.get().normalize", "canonical", "getCanonicalPath", "Pattern.compile", "whitelist"]
+    },
+    "generic": {
+      "file_ops": ["open", "readFile", "writeFile", "sendFile", "download", "upload", "path.join", "os.path.join"],
+      "sanitize_calls": ["basename", "realpath", "normalize", "sanitize", "whitelist"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别文件操作】当前函数是否涉及文件系统操作（读写、复制、移动、删除）？",
+    "Step 2: 【检查用户输入来源】文件路径是否来自用户可控输入（@RequestParam、@PathVariable、HTTP Header、Cookie、表单）？",
+    "   - ❌ 漏洞模式: new File(userInput) / Paths.get(userInput) 直接使用",
+    "   - ✅ 安全模式: 经过白名单校验或规范化处理",
+    "Step 3: 【检查路径规范化】是否执行了以下防护？",
+    "   - path.normalize() / getCanonicalPath() 消除 ../ 遍历",
+    "   - 校验路径前缀是否在允许的基目录内（startsWith check）",
+    "   - 文件名白名单（正则匹配合法字符）",
+    "Step 4: 【检查基目录约束】文件操作是否限定在特定目录下？",
+    "   - ❌ 使用绝对路径或无基目录约束",
+    "   - ✅ basePath.resolve(userInput).startsWith(basePath)",
+    "Step 5: 【评估影响范围】路径遍历可能访问哪些敏感文件？（配置文件、密钥、/etc/passwd、其他用户数据）"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "@GetMapping(\"/download\") public void download(@RequestParam String filename) { Files.copy(Paths.get(\"/uploads/\" + filename), response.getOutputStream()); }",
+        "vulnerability_analysis": "filename 直接来自用户输入，拼接后构造文件路径。攻击者传入 ../../etc/passwd 即可遍历到系统敏感文件。缺少 normalize() 和 startsWith() 校验。",
+        "fix_pattern": "Path base = Paths.get(\"/uploads/\").toRealPath();\nPath target = base.resolve(filename).normalize();\nif (!target.startsWith(base)) throw new IllegalArgumentException(\"Invalid path\");\nFiles.copy(target, response.getOutputStream());"
+      }
+    ],
+    "mitigation_rules": [
+      "永远不要将用户输入直接用于文件路径构造",
+      "必须使用 Path.resolve() + normalize() + startsWith(basePath) 组合校验",
+      "文件名应通过白名单正则校验（如 ^[a-zA-Z0-9._-]+$）",
+      "使用 getCanonicalPath() 而非 getAbsolutePath() 以解析符号链接"
+    ]
+  },
+  "sanitizers": [
+    "路径经过 normalize() + startsWith(basePath) 双重校验",
+    "文件名通过白名单正则校验（仅允许字母数字和安全的特殊字符）",
+    "使用 getCanonicalPath() 解析后与基目录比对",
+    "框架级路径遍历防护已启用（如 Spring 的 ResourceHttpRequestHandler）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-22",
+    "user_input_source": "string (参数来源: RequestParam/PathVariable/Header)",
+    "file_operation": "string (read/write/delete/copy)",
+    "sanitization_check": "string (是否经过 normalize/whitelist/prefix check)",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

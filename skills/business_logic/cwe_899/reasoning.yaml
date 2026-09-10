@@ -1,0 +1,42 @@
+# CWE-899 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【端点×配置总线】建立全量端点认证/授权状态表（security_filter_chain、Shiro、JAX-RS、方法注解）；标记「部分保护」与「未配置」'
+  - 'Step 0b: 【组件扫描联动】auth_bypass/acl_bypass 类命中 → 先查组件配置面，再查业务旁路'
+  - 'Step 1: 识别当前候选保护的【敏感资源】与【预期访问控制策略】'
+  - 'Step 2: 追踪【当前用户身份】来源与可信度 (Session/JWT/Header)'
+  - 'Step 3: CFG 分析：权限校验是否覆盖所有到达敏感操作的路径（含 else、catch、内部 public 方法）'
+  - 'Step 4: 查找并行入口：直接调用 service 层、内部 API、定时任务、消息消费者是否绕过 Controller 守卫'
+  - 'Step 5: 校验粒度：粗粒度 RBAC 是否保护细粒度资源（应转 639/285 时在 reasoning 说明）'
+  - 'Step 6: 存在可证明的旁路或覆盖缺口 → CWE-899；六项确认标准缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public void deleteOrder(Long id) { if (isAdmin()) repo.delete(id); } // 另有 package void forceDelete(Long id) 无检查'
+      vulnerability_analysis: Controller 路径有 admin 检查，但同 Service 的 forceDelete 可被内部或其它 Controller 直接调用，形成访问控制旁路。
+      fix_pattern: '在 Service 层统一 enforce 授权；收缩 forceDelete 可见性或加 @PreAuthorize'
+    - code_snippet: 'Security: /api/** authenticated; 但 /api/internal/** permitAll 且挂载敏感管理接口'
+      vulnerability_analysis: 安全配置存在更宽 permitAll 前缀，导致本应受保护的 API 子树暴露。属于机制级 CWE-899。
+      fix_pattern: 收紧 permitAll；敏感路径显式 authenticated + 角色
+  mitigation_rules:
+    - 访问控制应在统一边界（Filter/网关/Service Policy）强制执行，避免仅 Controller 层零散 if
+    - 所有并行代码路径须经过同一授权策略
+    - 定期做端点覆盖审计（路由扫描 × Security 配置）
+
+differentiation_from_related:
+  - CWE-899 关注「访问控制机制不完整或可被旁路」的总线性问题，而非单点 missing_auth 或单条 IDOR
+  - 与 CWE-862：862 是缺授权检查；899 是「有检查但覆盖不全/多路径不一致」
+  - 与 CWE-285：285 是授权决策错误；899 强调 CFG 上存在未覆盖分支或并行入口
+  - 分析须结合端点映射表 + 安全配置 + CFG 旁路，而非只看一个 if
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-899
+  access_control_gap_type: 'enum[''cfg_branch_missing'', ''parallel_entry'', ''security_config_hole'', ''coarse_grained_only'', ''inconsistent_guards'']'
+  uncovered_paths: array — 未受保护的路径或端点
+  endpoint_auth_map: array
+  reasoning_trace: string
+  business_impact: string
+  remediation_code: string
+  remediation: string

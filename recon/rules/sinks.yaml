@@ -1,0 +1,140 @@
+# sinks.yaml — Sink 定义（危险函数/操作点）
+# 从 code-audit sinks_sources.md + security_indicators.md 迁移
+# 用于 sensitive_operations scanner 识别高价值操作
+
+sinks:
+  # ── SQL 注入 ──────────────────────────────────────────────────────────────
+  sql_injection:
+    risk: critical
+    cwe: CWE-89
+    java:
+      - "jdbcTemplate\\.update"
+      - "jdbcTemplate\\.query"
+      - "jdbcTemplate\\.execute"
+      - "executeQuery"
+      - "executeUpdate"
+      - "execute\\b"
+      - "createQuery"
+      - "createNativeQuery"
+      - "createSQLQuery"
+      - "EntityManager\\.createQuery"
+      - "PreparedStatement"
+    python:
+      - "cursor\\.execute"
+      - "\\.raw\\("
+      - "\\.extra\\("
+      - "text\\("
+      - "session\\.execute"
+    go:
+      - "db\\.Exec"
+      - "db\\.Query"
+      - "db\\.QueryRow"
+      - "gorm\\.Raw"
+
+  # ── 命令注入 ──────────────────────────────────────────────────────────────
+  cmd_injection:
+    risk: critical
+    cwe: CWE-78
+    java:
+      - "Runtime\\.exec"
+      - "ProcessBuilder"
+      - "Runtime\\.getRuntime\\(\\)\\.exec"
+    python:
+      - "os\\.system"
+      - "os\\.popen"
+      - "subprocess\\.call"
+      - "subprocess\\.run"
+      - "subprocess\\.Popen"
+      - "subprocess\\.check_output"
+      - "commands\\.getoutput"
+    go:
+      - "exec\\.Command"
+      - "exec\\.CommandContext"
+
+  # ── 反序列化 ──────────────────────────────────────────────────────────────
+  deserialization:
+    risk: critical
+    cwe: CWE-502
+    java:
+      - "readObject"
+      - "ObjectInputStream"
+      - "fromXML"
+      - "XStream\\.fromXML"
+      - "ObjectMapper\\.readValue"
+      - "JSON\\.parseObject"
+      - "JSON\\.parseArray"
+    python:
+      - "pickle\\.loads"
+      - "pickle\\.load"
+      - "yaml\\.load"
+      - "yaml\\.unsafe_load"
+      - "marshal\\.loads"
+      - "shelve\\.open"
+
+  # ── SSRF ──────────────────────────────────────────────────────────────────
+  ssrf:
+    risk: high
+    cwe: CWE-918
+    java:
+      - "RestTemplate\\.getForObject"
+      - "RestTemplate\\.postForObject"
+      - "RestTemplate\\.exchange"
+      - "WebClient\\.get"
+      - "WebClient\\.post"
+      - "HttpClient\\.newCall"
+      - "URL\\.openConnection"
+      - "FeignClient"
+    python:
+      - "requests\\.get"
+      - "requests\\.post"
+      - "urllib\\.request\\.urlopen"
+      - "httpx\\.get"
+      - "aiohttp\\.ClientSession"
+
+  # ── 文件操作 ──────────────────────────────────────────────────────────────
+  file_operations:
+    risk: high
+    cwe: CWE-22
+    java:
+      - "new File\\("
+      - "Files\\.readAllBytes"
+      - "Files\\.write"
+      - "FileInputStream"
+      - "FileOutputStream"
+      - "MultipartFile"
+    python:
+      - "\\bopen\\("
+      - "shutil\\.copy"
+      - "shutil\\.move"
+      - "os\\.remove"
+      - "pathlib\\.Path.*read"
+      - "pathlib\\.Path.*write"
+
+  # ── XXE ──────────────────────────────────────────────────────────────────
+  xxe:
+    risk: high
+    cwe: CWE-611
+    java:
+      - "DocumentBuilderFactory"
+      - "SAXParser"
+      - "XMLReader\\.parse"
+      - "TransformerFactory"
+      - "XMLInputFactory"
+    python:
+      - "xml\\.etree"
+      - "lxml\\.etree"
+      - "xml\\.dom"
+      - "xml\\.sax"
+
+  # ── 路径遍历 ──────────────────────────────────────────────────────────────
+  path_traversal:
+    risk: high
+    cwe: CWE-22
+    java:
+      - "Paths\\.get"
+      - "new File\\(.*\\+"
+      - "ResourceUtils\\.getFile"
+    python:
+      - "os\\.path\\.join"
+      - "send_from_directory"
+      - "send_file"

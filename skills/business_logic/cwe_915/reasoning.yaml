@@ -1,0 +1,86 @@
+# CWE-915 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别数据绑定入口】定位接收复杂对象（如 User, Order, Profile）作为参数的 Controller 或表单处理方法。'
+  - 'Step 1: 【分析对象结构与敏感性】检查绑定的目标对象是否为直接映射数据库的实体（Entity/Model），且包含不应由用户修改的敏感字段（如 role, is_admin, balance, status）。'
+  - 'Step 2: 【检查字段级限制机制】验证框架或代码是否实施了显式的字段白名单/黑名单（如 Spring 的 @InitBinder/setDisallowedFields，Rails 的 strong_parameters，Laravel 的 $fillable/$guarded）。'
+  - 'Step 3: 【评估 DTO 隔离策略】检查是否使用了专门的数据传输对象（DTO/VO/Form）来接收请求，从而在物理层面隔离了敏感字段，而非直接绑定 Entity。'
+  - 'Step 4: 【追踪 ORM 保存逻辑】确认被绑定的对象是否被直接传递给 ORM 的 save/update 方法，导致被污染的敏感字段被持久化到数据库。'
+  - 'Step 5: 【检查 JSON 反序列化控制】对于 @RequestBody 或 JSON 绑定，检查是否在 Entity 的敏感字段上使用了 @JsonIgnore、@JsonProperty(READ_ONLY) 或等效注解以防止恶意 JSON 注入。'
+  - 'Step 6: 【评估嵌套对象攻击面】检查是否存在嵌套对象的批量赋值（如 user.address.city），攻击者可能通过深层参数注入绕过顶层字段限制。'
+  - 'Step 7: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: '@PostMapping("/profile")
+public String updateProfile(@ModelAttribute User user) {
+    userRepository.save(user);
+    return "success";
+}'
+      vulnerability_analysis: '存在典型的批量赋值（Mass Assignment）漏洞。User 实体包含 role 字段，后端直接使用 @ModelAttribute 将 HTTP 请求参数绑定到 User 对象并存入数据库。攻击者可在请求中伪造 role=admin 参数，直接提升自身权限。'
+      fix_pattern: '引入 UserDTO 类（仅包含 nickname, avatar 等允许修改的字段）接收参数，然后手动映射到 User 实体；或使用 @InitBinder("user") 配置 WebDataBinder 的 setDisallowedFields("role", "status")。'
+    - code_snippet: 'def update_user(request):
+    user = User.objects.get(id=request.user.id)
+    form = UserForm(request.POST, instance=user)
+    if form.is_valid():
+        form.save()
+        return redirect(''profile'')'
+      vulnerability_analysis: '若 UserForm (ModelForm) 未在 Meta 类中显式定义 fields 白名单（如 fields = [''nickname'', ''bio'']），而是使用了 fields = ''__all__''，则攻击者可通过提交 is_admin=True 篡改管理员权限。'
+      fix_pattern: '在 Django ModelForm 的 Meta 类中严格指定 fields = (''nickname'', ''bio'')，或使用 exclude = (''is_admin'', ''role'', ''status'') 排除敏感字段。'
+    - code_snippet: 'public function update(Request $request, User $user)
+{
+    $user->update($request->all());
+    return response()->json($user);
+}'
+      vulnerability_analysis: 'Laravel 中使用 $request->all() 直接传入 update 方法。若 User Model 未正确配置 $guarded 或 $fillable，攻击者可通过提交 is_admin=1 或 role=superadmin 实现越权提权。'
+      fix_pattern: '使用 $request->only([''name'', ''email'', ''avatar'']) 或 $request->validated()（配合 FormRequest）限制可更新字段；在 Model 中配置 protected $guarded = [''is_admin'', ''role'', ''status'']。'
+    - code_snippet: 'app.put(''/api/user/profile'', async (req, res) => {
+    const user = await User.findById(req.user.id);
+    Object.assign(user, req.body);
+    await user.save();
+    res.json(user);
+});'
+      vulnerability_analysis: '使用 Object.assign 将请求体直接合并到用户对象。攻击者可在 JSON body 中注入 {"role": "admin", "balance": 99999} 等字段，覆盖数据库中的敏感属性。'
+      fix_pattern: '使用白名单提取允许字段：const allowed = _.pick(req.body, [''name'', ''avatar'', ''bio'']); Object.assign(user, allowed); 或使用 Joi/Zod schema 验证请求体。'
+    - code_snippet: 'func UpdateProfile(c *gin.Context) {
+    var user models.User
+    c.ShouldBindJSON(&user)
+    db.Model(&user).Updates(user)
+}'
+      vulnerability_analysis: 'Go 中直接将 JSON 请求体反序列化到 User model 并更新数据库。若 User 结构体的 Role/IsAdmin 字段未标记 json:"-"，攻击者可通过 JSON 注入修改权限字段。'
+      fix_pattern: '定义独立的 UpdateProfileRequest 结构体（仅含 Name/Avatar/Bio 字段），反序列化后手动映射到 User model；或在 User 结构体敏感字段上添加 json:"-" 和 gorm:"->"。'
+    - code_snippet: 'def update
+    @user = User.find(params[:id])
+    @user.update_attributes(params[:user])
+    redirect_to @user
+end'
+      vulnerability_analysis: 'Ruby on Rails 中经典的批量赋值漏洞。直接将 params[:user] 传入 update_attributes，若 User Model 未使用 attr_accessible 白名单或 Strong Parameters，攻击者可注入 admin=true 提权。'
+      fix_pattern: '使用 Strong Parameters：@user.update(user_params)，其中 def user_params; params.require(:user).permit(:name, :email, :avatar); end'
+  mitigation_rules:
+    - 优先使用 DTO (Data Transfer Object) 或 Form Object 接收客户端输入，物理隔离数据库实体的敏感字段。
+    - 若必须直接绑定 Entity，必须在框架层配置严格的字段白名单（Allowed Fields）或黑名单（Disallowed Fields）。
+    - '在 ORM 实体类中，对敏感字段使用 @JsonIgnore、@Transient 或 updatable=false 等注解进行防御。'
+    - 遵循最小权限原则，默认拒绝所有字段的自动绑定，仅显式开放业务必需的字段。
+    - 对所有接收外部输入的 API 端点，使用 Schema 验证（如 Joi、Zod、marshmallow）严格限制可接受的字段和类型。
+    - 嵌套对象绑定需特别注意深层参数注入，确保子对象同样受到字段限制保护。
+
+anti_patterns:
+  - description
+  - direct_entity_binding
+  - sensitive_field_exposure
+  - missing_field_restriction
+  - orm_direct_save
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-915
+  binding_mechanism: 'enum[''model_attribute'', ''request_body'', ''form_populate'', ''orm_direct_save'', ''json_unmarshal'', ''object_assign'']'
+  tampered_attribute: 'string (指出可能被篡改的敏感字段，如 ''role'', ''is_admin'', ''balance'')'
+  missing_restriction: 'string (描述缺失的限制机制，如 ''未使用 DTO 隔离'' 或 ''缺少 setDisallowedFields 配置'')'
+  target_entity: 'string (被绑定的目标实体类名，如 ''User'', ''Order'', ''Profile'')'
+  persistence_path: 'string (数据持久化路径，如 ''userRepository.save()'', ''db.Updates()'')'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: HIGH
+  remediation: string

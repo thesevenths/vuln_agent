@@ -1,0 +1,24 @@
+# CWE-269 Skill 元数据
+# 从 templates/cwe/cwe_269.json 迁移
+
+skill_id: cwe_269_improper_privilege_management
+source_cwe: CWE-269
+priority: P0
+
+related_cwes:
+  - cwe: CWE-862
+    reason: missing_authorization - 权限管理不当的根本表现之一：变更操作缺少操作者授权校验
+  - cwe: CWE-863
+    reason: improper_authorization - 授权检查存在但逻辑错误，如仅校验登录状态未校验角色
+  - cwe: CWE-285
+    reason: improper_authorization_general - 授权逻辑整体缺陷，CWE-269 是其在权限管理维度的具体化
+  - cwe: CWE-276
+    reason: incorrect_default_permissions - 新用户或新资源被赋予过高的默认权限，是权限管理不当的常见形态
+  - cwe: CWE-915
+    reason: mass_assignment - 通过自动绑定机制污染权限字段（role/isAdmin），是 CWE-269 的高频攻击路径
+  - cwe: CWE-250
+    reason: execution_with_unnecessary_privileges - 运行时持有超出当前操作所需的权限，是权限管理粗放的另一面
+  - cwe: CWE-639
+    reason: idor - 水平越权与垂直越权常组合出现：IDOR 访问他人资源后通过权限管理缺陷提升角色
+
+description: 权限变更端点和用户管理端点是 CWE-269 的核心攻击面，必须逐一验证操作者授权和参数来源

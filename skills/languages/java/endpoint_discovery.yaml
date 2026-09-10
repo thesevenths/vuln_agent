@@ -1,0 +1,63 @@
+# Java 端点枚举规则
+# 用于发现所有 HTTP 可达入口
+
+# Spring MVC / Spring Boot
+spring_mvc:
+  class_level:
+    - "@RestController"
+    - "@Controller"
+  method_level:
+    - "@GetMapping"
+    - "@PostMapping"
+    - "@PutMapping"
+    - "@DeleteMapping"
+    - "@PatchMapping"
+    - "@RequestMapping"
+  route_extraction:
+    - "从 @RequestMapping value 提取路径"
+    - "从类级 + 方法级注解拼接完整路径"
+
+# JAX-RS
+jaxrs:
+  class_level:
+    - "@Path"
+    - "@ApplicationPath"
+  method_level:
+    - "@GET"
+    - "@POST"
+    - "@PUT"
+    - "@DELETE"
+    - "@PATCH"
+    - "@HEAD"
+    - "@OPTIONS"
+  route_extraction:
+    - "从 @Path value 提取路径"
+    - "从类级 + 方法级 @Path 拼接"
+
+# Servlet（传统 Java Web）
+servlet:
+  class_level:
+    - "extends HttpServlet"
+    - "implements Servlet"
+  config:
+    - "web.xml <servlet-mapping>"
+    - "@WebServlet"
+  route_extraction:
+    - "从 web.xml 或 @WebServlet urlPatterns 提取"
+
+# Struts
+struts:
+  config:
+    - "struts.xml <action>"
+    - "struts-config.xml"
+  route_extraction:
+    - "从 XML 配置提取 action mapping"
+
+# 端点属性提取
+endpoint_attributes:
+  http_method: "GET/POST/PUT/DELETE/PATCH"
+  path: "URL 路径模板"
+  auth_annotations: "方法上的安全注解"
+  parameters: "参数注解列表"
+  class_name: "Controller 类名"
+  method_name: "处理方法名"

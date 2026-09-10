@@ -1,0 +1,24 @@
+# CWE-362 Skill 元数据
+# 从 templates/cwe/cwe_362.json 迁移
+
+skill_id: cwe_362_race_condition_improper_synchronization
+source_cwe: CWE-362
+priority: P1
+
+related_cwes:
+  - cwe: CWE-367
+    reason: TOCTOU - 检查时间与使用时间之间的竞态是 CWE-362 最常见子类型
+  - cwe: CWE-820
+    reason: missing_synchronization - 共享资源缺少同步机制导致数据不一致
+  - cwe: CWE-821
+    reason: incorrect_synchronization - 同步机制使用不当（如锁粒度错误、死锁）
+  - cwe: CWE-363
+    reason: race_condition_enabling_link_following - 文件系统竞态条件可被符号链接攻击利用
+  - cwe: CWE-828
+    reason: signal_handler_race - 信号处理函数中的竞态条件
+  - cwe: CWE-840
+    reason: business_logic_errors - 并发竞态常被利用实现业务逻辑滥用（如超卖、重复领取）
+  - cwe: CWE-330
+    reason: insufficient_randomness - 竞态窗口内可预测的随机数被利用
+
+description: 涉及共享资源的读-改-写操作是 CWE-362 的核心攻击面

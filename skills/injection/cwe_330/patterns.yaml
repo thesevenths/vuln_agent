@@ -1,0 +1,45 @@
+# CWE-330 检测模式
+
+ast_patterns:
+  - 'Call[name=~/(Random|Math\.random|ThreadLocalRandom|java\.util\.Random|srand|rand)/i]'
+  - 'NewExpr[name=~/(Random|SplittableRandom)/i]'
+
+semantic_keywords:
+  - random
+  - token
+  - session id
+  - nonce
+  - salt
+  - otp
+  - verification code
+  - reset link
+  - UUID
+
+file_context:
+  - auth
+  - token
+  - session
+  - otp
+  - security
+
+logic_query_keywords_generic:
+  weak_rng:
+    - random.random()
+    - Math.random()
+    - rand()
+    - mt_rand()
+  secure_rng:
+    - secrets.token_bytes()
+    - crypto.randomBytes()
+    - SecureRandom
+  security_context:
+    - token
+    - session
+    - nonce
+    - otp
+    - password_reset
+
+sanitizers:
+  - 使用 SecureRandom 且未手动设置种子
+  - 随机数仅用于非安全场景（UI动画、游戏、测试数据）
+  - 使用 crypto.randomBytes() / secrets 模块等密码学安全API

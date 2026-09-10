@@ -1,0 +1,95 @@
+{
+  "skill_id": "cwe_284_improper_access_control_fallback",
+  "source_cwe": ["CWE-284"],
+  "related_cwes": ["CWE-306", "CWE-862", "CWE-863", "CWE-639", "CWE-942"],
+  "priority": "P2",
+  "role": "privilege_management_and_cors_specialist",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionCall[name=~/(raise|drop|elevate|lower|switch|impersonate)/i][args=~/(privilege|role|token|user)/i]",
+      "HeaderSet[name='Access-Control-Allow-Origin'][value.source~=/request|input|param/i]",
+      "TryCatch[body.contains_privilege_operation=true]"
+    ],
+    "semantic_keywords": [
+      "cors", "cross-origin", "withCredentials", "dynamic origin",
+      "privilege escalation", "exception handling", "finally block",
+      "trust boundary", "compartmentalization"
+    ],
+    "file_context": ["middleware", "security_filter", "cors_config", "admin_utility"]
+  },
+  "logic_query_keywords": {
+    "java": {
+      "cors_keywords": ["addAllowedOrigin", "setAllowedOrigins", "CorsConfiguration", "Access-Control-Allow-Origin", "CrossOrigin"],
+      "privilege_ops": ["raise", "elevate", "switch", "impersonate", "grantRole", "revokeRole"]
+    },
+    "express": {
+      "cors_keywords": ["cors", "setHeader", "Access-Control-Allow-Origin"],
+      "privilege_ops": ["elevate", "switch", "impersonate"]
+    },
+    "generic": {
+      "cors_keywords": ["CORS", "Access-Control", "allowedOrigins", "cross-origin"],
+      "privilege_ops": ["elevate", "switch", "impersonate", "grant", "revoke"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 1: 【识别特权操作或跨域配置】当前代码是否涉及权限提升/降级，或动态设置 CORS 头？",
+    "Step 2: 【区分规范vs执行缺陷】",
+    "   - 规范性(Spec): 静态配置是否错误？(如 CORS 允许 * + withCredentials, 文件权限 world-writable)",
+    "   - 执行性(Enforcement): 运行时逻辑是否有漏洞？(如异常导致权限未降级, 用户可控输入影响ACL)",
+    "Step 3: 【检查特权操作的原子性与异常安全】",
+    "   - ✅ 安全模式: try { raise(); op(); } finally { lower(); }",
+    "   - ❌ 漏洞模式: try { raise(); op(); lower(); } catch { ... } // 异常时未降级(演示代码Bad案例)",
+    "Step 4: 【评估CORS配置的安全性】",
+    "   - 若 Access-Control-Allow-Origin 来自请求头/参数 → ️ 高风险(反射型CORS)",
+    "   - 若同时启用 withCredentials → 🔴 致命风险(凭证泄露给任意源)",
+    "Step 5: 【兜底归类判断】若发现访问控制缺陷但不符合 306/862/863/639/798 的典型模式 → 归入 CWE-284"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "code_snippet": "try: raisePrivileges(); os.mkdir('/home/' + username); lowerPrivileges() except OSError: print('Error'); return False",
+        "vulnerability_analysis": "执行性缺陷(Enforcement Failure)：当 os.mkdir() 抛出异常时，lowerPrivileges() 不会被执行，程序永久处于提权状态。攻击者可利用此窗口期执行任意高权限操作。这是典型的‘异常处理破坏安全策略’模式。",
+        "fix_pattern": "try:\n    raisePrivileges()\n    os.mkdir('/home/' + username)\nfinally:\n    lowerPrivileges()"
+      },
+      {
+        "code_snippet": "response.setHeader('Access-Control-Allow-Origin', request.getHeader('Origin'));\nresponse.setHeader('Access-Control-Allow-Credentials', 'true');",
+        "vulnerability_analysis": "规范性缺陷(Specification Error)：CORS 配置动态反射请求的 Origin 头，且启用了 withCredentials。攻击者可构造恶意页面，以受害者身份向服务器发送带凭证的请求并读取响应。这等同于完全开放的跨域凭证访问。",
+        "fix_pattern": "// 使用白名单校验\nString origin = request.getHeader('Origin');\nif (ALLOWED_ORIGINS.contains(origin)) {\n    response.setHeader('Access-Control-Allow-Origin', origin);\n}"
+      },
+      {
+        "code_snippet": "function runEmployeeQuery($dbName, $name){ ... SELECT * FROM employees WHERE name = :name ... }",
+        "vulnerability_analysis": "虽然使用了预编译语句防止 SQL 注入，但函数未校验调用者是否有权查询员工表。由于该缺陷不属于‘缺失认证’(306)或‘IDOR’(639)的典型模式，而是广义的‘访问控制执行失败’，归入 CWE-284。",
+        "fix_pattern": "if (!currentUser.hasPermission('VIEW_EMPLOYEES')) throw new ForbiddenException();"
+      }
+    ],
+    "mitigation_rules": [
+      "特权操作必须使用 try-finally 或 RAII 模式确保异常安全降级",
+      "CORS 配置禁止动态反射 Origin；必须使用服务端白名单校验",
+      "启用 withCredentials 时，Access-Control-Allow-Origin 绝不能为 * 或用户可控值",
+      "实施信任边界隔离：敏感数据不得跨越未经验证的边界",
+      "遵循最小特权原则：仅在必要时提权，操作完成后立即降级"
+    ]
+  },
+  "tool_calls": [
+    {"name": "analyze_exception_safety", "desc": "检查特权操作是否在 finally/defer 块中降级，评估异常路径的安全性"},
+    {"name": "validate_cors_configuration", "desc": "分析 CORS 头的来源是否为外部输入，检查 withCredentials 组合风险"},
+    {"name": "classify_access_control_failure_type", "desc": "判断缺陷属于 Specification 还是 Enforcement 类型"}
+  ],
+  "sanitizers": [
+    "特权操作使用语言级资源管理(如 Python context manager, Java try-with-resources, Rust Drop trait)",
+    "CORS Origin 经过服务端硬编码白名单校验，非直接反射",
+    "存在全局异常处理器确保特权状态在异常时自动清理",
+    "该功能在设计文档中明确定义为公开访问且经安全评审确认"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-284",
+    "failure_type": "enum['specification_error', 'enforcement_failure', 'privilege_escalation_via_exception', 'cors_misconfiguration']",
+    "specific_issue": "string (如 'Exception bypasses privilege downgrade', 'Reflected CORS with credentials')",
+    "reasoning_trace": "string (必须说明为何不归入 306/862/863/639 而选择 284)",
+    "business_impact": "string (从 common_consequences 映射: Varies by Context)",
+    "risk_level": "HIGH",
+    "remediation": "string (结合 potential_mitigations 生成，区分 Spec/Enforcement 修复方案)"
+  }
+}

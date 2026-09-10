@@ -1,0 +1,503 @@
+{
+  "skill_id": "cwe_362_race_condition_improper_synchronization",
+  "source_cwe": [
+    "CWE-362"
+  ],
+  "related_cwes": [
+    {"cwe": "CWE-367", "reason": "TOCTOU - 检查时间与使用时间之间的竞态是 CWE-362 最常见子类型"},
+    {"cwe": "CWE-820", "reason": "missing_synchronization - 共享资源缺少同步机制导致数据不一致"},
+    {"cwe": "CWE-821", "reason": "incorrect_synchronization - 同步机制使用不当（如锁粒度错误、死锁）"},
+    {"cwe": "CWE-363", "reason": "race_condition_enabling_link_following - 文件系统竞态条件可被符号链接攻击利用"},
+    {"cwe": "CWE-828", "reason": "signal_handler_race - 信号处理函数中的竞态条件"},
+    {"cwe": "CWE-840", "reason": "business_logic_errors - 并发竞态常被利用实现业务逻辑滥用（如超卖、重复领取）"},
+    {"cwe": "CWE-330", "reason": "insufficient_randomness - 竞态窗口内可预测的随机数被利用"}
+  ],
+  "priority": "P1",
+  "trigger_condition": {
+    "ast_patterns": [
+      "FunctionDef[name=~/(transfer|withdraw|deduct|consume|claim|checkout|process|exchange|redeem|vote|like)/i]",
+      "Call[name=~/(exists|isFile|canRead|access|stat|isWritable|is_readable|file_exists)/i]",
+      "BinOp[op=~/(Assign|SubAssign|AddAssign)/i]"
+    ],
+    "semantic_keywords": [
+      "balance",
+      "inventory",
+      "stock",
+      "lock",
+      "synchronized",
+      "mutex",
+      "atomic",
+      "transaction",
+      "race condition",
+      "TOCTOU",
+      "concurrent",
+      "idempotent",
+      "double_spend",
+      "oversell"
+    ],
+    "file_context": [
+      "payment_service",
+      "inventory_manager",
+      "order_processor",
+      "file_handler",
+      "account_service",
+      "coupon_service",
+      "reward_service",
+      "ticket_service",
+      "queue_consumer"
+    ],
+    "operation_triggers": {
+      "description": "涉及共享资源的读-改-写操作是 CWE-362 的核心攻击面",
+      "sensitive_operations": [
+        "deduct_balance", "deduct_stock", "claim_coupon",
+        "transfer_funds", "vote_or_like", "checkout_order",
+        "file_check_then_write", "idempotent_request"
+      ],
+      "route_patterns": {
+        "java": ["SELECT ... FOR UPDATE", "@Transactional", "synchronized", "ReentrantLock", "AtomicInteger"],
+        "python": ["select_for_update", "atomic", "threading.Lock", "F("],
+        "php": ["LOCK TABLES", "DB::transaction", "Cache::lock"],
+        "go": ["sync.Mutex", "sync.RWMutex", "atomic.AddInt64", "sql.Tx"],
+        "javascript": ["Promise.all", "async.parallel", "redis.LOCK", "SETNX"],
+        "dotnet": ["lock(", "SemaphoreSlim", "Interlocked.", "SqlTransaction"],
+        "ruby": ["ActiveRecord::Base.transaction", "with_lock", "Redis.current.setnx"],
+        "rust": ["Mutex::new", "RwLock", "Arc<Mutex", "tokio::sync::Mutex"]
+      }
+    }
+  },
+  "logic_query_keywords": {
+    "java": {
+      "shared_state": [
+        "static",
+        "singleton",
+        "instance variable",
+        "balance",
+        "stock",
+        "counter",
+        "ConcurrentHashMap",
+        "volatile"
+      ],
+      "sync_mechanisms": [
+        "synchronized",
+        "ReentrantLock",
+        "AtomicInteger",
+        "AtomicReference",
+        "@Transactional",
+        "Lock",
+        "RedissonClient",
+        "StampedLock",
+        "ReadWriteLock"
+      ],
+      "toctou_ops": [
+        "File.exists",
+        "Files.isReadable",
+        "file.canWrite",
+        "Files.exists",
+        "file.isFile",
+        "file.canRead"
+      ],
+      "db_ops": [
+        "SELECT ... FOR UPDATE",
+        "@Version",
+        "saveAndFlush",
+        "PESSIMISTIC_WRITE",
+        "OPTIMISTIC"
+      ]
+    },
+    "python": {
+      "shared_state": [
+        "global",
+        "class variable",
+        "cache",
+        "redis",
+        "g.",
+        "thread_local"
+      ],
+      "sync_mechanisms": [
+        "threading.Lock",
+        "multiprocessing.Lock",
+        "select_for_update",
+        "atomic",
+        "with_lock",
+        "F(",
+        "transaction.atomic"
+      ],
+      "toctou_ops": [
+        "os.path.exists",
+        "os.access",
+        "os.stat",
+        "os.path.isfile",
+        "os.path.isdir",
+        "os.path.islink"
+      ],
+      "db_ops": [
+        "select_for_update",
+        "F(",
+        "transaction.atomic",
+        "update_fields"
+      ]
+    },
+    "php": {
+      "shared_state": [
+        "static $",
+        "Cache::",
+        "session",
+        "apcu_"
+      ],
+      "sync_mechanisms": [
+        "LOCK TABLES",
+        "DB::transaction",
+        "Cache::lock",
+        "flock(",
+        "Redis::setnx"
+      ],
+      "toctou_ops": [
+        "file_exists",
+        "is_readable",
+        "is_writable",
+        "filemtime"
+      ],
+      "db_ops": [
+        "lockForUpdate",
+        "sharedLock",
+        "DB::transaction"
+      ]
+    },
+    "go": {
+      "shared_state": [
+        "global var",
+        "struct field",
+        "map[",
+        "sync.Map"
+      ],
+      "sync_mechanisms": [
+        "sync.Mutex",
+        "sync.RWMutex",
+        "atomic.AddInt64",
+        "atomic.CompareAndSwap",
+        "sql.Tx",
+        "redis.SetNX"
+      ],
+      "toctou_ops": [
+        "os.Stat",
+        "os.Lstat",
+        "os.IsExist",
+        "os.IsNotExist"
+      ],
+      "db_ops": [
+        "FOR UPDATE",
+        "tx.Exec",
+        "db.Begin"
+      ]
+    },
+    "javascript": {
+      "shared_state": [
+        "global.",
+        "module.exports",
+        "cache",
+        "Map(",
+        "redis"
+      ],
+      "sync_mechanisms": [
+        "redis.LOCK",
+        "SETNX",
+        "Promise.all",
+        "sequelize.transaction",
+        "mutex-promise"
+      ],
+      "toctou_ops": [
+        "fs.exists",
+        "fs.access",
+        "fs.stat",
+        "fs.existsSync"
+      ],
+      "db_ops": [
+        "FOR UPDATE",
+        "sequelize.transaction",
+        "knex.transaction"
+      ]
+    },
+    "dotnet": {
+      "shared_state": [
+        "static",
+        "singleton",
+        "ConcurrentDictionary",
+        "IMemoryCache"
+      ],
+      "sync_mechanisms": [
+        "lock(",
+        "SemaphoreSlim",
+        "Interlocked.",
+        "ReaderWriterLockSlim",
+        "SqlTransaction"
+      ],
+      "toctou_ops": [
+        "File.Exists",
+        "Directory.Exists",
+        "File.GetAttributes"
+      ],
+      "db_ops": [
+        "UPDLOCK",
+        "ROWLOCK",
+        "BeginTransaction",
+        "[Timestamp]"
+      ]
+    },
+    "ruby": {
+      "shared_state": [
+        "@@class_var",
+        "$global",
+        "Rails.cache",
+        "Thread.current"
+      ],
+      "sync_mechanisms": [
+        "Mutex.new",
+        "with_lock",
+        "ActiveRecord::Base.transaction",
+        "Redis.current.setnx"
+      ],
+      "toctou_ops": [
+        "File.exist?",
+        "File.readable?",
+        "File.writable?"
+      ],
+      "db_ops": [
+        "lock!",
+        "with_lock",
+        "transaction"
+      ]
+    },
+    "generic": {
+      "shared_state": [
+        "global_state",
+        "shared_resource",
+        "counter",
+        "balance",
+        "quota",
+        "singleton"
+      ],
+      "sync_mechanisms": [
+        "lock",
+        "mutex",
+        "semaphore",
+        "transaction",
+        "atomic",
+        "distributed_lock",
+        "optimistic_lock",
+        "pessimistic_lock"
+      ]
+    }
+  },
+  "anti_patterns": {
+    "description": "以下模式匹配到时应立即报警——它们代表并发竞态中的高风险反模式",
+    "non_atomic_read_modify_write": {
+      "description": "读取-修改-写入操作不是原子的，存在覆盖更新风险",
+      "java": ["getStock\\(\\)\\s*-\\s*qty.*setStock", "getBalance\\(\\)\\s*-.*setBalance", "\\.findById.*\\.get\\w+.*\\.save\\("],
+      "python": ["\\.balance\\s*-.*\\.save\\(\\)", "\\.stock\\s*-.*\\.save\\(\\)", "obj\\.\\w+\\s*-=.*obj\\.save"],
+      "php": ["->balance\\s*-.*->save\\(\\)", "->stock\\s*-.*->save\\(\\)"],
+      "go": ["\\.Stock\\s*-.*db\\.Save", "\\.Balance\\s*-.*db\\.Updates"],
+      "javascript": ["\\.balance\\s*-.*\\.save\\(\\)", "\\.stock\\s*-.*\\.save\\(\\)"],
+      "dotnet": ["\\.Balance\\s*-.*SaveChanges", "\\.Stock\\s*-.*Update"],
+      "ruby": ["\\.balance\\s*-.*\\.save", "\\.stock\\s*-.*\\.save"]
+    },
+    "check_then_act_without_lock": {
+      "description": "先检查后操作（TOCTOU）模式，中间无锁保护",
+      "java": ["if.*getBalance.*>=.*\\n.*setBalance", "if.*getStock.*>=.*\\n.*setStock", "File\\.exists.*\\n.*open\\("],
+      "python": ["if.*\\.balance.*>=.*:\\n.*save", "if.*os\\.path\\.exists.*:\\n.*open\\("],
+      "php": ["if.*file_exists.*\\{.*fopen", "if.*->balance.*>.*->save"],
+      "go": ["if.*\\.Stock.*>=.*\\{.*\\.Stock\\s*=", "if.*os\\.Stat.*\\{.*os\\.Create"],
+      "javascript": ["if.*fs\\.existsSync.*\\{.*fs\\.writeFileSync"],
+      "generic": ["if.*exists.*then.*write", "check.*then.*act.*without.*lock"]
+    },
+    "application_level_compute_then_save": {
+      "description": "在应用层计算新值后全量覆盖保存（而非使用数据库原子操作）",
+      "java": ["int\\s+newVal.*=.*getVal.*[+-].*setVal.*newVal.*save", "BigDecimal.*getBalance.*subtract.*setBalance"],
+      "python": ["new_balance.*=.*\\.balance.*[+-].*\\.balance\\s*=\\s*new_balance.*save"],
+      "php": ["\\$new.*=.*->balance.*[+-].*->balance\\s*=\\s*\\$new.*->save"],
+      "go": ["newStock.*:=.*\\.Stock.*-.*\\.Stock\\s*=\\s*newStock.*Save"],
+      "generic": ["new_val.*=.*current.*[+-].*set.*new_val.*save"]
+    },
+    "local_lock_in_distributed_env": {
+      "description": "在分布式/多实例环境中仅使用本地锁（如 JVM 内锁），无法跨进程生效",
+      "java": ["synchronized.*\\{.*db\\.", "ReentrantLock.*lock\\(\\).*repository\\."],
+      "python": ["threading\\.Lock.*\\n.*db\\.", "with\\s+lock.*\\n.*\\.save"],
+      "go": ["mu\\.Lock.*\\n.*db\\."],
+      "generic": ["local.*lock.*distributed.*resource", "jvm.*lock.*shared.*database"],
+      "indicators": ["docker-compose.*replicas", "kubernetes.*Deployment.*replicas.*[2-9]", "load_balancer", "horizontal_scaling"]
+    },
+    "missing_idempotency": {
+      "description": "关键操作（如支付、领取、投票）缺少幂等性保护",
+      "java": ["deductBalance(?!.*idempotent)(?!.*unique)(?!.*deduplicate)", "claimCoupon(?!.*claimed)(?!.*used)"],
+      "python": ["deduct_balance(?!.*idempotent)", "claim_reward(?!.*already_claimed)"],
+      "generic": ["transfer(?!.*idempotency_key)", "vote(?!.*unique_constraint)", "claim(?!.*once)"]
+    }
+  },
+  "control_detection_patterns": {
+    "description": "引擎用正则自动检测安全控制是否已存在。匹配到 = 有防护，不报漏洞",
+    "atomic_database_ops": {
+      "description": "是否使用了数据库原子更新语句",
+      "java": ["SET.*=.*\\w+\\s*-\\s*\\?", "stock\\s*=\\s*stock\\s*-\\s*:qty", "balance\\s*=\\s*balance\\s*-\\s*:amount", "UPDATE.*WHERE.*>=\\s*:qty"],
+      "python": ["F\\(.*[+-]", "update\\(.*F\\(", "stock.*=.*F\\('stock'\\)\\s*-"],
+      "php": ["lockForUpdate", "DB::raw\\(.*-\\s*\\d"],
+      "go": ["SET.*stock\\s*=\\s*stock\\s*-\\s*\\$", "FOR UPDATE"],
+      "javascript": ["sequelize\\.literal\\(.*-\\s*", "knex\\.raw\\(.*-\\s*"],
+      "dotnet": ["SET.*=.*\\w+\\s*-\\s*@", "UPDLOCK.*ROWLOCK"],
+      "ruby": ["lock!", "with_lock", "decrement!"],
+      "generic": ["atomic.*update", "SET.*=.*column\\s*[+-]"]
+    },
+    "pessimistic_or_optimistic_lock": {
+      "description": "是否使用了悲观锁或乐观锁",
+      "java": ["@Lock.*PESSIMISTIC", "@Version", "FOR UPDATE", "PESSIMISTIC_WRITE"],
+      "python": ["select_for_update", "transaction\\.atomic"],
+      "php": ["lockForUpdate", "sharedLock"],
+      "go": ["FOR UPDATE", "tx\\.Exec.*WHERE.*version"],
+      "javascript": ["FOR UPDATE", "transaction.*isolation"],
+      "dotnet": ["UPDLOCK", "ROWLOCK", "\\[Timestamp\\]", "\\[ConcurrencyCheck\\]"],
+      "ruby": ["lock!", "with_lock", "lock_version"],
+      "generic": ["pessimistic.*lock", "optimistic.*lock", "version.*check"]
+    },
+    "distributed_lock": {
+      "description": "是否使用了分布式锁保护共享资源",
+      "java": ["RedissonClient", "getLock", "tryLock", "RedisLock", "ZookeeperLock"],
+      "python": ["redis\\.lock", "RedisLock", "etcd.*lock"],
+      "php": ["Cache::lock", "Redis::setnx"],
+      "go": ["redis\\.SetNX", "etcd.*Lock", "consul.*Lock"],
+      "javascript": ["redis.*SETNX", "redlock", "redis-lock"],
+      "dotnet": ["Redis.*Lock", "StackExchange.*Lock"],
+      "ruby": ["Redis.*setnx", "Redlock"],
+      "generic": ["distributed.*lock", "redis.*lock", "etcd.*lock", "zookeeper.*lock"]
+    },
+    "idempotency_protection": {
+      "description": "是否实施了幂等性保护机制",
+      "java": ["Idempotent", "idempotency_key", "deduplication", "unique.*constraint", "@Idempotent"],
+      "python": ["idempotency_key", "unique_together", "IntegrityError"],
+      "php": ["idempotency_key", "unique.*index", "ON DUPLICATE KEY"],
+      "go": ["IdempotencyKey", "ON CONFLICT", "unique.*constraint"],
+      "javascript": ["idempotency_key", "unique.*constraint", "ON CONFLICT"],
+      "generic": ["idempotent", "deduplication", "unique_constraint", "once_token"]
+    }
+  },
+  "reasoning_workflow": [
+    "Step 0: 【识别共享资源与并发入口】定位涉及资金、库存、积分、限量凭证扣减的端点，或涉及文件系统检查与操作的函数。",
+    "Step 1: 【分析状态读取与修改（Check-then-Act）】检查是否存在「先读取状态（如余额是否充足/文件是否存在），再进行修改或操作」的逻辑序列。",
+    "Step 2: 【评估同步机制（代码层）】验证在 Check 和 Act 之间，是否使用了适当的并发控制原语（如 synchronized、ReentrantLock、Atomic 类、分布式锁）。",
+    "Step 3: 【评估同步机制（数据层）】若依赖数据库，检查是否使用了事务（@Transactional）、悲观锁（FOR UPDATE）或原子更新语句（UPDATE ... SET stock = stock - 1 WHERE stock > 0），排除在应用层计算后直接 save() 的覆盖更新。",
+    "Step 4: 【识别 TOCTOU 漏洞】针对文件操作，检查 os.access() 或 File.exists() 与后续的 open() 之间是否存在时间窗口，是否可能被符号链接（Symlink）攻击利用。",
+    "Step 5: 【评估分布式环境风险】在微服务或多实例部署下，检查本地锁（如 JVM 锁）是否失效，是否缺乏 Redis/Zookeeper 等分布式锁保护。",
+    "Step 6: 【评估幂等性保护】检查关键操作（如支付扣款、优惠券领取、投票）是否设计了幂等性机制（如唯一约束、防重 Token、Idempotency Key），防止并发重复提交。",
+    "Step 7: 【检查乐观锁有效性】若使用了乐观锁（如 @Version），确认版本号检查与更新是否在同一原子操作内完成，且冲突时有正确的重试或拒绝策略。",
+    "Step 8: 【六项确认标准】缺一不得 confirmed"
+  ],
+  "knowledge_injection": {
+    "few_shot_examples": [
+      {
+        "language": "java",
+        "code_snippet": "public void deductStock(Long itemId, int qty) {\n    Item item = itemRepo.findById(itemId);\n    if (item.getStock() >= qty) {\n        item.setStock(item.getStock() - qty);\n        itemRepo.save(item);\n    }\n}",
+        "vulnerability_analysis": "存在典型的竞态条件（库存超卖）。在并发请求下，多个线程可能同时读取到相同的 `item.getStock()`，通过检查后各自计算新库存并 `save()`，导致后写入的覆盖先写入的，最终库存扣减数量少于实际售出数量。",
+        "fix_pattern": "使用数据库原子更新：`@Modifying @Query('UPDATE Item i SET i.stock = i.stock - :qty WHERE i.id = :id AND i.stock >= :qty')`；或使用悲观锁 `@Lock(LockModeType.PESSIMISTIC_WRITE)`。"
+      },
+      {
+        "language": "python",
+        "code_snippet": "if (os.access(filepath, os.W_OK)):\n    with open(filepath, 'w') as f:\n        f.write(data)",
+        "vulnerability_analysis": "存在 TOCTOU（Time-of-Check to Time-of-Use）漏洞。在 `os.access` 检查权限和 `open` 打开文件之间存在时间窗口。攻击者可利用符号链接（Symlink）替换该文件，诱使高权限进程覆盖系统敏感文件。",
+        "fix_pattern": "遵循 EAFP 原则（Easier to Ask for Forgiveness than Permission），直接尝试以安全模式打开文件并捕获异常；或使用底层原子标志 `os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL)`。"
+      },
+      {
+        "language": "java",
+        "code_snippet": "@Transactional\npublic void transfer(Long fromId, Long toId, BigDecimal amount) {\n    Account from = accountRepo.findById(fromId);\n    Account to = accountRepo.findById(toId);\n    if (from.getBalance().compareTo(amount) >= 0) {\n        from.setBalance(from.getBalance().subtract(amount));\n        to.setBalance(to.getBalance().add(amount));\n        accountRepo.save(from);\n        accountRepo.save(to);\n    }\n}",
+        "vulnerability_analysis": "虽然有 @Transactional 注解，但余额检查和扣减在应用层完成。在 READ_COMMITTED 隔离级别下，两个并发转账请求可能同时读到相同余额并通过检查，导致余额透支（双花问题）。@Transactional 仅提供事务边界，不自动解决并发读-改-写冲突。",
+        "fix_pattern": "使用悲观锁：`@Lock(PESSIMISTIC_WRITE) Account findById(Long id)` 或 `SELECT ... FOR UPDATE`；或使用原子更新：`UPDATE account SET balance = balance - ? WHERE id = ? AND balance >= ?`。"
+      },
+      {
+        "language": "go",
+        "code_snippet": "func (s *OrderService) PlaceOrder(ctx context.Context, itemID string, qty int) error {\n    item, _ := s.db.GetItem(ctx, itemID)\n    if item.Stock >= qty {\n        item.Stock -= qty\n        s.db.SaveItem(ctx, item)\n        s.db.CreateOrder(ctx, &Order{ItemID: itemID, Qty: qty})\n    }\n    return nil\n}",
+        "vulnerability_analysis": "Go 服务中的库存竞态条件。在高并发场景下，多个 goroutine 同时读取 item.Stock 并通过检查，各自计算新库存后 SaveItem 覆盖写入，导致超卖。本地无锁且未使用数据库原子操作。",
+        "fix_pattern": "使用数据库原子更新：`UPDATE items SET stock = stock - $1 WHERE id = $2 AND stock >= $1`；或使用行级锁 `SELECT stock FROM items WHERE id = $1 FOR UPDATE` 在事务内完成。"
+      },
+      {
+        "language": "javascript",
+        "code_snippet": "app.post('/api/coupon/claim', async (req, res) => {\n    const coupon = await Coupon.findOne({ code: req.body.code });\n    if (coupon && coupon.remaining > 0 && !coupon.claimedBy.includes(req.user.id)) {\n        coupon.remaining -= 1;\n        coupon.claimedBy.push(req.user.id);\n        await coupon.save();\n        res.json({ success: true });\n    }\n});",
+        "vulnerability_analysis": "优惠券领取接口存在竞态条件。并发请求可能同时读取到 coupon.remaining > 0 并通过检查，各自减 1 后 save()，导致优惠券被超额领取。claimedBy 数组检查同样可被竞态绕过。",
+        "fix_pattern": "使用 MongoDB 原子操作：`Coupon.findOneAndUpdate({ code, remaining: { $gt: 0 }, claimedBy: { $ne: userId } }, { $inc: { remaining: -1 }, $push: { claimedBy: userId } })`；或使用 Redis 分布式锁。"
+      },
+      {
+        "language": "dotnet",
+        "code_snippet": "[HttpPost(\"withdraw\")]\npublic async Task<IActionResult> Withdraw(decimal amount)\n{\n    var account = await _context.Accounts.FindAsync(userId);\n    if (account.Balance >= amount)\n    {\n        account.Balance -= amount;\n        await _context.SaveChangesAsync();\n    }\n    return Ok();\n}",
+        "vulnerability_analysis": ".NET 中的余额竞态条件。在高并发下，多个请求可能同时通过 FindAsync 读取到相同余额，通过检查后各自减去金额并 SaveChanges，导致余额透支。EF Core 的 ChangeTracker 不会自动检测并发冲突（除非配置了乐观锁）。",
+        "fix_pattern": "使用乐观锁：在 Account 实体上添加 [Timestamp] 属性，EF Core 会自动在 UPDATE 时加入 WHERE 版本号检查；或使用原子 SQL：`UPDATE Accounts SET Balance = Balance - @amount WHERE Id = @id AND Balance >= @amount`。"
+      }
+    ],
+    "mitigation_rules": [
+      "使用数据库层面的原子操作或悲观锁/乐观锁处理并发状态变更，严禁在应用层读取、计算后再全量覆盖更新。",
+      "代码层使用线程安全的原子变量或互斥锁保护临界区。",
+      "分布式/多实例环境下必须使用分布式锁（如 Redisson, Zookeeper），本地锁无法跨进程生效。",
+      "文件操作避免 Check-then-Act，直接尝试操作并捕获异常（EAFP 原则），或使用安全的临时文件创建 API。",
+      "关键业务操作（支付、领取、投票）必须设计幂等性机制：唯一约束（Unique Constraint）、防重 Token 或 Idempotency Key。",
+      "乐观锁（如 @Version）需配合正确的重试策略或冲突拒绝机制，避免静默丢失更新。",
+      "在高并发场景下，考虑使用消息队列（如 Kafka、RabbitMQ）串行化处理关键操作，避免直接并发竞争。"
+    ],
+    "refutation_checklist": [
+      "数据库更新是否使用了原子 SQL（如 UPDATE account SET balance = balance - ? WHERE id = ? AND balance >= ?）？",
+      "是否使用了 ORM 提供的乐观锁机制（如 JPA 的 @Version 字段、EF Core 的 [Timestamp]）？",
+      "文件操作是否使用了 O_CREAT | O_EXCL 等原子标志，或安全的临时文件 API（如 mkstemp）？",
+      "业务逻辑是否设计为幂等性（Idempotency），并通过唯一约束（Unique Constraint）或防重 Token 杜绝了并发重复提交？",
+      "分布式环境下是否使用了分布式锁（如 Redisson、etcd、Zookeeper）而非仅依赖本地锁？",
+      "悲观锁（SELECT ... FOR UPDATE）是否覆盖了所有并发修改路径，且事务范围最小化？",
+      "是否使用了消息队列串行化处理关键操作，从根本上避免了并发竞争？",
+      "乐观锁冲突时是否有重试或拒绝策略，而非静默丢失更新？"
+    ]
+  },
+  "tool_calls": [
+    {
+      "name": "identify_shared_resources",
+      "desc": "识别跨请求或跨线程共享的状态变量、数据库记录或文件系统路径。"
+    },
+    {
+      "name": "trace_check_then_act",
+      "desc": "追踪「条件检查「与「状态修改「之间的代码执行路径，寻找未受保护的时间窗口。"
+    },
+    {
+      "name": "analyze_synchronization_primitives",
+      "desc": "检查临界区是否被正确的锁机制（本地锁、分布式锁、数据库事务）保护。"
+    },
+    {
+      "name": "verify_atomic_database_ops",
+      "desc": "分析数据库更新语句，确认是否为原子操作或使用了行级锁（FOR UPDATE）。"
+    },
+    {
+      "name": "detect_toctou_file_ops",
+      "desc": "检查文件系统中 stat/access 与 open/read/write 之间是否存在竞态窗口。"
+    },
+    {
+      "name": "check_distributed_lock",
+      "desc": "在微服务/多实例部署环境中，验证是否使用了分布式锁替代本地锁。"
+    },
+    {
+      "name": "evaluate_idempotency",
+      "desc": "检查关键操作是否实现了幂等性保护（如唯一约束、防重 Token、Idempotency Key）。"
+    }
+  ],
+  "sanitizers": [
+    "状态更新通过数据库原子 SQL（如 SET val = val - 1）或带版本号的乐观锁（@Version/[Timestamp]）完成",
+    "使用了数据库事务并配合 SELECT ... FOR UPDATE 悲观锁",
+    "临界区被正确的并发原语保护（如 Java synchronized/ReentrantLock，Python threading.Lock），且在分布式环境下使用了分布式锁",
+    "文件操作遵循 EAFP 原则（直接操作并捕获异常），或使用 O_EXCL 等原子创建标志，避免了 Check-then-Act",
+    "业务逻辑设计为幂等性（Idempotency），并通过唯一约束（Unique Constraint）或防重 Token 杜绝了并发重复提交",
+    "使用了消息队列（如 Kafka、RabbitMQ）对关键操作进行串行化处理",
+    "乐观锁冲突配置了重试策略或明确的拒绝机制（如 OptimisticLockException 处理）"
+  ],
+  "output_schema": {
+    "vulnerability_confirmed": "boolean",
+    "confidence": "float (0-1)",
+    "cwe_mapping": "CWE-362",
+    "race_condition_type": "enum['check_then_act', 'non_atomic_update', 'toctou_file', 'singleton_init', 'distributed_race', 'missing_idempotency']",
+    "shared_resource": "string (如 'account_balance', 'inventory_count', 'coupon_remaining', 'temp_file')",
+    "missing_sync_mechanism": "string (指出缺失的同步机制，如 '缺少数据库行级锁' 或 '缺少分布式锁' 或 '缺少幂等性保护')",
+    "concurrency_context": "enum['single_jvm', 'multi_instance', 'distributed_microservice']",
+    "lock_scope": "enum['none', 'local_only', 'distributed', 'database_level']",
+    "reasoning_trace": "string",
+    "business_impact": "string",
+    "risk_level": "HIGH",
+    "remediation": "string"
+  }
+}

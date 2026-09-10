@@ -1,0 +1,59 @@
+# Java Source 定义（污点源入口点）
+# 标记用户可控数据的入口，用于污点分析
+
+# HTTP 请求参数
+http_parameters:
+  annotations:
+    - "@RequestParam"
+    - "@PathVariable"
+    - "@RequestBody"
+    - "@RequestHeader"
+    - "@CookieValue"
+    - "@MatrixVariable"
+    - "@ModelAttribute"
+  servlet_api:
+    - "request.getParameter"
+    - "request.getParameterValues"
+    - "request.getParameterMap"
+    - "request.getHeader"
+    - "request.getCookies"
+    - "request.getInputStream"
+    - "request.getReader"
+    - "request.getQueryString"
+
+# JAX-RS 参数
+jaxrs_parameters:
+  annotations:
+    - "@QueryParam"
+    - "@PathParam"
+    - "@HeaderParam"
+    - "@CookieParam"
+    - "@FormParam"
+    - "@MatrixParam"
+    - "@BeanParam"
+
+# 文件上传入口
+file_upload:
+  patterns:
+    - "MultipartFile"
+    - "CommonsMultipartFile"
+    - "Part"
+    - "getInputStream"
+    - "getOriginalFilename"
+
+# 消息队列 / 事件入口
+async_sources:
+  patterns:
+    - "@RabbitListener"
+    - "@KafkaListener"
+    - "@JmsListener"
+    - "@EventListener"
+    - "onMessage"
+
+# 定时任务（非用户输入但可能受配置影响）
+scheduled_sources:
+  patterns:
+    - "@Scheduled"
+    - "ScheduledExecutorService"
+    - "Timer"
+    - "TimerTask"

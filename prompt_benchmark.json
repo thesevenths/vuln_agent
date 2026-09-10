@@ -1,0 +1,333 @@
+{
+  "variants": {
+    "base": {
+      "status": "active",
+      "attempts": 64,
+      "success": 64
+    }
+  },
+  "pending": {},
+  "active_variant_id": "base",
+  "history": [
+    {
+      "ts": 1780577815,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1780749222,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781185335,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781270842,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781337628,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781344248,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781352738,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781356977,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781422110,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781529517,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781613479,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781682979,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781699949,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781750112,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781750237,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781765976,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781779187,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781789352,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781864041,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781876284,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781879523,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1781880609,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782045825,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782046274,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782046835,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782047857,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782048530,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782100436,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782110866,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782118385,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782130757,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782132985,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782136414,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782268576,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782268777,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782270762,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782270775,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782270786,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782271634,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782273278,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782281036,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782287551,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782290024,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782304791,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782469743,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782484324,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782621212,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782630448,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782648894,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782664466,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782686945,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782715409,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782721714,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782817739,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782873126,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1782993276,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783061790,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783310307,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783315370,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783328353,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783338513,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783422168,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783443195,
+      "variant_id": "base",
+      "ok": true
+    },
+    {
+      "ts": 1783489401,
+      "variant_id": "base",
+      "ok": true
+    }
+  ]
+}

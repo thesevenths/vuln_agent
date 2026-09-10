@@ -1,0 +1,26 @@
+# CWE-287 Skill 元数据
+# 从 templates/cwe/cwe_287.json 迁移
+
+skill_id: cwe_287_improper_authentication
+source_cwe: CWE-287
+priority: P0
+
+related_cwes:
+  - cwe: CWE-306
+    reason: missing_auth_for_critical_function - 认证不当与缺少认证常共现：认证机制存在缺陷等同于关键功能无认证
+  - cwe: CWE-384
+    reason: session_fixation - 会话固定是 CWE-287 的典型攻击向量：登录后未重新生成 Session ID
+  - cwe: CWE-613
+    reason: insufficient_session_expiration - 会话过期不足使认证令牌长期有效，放大认证缺陷窗口
+  - cwe: CWE-640
+    reason: weak_password_reset - 弱密码重置机制（可预测 token、无过期）是认证不当的补充攻击面
+  - cwe: CWE-798
+    reason: hardcoded_credentials - 硬编码凭据直接导致认证可被绕过
+  - cwe: CWE-307
+    reason: brute_force_gap - 缺少登录频率限制使暴力破解成为可能，是 CWE-287 的高频利用路径
+  - cwe: CWE-521
+    reason: weak_password_requirements - 弱密码策略（无复杂度/长度要求）降低认证强度
+  - cwe: CWE-862
+    reason: missing_authorization - 认证缺陷常与授权缺失组合：未认证即可访问需鉴权资源
+
+description: 认证入口点和凭据管理端点是 CWE-287 的核心攻击面，必须逐一验证认证逻辑完整性

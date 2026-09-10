@@ -1,0 +1,101 @@
+# Pipeline: expert_cpp_memory_leak
+# C/C++ 内存泄漏专家分析
+
+skill_id: expert_cpp_memory_leak
+name: C/C++ 内存泄漏专家分析
+summary: 定向扫描 memory_leak → 追溯 alloc-free 路径 → 检查所有 return 路径 → 反证 → 收口
+min_score_to_activate: 0.2
+start_node_id: set_context
+trigger_keywords:
+  - memory_leak
+  - 内存泄漏
+  - memory leak
+  - CWE-401
+  - malloc no free
+  - alloc without free
+  - 资源泄漏
+completion_hints:
+  - 必须检查所有 return/goto 路径是否都有对应 free
+  - 必须排除 RAII、cleanup 函数、全局生命周期等误报
+  - 报告中须标注泄漏发生在哪个路径（error path / normal path / 全部）
+
+nodes:
+  - node_id: set_context
+    tool_name: set_context
+    success_next: targeted_scan
+    expert_guidance:
+      analysis_focus: 准备内存泄漏分析上下文
+      expert_rules:
+        - 内存泄漏判定核心：malloc/calloc/realloc 的返回值在所有退出路径上是否都有对应 free
+        - error path 泄漏比 normal path 泄漏更常见但也更难发现
+
+  - node_id: targeted_scan
+    tool_name: JoernTool.run_targeted_scan
+    arguments:
+      vuln_types: [cpp_memory_leak]
+    success_next: trace_alloc_free_paths
+    failure_next: trace_alloc_free_paths
+    expert_guidance:
+      analysis_focus: 扫描内存泄漏相关查询
+      expert_rules:
+        - cpp_memory_leak 查找分配后方法体内无 free 调用的模式
+        - 这只是启发式初筛，需人工复核是否在其他函数中释放
+
+  - node_id: trace_alloc_free_paths
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*.c'
+      limit: 30
+    success_next: check_all_return_paths
+    failure_next: check_all_return_paths
+    expert_guidance:
+      analysis_focus: 追溯 alloc 返回值在函数内和跨函数的生命周期
+      required_evidence:
+        - 分配点代码（malloc 返回值赋给哪个变量）
+        - 函数内所有 return/goto 路径
+        - 返回值是否通过 return 传递给调用方（由调用方释放）
+      expert_rules:
+        - 精读分配点所在函数的完整方法体
+        - 标记每一个 return 语句，检查之前是否有 free
+        - 若返回值通过 return 传出，检查调用方是否释放
+
+  - node_id: check_all_return_paths
+    tool_name: null
+    success_next: verify
+    failure_next: verify
+    parallel_actions:
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/*.h'
+          limit: 20
+      - tool_name: FileTool.glob_files
+        arguments:
+          pattern: '**/CMakeLists.txt'
+          limit: 5
+    expert_guidance:
+      analysis_focus: 检查所有退出路径是否都有 free
+      refutation_checklist:
+        - 每个 return 前是否都有 free(ptr)
+        - goto cleanup 路径中是否做了 free
+        - 是否通过 _cleanup_ 属性或 RAII 自动释放
+        - 指针是否存入全局/结构体由其他函数统一释放
+        - 是否为一次性初始化（进程生命周期内不释放是设计意图）
+      false_positive_patterns:
+        - 返回值由调用方负责释放（API 设计如此）
+        - 分配后存入结构体，由专用 destroy/free 函数统一释放
+        - 'C++ RAII / std::unique_ptr 管理'
+        - 进程级一次性初始化（main 中 malloc 后不 free 是常见实践）
+        - 使用 GC 或内存池管理
+
+  - node_id: verify
+    tool_name: FileTool.write_report
+    arguments:
+      subdir: source_scan
+    completion_signal: expert_analysis_done
+    expert_guidance:
+      analysis_focus: 综合判定内存泄漏是否成立
+      expert_rules:
+        - 判定为真实泄漏须满足：(1) 有分配 (2) 至少一条路径无 free (3) 非设计意图
+        - 区分 error path 泄漏（严重）vs 初始化泄漏（通常低风险）
+        - 若仅在极端 error path 泄漏（如 OOM），风险等级可适当降低
+

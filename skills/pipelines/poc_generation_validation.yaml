@@ -1,0 +1,32 @@
+# Pipeline: poc_generation_validation
+# POC生成与验证
+
+skill_id: poc_generation_validation
+name: POC生成与验证
+summary: 补齐上下文证据并生成可交付报告
+min_score_to_activate: 0.2
+start_node_id: read_context
+trigger_keywords:
+  - poc
+  - 复现
+  - 验证
+  - exploit
+  - 利用方法
+  - payload
+completion_hints:
+  - 判定为✅是时必须包含可执行 PoC 要素
+  - 判定为❌否时需给反证与阻断说明
+
+nodes:
+  - node_id: read_context
+    tool_name: FileTool.glob_files
+    arguments:
+      pattern: '**/*'
+      limit: 5
+    success_next: write_report
+    failure_next: write_report
+
+  - node_id: write_report
+    tool_name: FileTool.write_report
+    completion_signal: report_written
+

@@ -1,0 +1,70 @@
+# CWE-362 检测模式
+
+ast_patterns:
+  - 'FunctionDef[name=~/(transfer|withdraw|deduct|consume|claim|checkout|process|exchange|redeem|vote|like)/i]'
+  - 'Call[name=~/(exists|isFile|canRead|access|stat|isWritable|is_readable|file_exists)/i]'
+  - 'BinOp[op=~/(Assign|SubAssign|AddAssign)/i]'
+
+semantic_keywords:
+  - balance
+  - inventory
+  - stock
+  - lock
+  - synchronized
+  - mutex
+  - atomic
+  - transaction
+  - race condition
+  - TOCTOU
+  - concurrent
+  - idempotent
+  - double_spend
+  - oversell
+
+file_context:
+  - payment_service
+  - inventory_manager
+  - order_processor
+  - file_handler
+  - account_service
+  - coupon_service
+  - reward_service
+  - ticket_service
+  - queue_consumer
+
+sensitive_operations:
+  - deduct_balance
+  - deduct_stock
+  - claim_coupon
+  - transfer_funds
+  - vote_or_like
+  - checkout_order
+  - file_check_then_write
+  - idempotent_request
+
+logic_query_keywords_generic:
+  shared_state:
+    - global_state
+    - shared_resource
+    - counter
+    - balance
+    - quota
+    - singleton
+  sync_mechanisms:
+    - lock
+    - mutex
+    - semaphore
+    - transaction
+    - atomic
+    - distributed_lock
+    - optimistic_lock
+    - pessimistic_lock
+
+sanitizers:
+  - '状态更新通过数据库原子 SQL（如 SET val = val - 1）或带版本号的乐观锁（@Version/[Timestamp]）完成'
+  - 使用了数据库事务并配合 SELECT ... FOR UPDATE 悲观锁
+  - 临界区被正确的并发原语保护（如 Java synchronized/ReentrantLock，Python threading.Lock），且在分布式环境下使用了分布式锁
+  - 文件操作遵循 EAFP 原则（直接操作并捕获异常），或使用 O_EXCL 等原子创建标志，避免了 Check-then-Act
+  - 业务逻辑设计为幂等性（Idempotency），并通过唯一约束（Unique Constraint）或防重 Token 杜绝了并发重复提交
+  - 使用了消息队列（如 Kafka、RabbitMQ）对关键操作进行串行化处理
+  - 乐观锁冲突配置了重试策略或明确的拒绝机制（如 OptimisticLockException 处理）

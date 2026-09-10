@@ -1,0 +1,38 @@
+# CWE-307 分析推理流程
+
+reasoning_workflow:
+  - 'Step 0: 【识别认证入口】定位处理登录、Token颁发、密码重置等身份验证的端点或函数。'
+  - 'Step 0b: 【网关与WAF联动】检查前置 API Gateway、WAF 或 IdP 是否已全局接管并配置了防暴力破解策略，若已接管则应用层可能无需重复实现。'
+  - 'Step 1: 【检查速率限制(Rate Limiting)】检查认证入口是否配置了基于 IP、设备指纹或用户维度的请求频率限制（如 Redis 计数器、网关限流、注解）。'
+  - 'Step 2: 【检查账户锁定机制(Account Lockout)】验证连续失败后是否触发账户暂时或永久锁定（如 failed_login_count >= max_attempts）。'
+  - 'Step 3: 【检查挑战机制(CAPTCHA/MFA)】在多次失败后或高风险环境下，是否动态要求验证码或多因素认证。'
+  - 'Step 4: 【评估状态持久化与绕过风险】检查限流/锁定状态是否存储在服务端可信存储（如 Redis），是否可通过修改 Header (X-Forwarded-For) 或清除 Cookie 轻易绕过。'
+  - 'Step 5: 【确认响应一致性】检查认证失败时的响应是否区分了“用户名不存在”和“密码错误”（防范 CWE-203 用户名枚举）。'
+  - 'Step 6: 【六项确认标准】缺一不得 confirmed'
+
+knowledge_injection:
+  few_shot_examples:
+    - code_snippet: 'public boolean login(String user, String pwd) { User u = db.find(user); return u != null && u.getPassword().equals(hash(pwd)); }'
+      vulnerability_analysis: 登录接口直接比对密码，未限制尝试次数，未引入验证码或账户锁定机制，极易受到自动化字典爆破和撞库攻击。
+      fix_pattern: 引入 Redis 记录 IP/User 失败次数，超过5次锁定15分钟；或在网关层配置 limit_req；连续失败3次后强制返回 CAPTCHA 挑战。
+    - code_snippet: 'if (session.getAttribute("fail_count") == null) session.setAttribute("fail_count", 0); ... if(fail_count > 5) return error;'
+      vulnerability_analysis: 将失败计数存储在客户端可控的 Session 或未持久化的内存中，攻击者可通过清除 Cookie/Session 或开启隐身模式轻易重置计数器，锁定机制形同虚设。
+      fix_pattern: 将失败计数和锁定状态存储在可信的服务端存储（如 Redis/DB）中，并与用户名或设备指纹强绑定，设置合理的 TTL。
+  mitigation_rules:
+    - 实施基于 IP 和用户名的双重速率限制（Rate Limiting）。
+    - 配置账户锁定策略（如连续 5 次失败锁定 15-30 分钟，或引入指数退避延迟）。
+    - 在多次失败后强制要求 CAPTCHA 或 MFA 挑战。
+    - 确保限流和锁定状态存储在服务端防篡改存储（如 Redis）中，禁止依赖客户端状态。
+    - 统一认证失败响应，避免用户名枚举（结合 CWE-203）。
+
+output_schema:
+  vulnerability_confirmed: boolean
+  confidence: float (0-1)
+  cwe_mapping: CWE-307
+  auth_endpoint_type: 'enum[''login'', ''password_reset'', ''token_refresh'', ''mfa_verify'', ''api_key_auth'']'
+  missing_mechanism: 'array — 缺失的防护机制 (如 [''rate_limit'', ''account_lockout'', ''captcha''])'
+  state_storage_flaw: 'string (若存在状态存储缺陷，如''失败计数存储在客户端 Cookie 中'')'
+  reasoning_trace: string
+  business_impact: string
+  risk_level: HIGH
+  remediation: string
